@@ -1,5 +1,20 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(gh pr create*)",
+            "command": "echo \"[pre-pr-docs] Before submitting this PR, confirm documentation is up to date: (1) Technical decisions -> docs/adrs/<slug>.md  (2) Feature specs / spec changes -> docs/specs/<slug>.md  (3) System operations (scripts, infra, env setup) -> docs/runbooks/<slug>.md\"",
+            "shell": "powershell",
+            "async": false,
+            "statusMessage": "Checking documentation requirements..."
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",
@@ -11,6 +26,45 @@
             "shell": "powershell",
             "async": true,
             "statusMessage": "Syncing productivity after PR..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(gh pr create*)",
+            "command": "claude /pr-review-toolkit:review-pr all",
+            "shell": "powershell",
+            "async": true,
+            "statusMessage": "Running comprehensive PR review..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[docs-check] If this edit changes public API, component props, or env vars - run /engineering:documentation\"",
+            "shell": "powershell",
+            "async": false
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "claude /productivity:update",
+            "shell": "powershell",
+            "async": true,
+            "statusMessage": "Syncing productivity at end of session..."
+          },
+          {
+            "type": "command",
+            "command": "claude --print /simplify",
+            "shell": "powershell",
+            "async": true,
+            "statusMessage": "Running /simplify code quality review..."
           }
         ]
       }
