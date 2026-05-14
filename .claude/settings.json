@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(gh pr create*)",
+            "command": "claude /productivity:update",
+            "shell": "powershell",
+            "async": true,
+            "statusMessage": "Syncing productivity after PR..."
+          }
+        ]
+      }
+    ]
+  }
+}
