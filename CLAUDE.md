@@ -77,6 +77,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 
 | Hook | Event | Trigger | Action | Async |
 |------|-------|---------|--------|-------|
+| Productivity start | SessionStart (project) | New session (`startup`) | `claude /productivity:start` | yes |
 | /simplify | Stop (project) | End of session turn | `claude --print /simplify` | yes |
 | Pre-PR docs gate | PreToolUse (project) | `gh pr create` | echo docs checklist | no |
 | PR review | PostToolUse (project) | `gh pr create` | `/pr-review-toolkit:review-pr all` | yes |
