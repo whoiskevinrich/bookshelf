@@ -100,6 +100,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | CI/CD | GitHub Actions — `cdk synth` on PR; deploy on semver tag | Fast feedback on infra changes; versioned artifacts for rollback | 2026-05-14 |
 | Package manager | pnpm workspaces monorepo | `apps/api`, `apps/mcp`, `apps/web`, `packages/infra` as separate packages | 2026-05-14 |
 | ADR | `docs/adrs/001-tech-stack.md` | Full decision record with options considered and cost analysis | 2026-05-14 |
+| Shelf API shape | Paginated inline book metadata (`GET /v1/shelf`) | MCP tools need full data in one call; cursor pagination maps to DynamoDB `LastEvaluatedKey` | 2026-05-15 |
 
 ## Memory and Documentation Files
 
