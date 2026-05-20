@@ -3,11 +3,6 @@
 ## Active
 
 ### Phase 1 — Workspace + Infra scaffold
-- [ ] Init pnpm workspace root (`pnpm-workspace.yaml`, root `package.json`, `tsconfig.base.json`)
-- [ ] Scaffold `packages/infra` CDK app
-- [ ] Write `AuthStack` — Cognito User Pool + App Client
-- [ ] Write `ApiStack` — DynamoDB single table + Lambda placeholder + API Gateway HTTP API
-- [ ] Write `WebStack` — S3 bucket + CloudFront distribution + OAC
 - [ ] `cdk deploy --all` to dev environment; confirm all resources in AWS console
 
 ## Backlog
@@ -76,3 +71,8 @@
 - [x] Run `/engineering:architecture` to decide tech stack and deployment target — see `docs/adrs/001-tech-stack.md`
 - [x] Write feature spec — core shelf — see `docs/specs/core-shelf.md`
 - [x] Add ADR-002: shelf API response shape (paginated inline metadata) — see `docs/adrs/002-shelf-api-response-shape.md`
+- [x] Init pnpm workspace root (`pnpm-workspace.yaml`, root `package.json`, `tsconfig.base.json`)
+- [x] Scaffold `packages/infra` CDK app (cdk.json, bin/bookshelf.ts, vitest config, CDK deps)
+- [x] Write `AuthStack` — Cognito User Pool + App Client + SSM params (19/19 CDK tests passing)
+- [x] Write `ApiStack` — DynamoDB single table + Lambda placeholder + API Gateway HTTP API + SSM params
+- [x] Write `WebStack` — S3 bucket + CloudFront distribution + OAC + versioned-prefix routing + SSM params
