@@ -3,3 +3,19 @@ notes
 
 # Claude Code worktrees (ephemeral, managed by Claude Code)
 .claude/worktrees/
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+cdk.out/
+
+# Environment — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db

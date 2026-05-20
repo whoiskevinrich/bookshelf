@@ -58,6 +58,20 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "claude /productivity:start",
+            "shell": "powershell",
+            "async": true,
+            "statusMessage": "Starting productivity system..."
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

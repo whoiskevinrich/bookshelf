@@ -1,0 +1,29 @@
+{
+  "name": "@bookshelf/infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint bin && eslint lib",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy --all --require-approval never"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.255.0",
+    "constructs": "^10.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.0",
+    "@types/source-map-support": "^0.5.10",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "aws-cdk": "^2.1123.0",
+    "eslint": "^10.4.0",
+    "typescript": "^6.0.3",
+    "vitest": "^2.0.0"
+  }
+}

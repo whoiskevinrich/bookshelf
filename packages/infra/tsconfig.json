@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "cdk.out/.ts",
+    // CDK types use optional properties that can be undefined, which is
+    // incompatible with exactOptionalPropertyTypes: true in the base config.
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["bin", "lib", "test"]
+}

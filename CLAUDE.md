@@ -77,6 +77,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 
 | Hook | Event | Trigger | Action | Async |
 |------|-------|---------|--------|-------|
+| Productivity start | SessionStart (project) | New session (`startup`) | `claude /productivity:start` | yes |
 | /simplify | Stop (project) | End of session turn | `claude --print /simplify` | yes |
 | Pre-PR docs gate | PreToolUse (project) | `gh pr create` | echo docs checklist | no |
 | PR review | PostToolUse (project) | `gh pr create` | `/pr-review-toolkit:review-pr all` | yes |
@@ -91,8 +92,15 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 
 | Decision | Choice | Rationale | Date |
 |----------|--------|-----------|------|
-| Tech stack | TBD | Run /engineering:architecture | — |
-| Deployment | TBD | Run /engineering:architecture | — |
+| Frontend | React SPA (Vite) → S3 + CloudFront | Auth-gated app; no SSR needed; API stays fully standalone for MCP | 2026-05-14 |
+| Backend API | Hono on Lambda + API Gateway HTTP API | Lightweight TS framework; CDK-native; co-deploys with infra | 2026-05-14 |
+| Database | DynamoDB on-demand | Permanent free tier; scales to zero; access patterns fit single-table design | 2026-05-14 |
+| Auth | Amazon Cognito User Pools | AWS-native; 10k MAU free; JWKS JWT works across Lambda + MCP without coordination | 2026-05-14 |
+| Deployment | AWS CDK (3 stacks: Auth, API, Web) | Full transparency; no Amplify abstraction; showcases CDK | 2026-05-14 |
+| CI/CD | GitHub Actions — `cdk synth` on PR; deploy on semver tag | Fast feedback on infra changes; versioned artifacts for rollback | 2026-05-14 |
+| Package manager | pnpm workspaces monorepo | `apps/api`, `apps/mcp`, `apps/web`, `packages/infra` as separate packages | 2026-05-14 |
+| ADR | `docs/adrs/001-tech-stack.md` | Full decision record with options considered and cost analysis | 2026-05-14 |
+| Shelf API shape | Paginated inline book metadata (`GET /v1/shelf`) | MCP tools need full data in one call; cursor pagination maps to DynamoDB `LastEvaluatedKey` | 2026-05-15 |
 
 ## Memory and Documentation Files
 
