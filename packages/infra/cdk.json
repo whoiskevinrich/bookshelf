@@ -1,5 +1,5 @@
 {
-  "app": "npx ts-node --prefer-ts-exts bin/bookshelf.ts",
+  "app": "npx tsx bin/bookshelf.ts",
   "watch": {
     "include": ["**"],
     "exclude": [
