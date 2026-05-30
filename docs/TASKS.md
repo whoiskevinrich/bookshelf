@@ -2,9 +2,6 @@
 
 ## Active
 
-### Phase 1 — Workspace + Infra scaffold
-- [ ] `cdk deploy --all` to dev environment; confirm all resources in AWS console
-
 ## Backlog
 
 ### Phase 2 — API (primary deliverable)
@@ -60,7 +57,6 @@
 - [ ] Write E2E tests (Playwright): sign-up → search → add → view shelf → move → remove
 
 ### Phase 5 — CI/CD
-- [ ] Write `docs/runbooks/rollback.md` — per-layer rollback procedures (Lambda, CloudFront/S3, promote.yml by version tag)
 - [ ] Configure GitHub Actions variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION` (no long-lived keys — OIDC)
 
 ## Done
@@ -80,3 +76,5 @@
 - [x] Write `.github/workflows/promote.yml` — `workflow_dispatch` promotion to prod by version tag
 - [x] Write `.github/workflows/version-bump.yml` — `workflow_dispatch` patch/minor/major bump; opens PR
 - [x] Write `docs/runbooks/cicd-setup.md` — OIDC roles, GitHub variables, branch protection, troubleshooting
+- [x] Write `docs/runbooks/rollback.md` — Lambda alias swap, CloudFront origin path, DynamoDB PITR, decision tree
+- [x] `cdk deploy --all` to dev environment
