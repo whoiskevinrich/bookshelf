@@ -60,10 +60,13 @@
 - [ ] Write E2E tests (Playwright): sign-up → search → add → view shelf → move → remove
 
 ### Phase 5 — CI/CD
-- [ ] Write `.github/workflows/ci.yml` — lint + type-check + tests + `cdk synth` on PR
-- [ ] Write `.github/workflows/deploy.yml` — semver-tagged deploy to all three CDK stacks
-- [ ] Write `docs/runbooks/rollback.md` — per-layer rollback procedures (Lambda, CloudFront/S3)
-- [ ] Configure GitHub Actions secrets (AWS credentials, Cognito IDs, Google Books API key)
+- [ ] Write `.github/workflows/ci.yml` — lint, format, unit tests, CDK synth, unique version gate (parallel jobs)
+- [ ] Write `.github/workflows/deploy.yml` — auto-deploy to dev sandbox on merge to main; git tag `v{version}` on success
+- [ ] Write `.github/workflows/promote.yml` — `workflow_dispatch` promotion from sandbox to prod (checkout tag → CDK deploy prod)
+- [ ] Write `.github/workflows/version-bump.yml` — `workflow_dispatch` bump type (patch/minor/major); opens PR against main
+- [ ] Write `docs/runbooks/cicd-setup.md` — IAM role policies for dev + prod OIDC roles, branch protection config, GitHub Actions variable setup (`AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION`)
+- [ ] Write `docs/runbooks/rollback.md` — per-layer rollback procedures (Lambda, CloudFront/S3, promote.yml by version tag)
+- [ ] Configure GitHub Actions variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION` (no long-lived keys — OIDC)
 
 ## Done
 
