@@ -13,7 +13,9 @@
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
     "deploy:infra": "pnpm --filter @bookshelf/infra run deploy",
-    "synth": "pnpm --filter ./packages/infra/** run synth"
+    "synth": "pnpm --filter ./packages/infra/** run synth",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

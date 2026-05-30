@@ -1,0 +1,66 @@
+name: Version Bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump-type:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Bump ${{ inputs.bump-type }} version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use a PAT so the resulting PR triggers CI checks.
+          # Falls back to GITHUB_TOKEN if PAT is not set (checks will not run).
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump version (no git tag — tag is created post-deploy)
+        run: |
+          npm version ${{ inputs.bump-type }} --no-git-tag-version
+          NEW_VERSION=$(jq -r .version package.json)
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+
+      - name: Commit and push branch
+        run: |
+          BRANCH="chore/bump-version-v${{ env.NEW_VERSION }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add package.json
+          git commit -m "chore: bump version to v${{ env.NEW_VERSION }}"
+          git push origin "$BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+        run: |
+          gh pr create \
+            --title "chore: bump version to v${{ env.NEW_VERSION }}" \
+            --body "Automated version bump (${{ inputs.bump-type }}) to \`v${{ env.NEW_VERSION }}\`.
+
+          This PR was created by the **Version Bump** workflow. The unique-version gate in CI will verify the new version is not already tagged before allowing merge." \
+            --base main \
+            --head "${{ env.BRANCH }}"
