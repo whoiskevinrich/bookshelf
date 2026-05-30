@@ -60,11 +60,6 @@
 - [ ] Write E2E tests (Playwright): sign-up → search → add → view shelf → move → remove
 
 ### Phase 5 — CI/CD
-- [x] Write `.github/workflows/ci.yml` — lint, format, unit tests, CDK synth, unique version gate (parallel jobs)
-- [x] Write `.github/workflows/deploy.yml` — auto-deploy to dev sandbox on merge to main; git tag `v{version}` on success
-- [x] Write `.github/workflows/promote.yml` — `workflow_dispatch` promotion from sandbox to prod (checkout tag → CDK deploy prod)
-- [x] Write `.github/workflows/version-bump.yml` — `workflow_dispatch` bump type (patch/minor/major); opens PR against main
-- [x] Write `docs/runbooks/cicd-setup.md` — IAM role policies for dev + prod OIDC roles, branch protection config, GitHub Actions variable setup (`AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION`)
 - [ ] Write `docs/runbooks/rollback.md` — per-layer rollback procedures (Lambda, CloudFront/S3, promote.yml by version tag)
 - [ ] Configure GitHub Actions variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION` (no long-lived keys — OIDC)
 
@@ -79,3 +74,9 @@
 - [x] Write `AuthStack` — Cognito User Pool + App Client + SSM params (19/19 CDK tests passing)
 - [x] Write `ApiStack` — DynamoDB single table + Lambda placeholder + API Gateway HTTP API + SSM params
 - [x] Write `WebStack` — S3 bucket + CloudFront distribution + OAC + versioned-prefix routing + SSM params
+- [x] Write CI/CD pipeline spec — see `docs/specs/cicd-pipeline.md`
+- [x] Write `.github/workflows/ci.yml` — lint, format, unit tests, CDK synth, unique version gate
+- [x] Write `.github/workflows/deploy.yml` — auto-deploy to dev on merge to main; git tag on success
+- [x] Write `.github/workflows/promote.yml` — `workflow_dispatch` promotion to prod by version tag
+- [x] Write `.github/workflows/version-bump.yml` — `workflow_dispatch` patch/minor/major bump; opens PR
+- [x] Write `docs/runbooks/cicd-setup.md` — OIDC roles, GitHub variables, branch protection, troubleshooting
