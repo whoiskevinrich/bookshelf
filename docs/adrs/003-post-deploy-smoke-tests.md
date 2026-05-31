@@ -36,12 +36,12 @@ version before marking the job as failed.
 Runs via `pnpm --filter @bookshelf/api run test:smoke` with `API_BASE_URL` set
 to the live API Gateway endpoint. Covers:
 
-| Suite | Assertions |
-|---|---|
-| Health | `GET /health` → 200 `{ status: "ok" }` |
+| Suite                   | Assertions                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| Health                  | `GET /health` → 200 `{ status: "ok" }`                                                                  |
 | Books (unauthenticated) | Search returns results; missing `q` → 400; ISBN lookup → 200/404 with correct shape; invalid ISBN → 400 |
-| Shelf (auth gate) | GET/POST/PATCH/DELETE all return 401 without a token; malformed token → 401 |
-| 404 handling | Unknown route → 404 |
+| Shelf (auth gate)       | GET/POST/PATCH/DELETE all return 401 without a token; malformed token → 401                             |
+| 404 handling            | Unknown route → 404                                                                                     |
 
 The suite is excluded from the regular `vitest run` (unit test job) via
 `vitest.config.ts` — it only runs when `API_BASE_URL` is set, which the deploy
@@ -74,6 +74,7 @@ is visible in CI. The broken version never receives a tag.
 ## Consequences
 
 **Good:**
+
 - The "Deploy to dev; smoke-test all endpoints" task is fully automated and
   gates every merge to main.
 - A broken deploy self-heals without manual intervention; dev is always left in
@@ -82,6 +83,7 @@ is visible in CI. The broken version never receives a tag.
   smoke-tested", not just "deployed".
 
 **Trade-offs:**
+
 - A failed deploy takes longer to complete (rollback CDK deploy adds ~2–3 min).
 - The smoke suite covers auth-gate shape and basic connectivity only — it does
   not perform full CRUD with real Cognito tokens. Authenticated-path regressions
