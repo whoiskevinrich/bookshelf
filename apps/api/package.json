@@ -8,6 +8,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
+    "test:smoke": "vitest run test/smoke",
     "test:coverage": "vitest run --coverage",
     "dev": "tsx watch src/index.ts"
   },

@@ -44,6 +44,20 @@ jobs:
       - name: CDK deploy all stacks
         run: pnpm deploy:infra
 
+      - name: Resolve API URL from SSM
+        id: api-url
+        run: |
+          URL=$(aws ssm get-parameter \
+            --name "/bookshelf/api/url" \
+            --query "Parameter.Value" \
+            --output text)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke tests
+        env:
+          API_BASE_URL: ${{ steps.api-url.outputs.url }}
+        run: pnpm --filter @bookshelf/api run test:smoke
+
       - name: Tag deployed version
         run: |
           VERSION=$(jq -r .version package.json)
