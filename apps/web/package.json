@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "kill-port 3000 || true",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -26,6 +27,7 @@
     "@vitejs/plugin-react": "^4.5.2",
     "@vitest/coverage-v8": "^4.1.7",
     "jsdom": "^26.1.0",
+    "kill-port": "^2.0.1",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
     "vite": "^6.3.5",
