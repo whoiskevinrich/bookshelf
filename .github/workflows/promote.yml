@@ -1,0 +1,67 @@
+name: Promote to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to promote (e.g. 1.2.3) — must exist as a git tag v{version}"
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false # never cancel an in-flight deploy
+
+permissions:
+  contents: read
+  id-token: write # OIDC for AWS
+
+jobs:
+  promote:
+    name: CDK Deploy → prod
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Validate version tag exists
+        run: |
+          TAG="v${{ inputs.version }}"
+          echo "Promoting version: $TAG"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+
+      - name: Confirm promotion target
+        run: |
+          ACTUAL=$(jq -r .version package.json)
+          echo "=================================================="
+          echo "  Promoting version : $ACTUAL"
+          echo "  Target environment: prod"
+          echo "=================================================="
+          if [ "$ACTUAL" != "${{ inputs.version }}" ]; then
+            echo "::error::package.json version ($ACTUAL) does not match input (${{ inputs.version }})"
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: CDK deploy all stacks to prod
+        run: pnpm deploy:infra
+        env:
+          BOOKSHELF_ENV: prod

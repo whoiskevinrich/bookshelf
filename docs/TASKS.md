@@ -2,12 +2,10 @@
 
 ## Active
 
-### Phase 1 — Workspace + Infra scaffold
-- [ ] `cdk deploy --all` to dev environment; confirm all resources in AWS console
-
 ## Backlog
 
 ### Phase 2 — API (primary deliverable)
+
 - [ ] Scaffold `apps/api` (pnpm init, Hono, AWS Lambda adapter, esbuild)
 - [ ] Implement `lib/books/types.ts` — `BookProvider` + `BookSearchResult` interfaces
 - [ ] Implement `lib/books/providers/google-books.ts`
@@ -32,6 +30,7 @@
 - [ ] Write integration tests against DynamoDB Local
 
 ### Phase 3 — MCP server
+
 - [ ] Write MCP spec (`docs/specs/mcp-server.md`) before starting
 - [ ] Scaffold `apps/mcp` (`@modelcontextprotocol/sdk`)
 - [ ] Implement `lib/api-client.ts` — typed wrapper for all `/v1/` endpoints (handles pagination)
@@ -41,6 +40,7 @@
 - [ ] Write unit tests for all tools
 
 ### Phase 4 — Web UI
+
 - [ ] Scaffold `apps/web` (`pnpm create vite web --template react-ts`)
 - [ ] Install Tailwind v4 + shadcn/ui + aws-amplify
 - [ ] Implement `lib/auth.ts` — Cognito sign-up / sign-in / sign-out via Amplify Auth
@@ -60,10 +60,8 @@
 - [ ] Write E2E tests (Playwright): sign-up → search → add → view shelf → move → remove
 
 ### Phase 5 — CI/CD
-- [ ] Write `.github/workflows/ci.yml` — lint + type-check + tests + `cdk synth` on PR
-- [ ] Write `.github/workflows/deploy.yml` — semver-tagged deploy to all three CDK stacks
-- [ ] Write `docs/runbooks/rollback.md` — per-layer rollback procedures (Lambda, CloudFront/S3)
-- [ ] Configure GitHub Actions secrets (AWS credentials, Cognito IDs, Google Books API key)
+
+- [ ] Configure GitHub Actions variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION` (no long-lived keys — OIDC)
 
 ## Done
 
@@ -76,3 +74,11 @@
 - [x] Write `AuthStack` — Cognito User Pool + App Client + SSM params (19/19 CDK tests passing)
 - [x] Write `ApiStack` — DynamoDB single table + Lambda placeholder + API Gateway HTTP API + SSM params
 - [x] Write `WebStack` — S3 bucket + CloudFront distribution + OAC + versioned-prefix routing + SSM params
+- [x] Write CI/CD pipeline spec — see `docs/specs/cicd-pipeline.md`
+- [x] Write `.github/workflows/ci.yml` — lint, format, unit tests, CDK synth, unique version gate
+- [x] Write `.github/workflows/deploy.yml` — auto-deploy to dev on merge to main; git tag on success
+- [x] Write `.github/workflows/promote.yml` — `workflow_dispatch` promotion to prod by version tag
+- [x] Write `.github/workflows/version-bump.yml` — `workflow_dispatch` patch/minor/major bump; opens PR
+- [x] Write `docs/runbooks/cicd-setup.md` — OIDC roles, GitHub variables, branch protection, troubleshooting
+- [x] Write `docs/runbooks/rollback.md` — Lambda alias swap, CloudFront origin path, DynamoDB PITR, decision tree
+- [x] `cdk deploy --all` to dev environment

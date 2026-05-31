@@ -16,6 +16,7 @@ Book identifiers (ISBN/ASIN) must come from user input, external API lookups, or
 Exception: test fixtures are allowed. If this is test data, ignore this warning.
 
 For production code, drive book data through:
+
 1. User input forms (validated before use)
 2. External API responses (Open Library, Google Books, etc.)
 3. Database reads

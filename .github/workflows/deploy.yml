@@ -1,0 +1,52 @@
+name: Deploy to Sandbox
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false # never cancel an in-flight deploy
+
+permissions:
+  contents: write # push git tag
+  id-token: write # OIDC for AWS
+
+jobs:
+  deploy:
+    name: CDK Deploy → dev
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: CDK deploy all stacks
+        run: pnpm deploy:infra
+
+      - name: Tag deployed version
+        run: |
+          VERSION=$(jq -r .version package.json)
+          TAG="v$VERSION"
+          echo "Tagging commit as $TAG"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"

@@ -2,6 +2,7 @@
   "name": "bookshelf",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=20",
     "pnpm": ">=10"
@@ -13,9 +14,12 @@
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
     "deploy:infra": "pnpm --filter @bookshelf/infra run deploy",
-    "synth": "pnpm --filter ./packages/infra/** run synth"
+    "synth": "pnpm --filter ./packages/infra/** run synth",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "jiti": "^2.4.2",
     "@eslint/js": "^10.0.1",
     "@eslint/json": "^2.0.0",
     "@eslint/markdown": "^8.0.2",
