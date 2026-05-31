@@ -147,7 +147,14 @@ shelfRouter.patch("/:isbn", async (c) => {
   }
 
   try {
-    await updateShelfStatus(userId, isbn, existing.status, newStatus, existing.addedAt, existing.notes);
+    await updateShelfStatus(
+      userId,
+      isbn,
+      existing.status,
+      newStatus,
+      existing.addedAt,
+      existing.notes,
+    );
   } catch (err) {
     console.error("Shelf update error:", err);
     return c.json({ error: "Failed to update book status" }, 500);

@@ -90,14 +90,14 @@ curl -X POST "$API_URL/v1/shelf" \
 
 Set in `ApiStack` at deploy time. Lambda reads these at runtime.
 
-| Variable                | Required | Default        | Notes                                     |
-| ----------------------- | -------- | -------------- | ----------------------------------------- |
-| `DYNAMODB_TABLE_NAME`   | Yes      | `bookshelf`    | Set automatically by CDK                  |
-| `COGNITO_USER_POOL_ID`  | Yes      | —              | Set automatically by CDK from `AuthStack` |
-| `COGNITO_CLIENT_ID`     | Yes      | —              | Set automatically by CDK from `AuthStack` |
-| `COGNITO_ISSUER`        | Yes      | —              | Set automatically by CDK from `AuthStack` |
-| `GOOGLE_BOOKS_API_KEY`  | No       | `""` (no key)  | Inject from GitHub Actions secret         |
-| `BOOK_PROVIDER`         | No       | `google-books` | Switch provider without code change       |
+| Variable               | Required | Default        | Notes                                     |
+| ---------------------- | -------- | -------------- | ----------------------------------------- |
+| `DYNAMODB_TABLE_NAME`  | Yes      | `bookshelf`    | Set automatically by CDK                  |
+| `COGNITO_USER_POOL_ID` | Yes      | —              | Set automatically by CDK from `AuthStack` |
+| `COGNITO_CLIENT_ID`    | Yes      | —              | Set automatically by CDK from `AuthStack` |
+| `COGNITO_ISSUER`       | Yes      | —              | Set automatically by CDK from `AuthStack` |
+| `GOOGLE_BOOKS_API_KEY` | No       | `""` (no key)  | Inject from GitHub Actions secret         |
+| `BOOK_PROVIDER`        | No       | `google-books` | Switch provider without code change       |
 
 `GOOGLE_BOOKS_API_KEY` is not set by CDK — inject it at deploy time:
 

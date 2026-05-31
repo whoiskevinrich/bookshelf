@@ -102,15 +102,11 @@ function shelfItem(
 
 // ── Cursor helpers ─────────────────────────────────────────────────────────
 
-export function encodeCursor(
-  key: Record<string, NativeAttributeValue>,
-): string {
+export function encodeCursor(key: Record<string, NativeAttributeValue>): string {
   return Buffer.from(JSON.stringify(key)).toString("base64url");
 }
 
-export function decodeCursor(
-  cursor: string,
-): Record<string, NativeAttributeValue> {
+export function decodeCursor(cursor: string): Record<string, NativeAttributeValue> {
   return JSON.parse(Buffer.from(cursor, "base64url").toString()) as Record<
     string,
     NativeAttributeValue
@@ -132,9 +128,7 @@ export interface QueryShelfResult {
   total: number;
 }
 
-export async function queryShelf(
-  opts: QueryShelfOptions,
-): Promise<QueryShelfResult> {
+export async function queryShelf(opts: QueryShelfOptions): Promise<QueryShelfResult> {
   const limit = Math.min(opts.limit ?? 20, 100);
   const skPrefix = opts.status ? `SHELF#${opts.status}#` : "SHELF#";
   const baseQuery = {
@@ -162,7 +156,7 @@ export async function queryShelf(
   const entries = items.map(toShelfEntry);
 
   // Fetch book metadata in a single BatchGetItem
-  let bookMap: Record<string, BookMetadata> = {};
+  const bookMap: Record<string, BookMetadata> = {};
   if (entries.length > 0) {
     const keys = entries.map((e) => ({ PK: bookPk(e.isbn), SK: BOOK_SK }));
     const batchResult = await dynamo.send(
@@ -175,17 +169,12 @@ export async function queryShelf(
 
   return {
     entries: entries.map((e) => ({ ...e, book: bookMap[e.isbn] ?? null })),
-    nextCursor: queryResult.LastEvaluatedKey
-      ? encodeCursor(queryResult.LastEvaluatedKey)
-      : null,
+    nextCursor: queryResult.LastEvaluatedKey ? encodeCursor(queryResult.LastEvaluatedKey) : null,
     total: countResult.Count ?? 0,
   };
 }
 
-export async function getShelfEntry(
-  userId: string,
-  isbn: string,
-): Promise<ShelfEntry | null> {
+export async function getShelfEntry(userId: string, isbn: string): Promise<ShelfEntry | null> {
   // Both status keys are probed in parallel — we don't know which prefix applies
   const [r1, r2] = await Promise.all(
     (["owned", "want"] as ShelfStatus[]).map((status) =>

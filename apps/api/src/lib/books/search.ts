@@ -6,16 +6,12 @@ export async function searchBooks(query: string): Promise<BookSearchResult[]> {
   return provider.search(query);
 }
 
-export async function getBookByIsbn(
-  isbn: string,
-): Promise<BookSearchResult | null> {
+export async function getBookByIsbn(isbn: string): Promise<BookSearchResult | null> {
   const provider = getActiveProvider();
   return provider.getByIsbn(isbn);
 }
 
-export async function getBookByAsin(
-  asin: string,
-): Promise<BookSearchResult | null> {
+export async function getBookByAsin(asin: string): Promise<BookSearchResult | null> {
   const provider = getActiveProvider();
   return provider.getByAsin(asin);
 }
