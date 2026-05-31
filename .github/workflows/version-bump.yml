@@ -18,19 +18,19 @@ jobs:
     name: Bump ${{ inputs.bump-type }} version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Use a PAT so the resulting PR triggers CI checks.
           # Falls back to GITHUB_TOKEN if PAT is not set (checks will not run).
           token: ${{ secrets.GH_PAT || github.token }}
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
