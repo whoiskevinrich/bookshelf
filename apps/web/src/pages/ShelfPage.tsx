@@ -1,6 +1,12 @@
 import { useState, useMemo } from "react";
 import { AppHeader } from "../components/AppHeader";
-import { useShelf, useAddToShelf, useMoveShelfEntry, useRemoveFromShelf, flattenShelf } from "../hooks/useShelf";
+import {
+  useShelf,
+  useAddToShelf,
+  useMoveShelfEntry,
+  useRemoveFromShelf,
+  flattenShelf,
+} from "../hooks/useShelf";
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
 import { BookSearch } from "../components/BookSearch";
 import type { ShelfEntry, ShelfStatus } from "../lib/api-client";
@@ -13,7 +19,13 @@ interface ShelfSectionProps {
   removeMutation: ReturnType<typeof useRemoveFromShelf>;
 }
 
-function ShelfSection({ title, entries, emptyMessage, moveMutation, removeMutation }: ShelfSectionProps) {
+function ShelfSection({
+  title,
+  entries,
+  emptyMessage,
+  moveMutation,
+  removeMutation,
+}: ShelfSectionProps) {
   return (
     <section>
       <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">

@@ -56,9 +56,7 @@ export function useMoveShelfEntry() {
           ...old,
           pages: old.pages.map((page) => ({
             ...page,
-            entries: page.entries.map((e) =>
-              e.isbn === isbn ? { ...e, status } : e,
-            ),
+            entries: page.entries.map((e) => (e.isbn === isbn ? { ...e, status } : e)),
           })),
         };
       });

@@ -21,17 +21,16 @@ export function WishlistPage() {
         <h1 className="text-2xl font-bold mb-8">Wishlist</h1>
 
         {isLoading && <p className="text-sm text-gray-400">Loading wishlist…</p>}
-        {isError && <p className="text-sm text-red-500">Failed to load wishlist. Please refresh.</p>}
+        {isError && (
+          <p className="text-sm text-red-500">Failed to load wishlist. Please refresh.</p>
+        )}
 
         {!isLoading && !isError && (
           <>
             {want.length === 0 ? (
               <div className="text-center py-16">
                 <p className="text-gray-400 mb-4">Your wishlist is empty.</p>
-                <Link
-                  to="/shelf"
-                  className="text-sm text-gray-900 underline underline-offset-2"
-                >
+                <Link to="/shelf" className="text-sm text-gray-900 underline underline-offset-2">
                   Go to your shelf to add books
                 </Link>
               </div>

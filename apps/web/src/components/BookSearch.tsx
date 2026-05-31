@@ -68,7 +68,10 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
 
       <div className="space-y-3">
         {results.map((book) => (
-          <div key={book.isbn} className="flex gap-3 items-start border border-gray-100 rounded-lg p-3">
+          <div
+            key={book.isbn}
+            className="flex gap-3 items-start border border-gray-100 rounded-lg p-3"
+          >
             <BookCover
               coverUrl={book.coverUrl}
               title={book.title}
@@ -79,9 +82,7 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
               {book.authors.length > 0 && (
                 <p className="text-xs text-gray-500">{book.authors.join(", ")}</p>
               )}
-              {book.publishedYear && (
-                <p className="text-xs text-gray-400">{book.publishedYear}</p>
-              )}
+              {book.publishedYear && <p className="text-xs text-gray-400">{book.publishedYear}</p>}
             </div>
             <div className="flex flex-col gap-1.5 flex-shrink-0">
               <button

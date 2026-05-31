@@ -9,7 +9,13 @@ interface ShelfBookCardProps {
   isRemoving?: boolean;
 }
 
-export function ShelfBookCard({ entry, onMove, onRemove, isMoving, isRemoving }: ShelfBookCardProps) {
+export function ShelfBookCard({
+  entry,
+  onMove,
+  onRemove,
+  isMoving,
+  isRemoving,
+}: ShelfBookCardProps) {
   const { isbn, status, book } = entry;
   const title = book?.title ?? isbn;
   const authors = book?.authors ?? [];

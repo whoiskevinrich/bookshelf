@@ -97,9 +97,7 @@ export function DemoShelf() {
   return (
     <div className="space-y-8">
       <section>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">
-          Owned
-        </h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4">Owned</h3>
         <BookGrid books={OWNED} />
       </section>
       <section>
