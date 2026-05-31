@@ -50,13 +50,7 @@ export class ApiStack extends cdk.Stack {
       functionName: "bookshelf-api",
       runtime: lambda.Runtime.NODEJS_22_X,
       handler: "index.handler",
-      code: lambda.Code.fromInline(
-        `exports.handler = async (event) => ({
-          statusCode: 200,
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ status: 'Phase 1 placeholder — API not yet implemented' }),
-        });`,
-      ),
+      code: lambda.Code.fromAsset("../../apps/api/dist"),
       timeout: cdk.Duration.seconds(29), // API GW max is 30s
       memorySize: 256,
       environment: {
