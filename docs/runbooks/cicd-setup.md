@@ -97,18 +97,27 @@ Note the ARN of each role (`arn:aws:iam::ACCOUNT_ID:role/bookshelf-github-action
 
 Set at the repository level (not secrets — these are not sensitive):
 
-```bash
-REPO="YOUR_GITHUB_ORG/YOUR_REPO_NAME"
+Variables are **environment-scoped** — set them per environment so the same name (`AWS_ROLE_ARN`) resolves to the correct role automatically.
 
-gh variable set AWS_REGION          --body "us-east-1"             --repo "$REPO"
-gh variable set AWS_ROLE_ARN_DEV    --body "arn:aws:iam::DEV_ACCOUNT_ID:role/bookshelf-github-actions-dev"   --repo "$REPO"
-gh variable set AWS_ROLE_ARN_PROD   --body "arn:aws:iam::PROD_ACCOUNT_ID:role/bookshelf-github-actions-prod" --repo "$REPO"
+```bash
+REPO="whoiskevinrich/bookshelf"
+
+# Dev environment
+gh variable set AWS_REGION    --body "us-west-2"                                              --repo "$REPO" -e dev
+gh variable set AWS_ROLE_ARN  --body "arn:aws:iam::DEV_ACCOUNT_ID:role/bookshelf-github-actions-dev"   --repo "$REPO" -e dev
+gh variable set AWS_ACCOUNT   --body "DEV_ACCOUNT_ID"                                         --repo "$REPO" -e dev
+
+# Prod environment (add when prod account is ready)
+gh variable set AWS_REGION    --body "us-west-2"                                              --repo "$REPO" -e prod
+gh variable set AWS_ROLE_ARN  --body "arn:aws:iam::PROD_ACCOUNT_ID:role/bookshelf-github-actions-prod" --repo "$REPO" -e prod
+gh variable set AWS_ACCOUNT   --body "PROD_ACCOUNT_ID"                                        --repo "$REPO" -e prod
 ```
 
 Verify:
 
 ```bash
-gh variable list --repo "$REPO"
+gh variable list --repo "$REPO" -e dev
+gh variable list --repo "$REPO" -e prod
 ```
 
 ---
