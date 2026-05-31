@@ -4,29 +4,10 @@
 
 ## Backlog
 
-### Phase 2 — API (primary deliverable)
+### Phase 2 — API (remaining)
 
-- [ ] Scaffold `apps/api` (pnpm init, Hono, AWS Lambda adapter, esbuild)
-- [ ] Implement `lib/books/types.ts` — `BookProvider` + `BookSearchResult` interfaces
-- [ ] Implement `lib/books/providers/google-books.ts`
-- [ ] Implement `lib/books/providers/index.ts` — registry + `getActiveProvider()`
-- [ ] Implement `lib/books/search.ts` — `searchBooks()`, `getBookByIsbn()`, `getBookByAsin()`
 - [ ] Validate demo shelf ISBNs against Google Books API (confirm all 10 have cover images)
-- [ ] Implement `lib/dynamo.ts` — DynamoDB DocumentClient + shelf CRUD helpers
-- [ ] Implement `middleware/auth.ts` — Cognito JWKS JWT verification
-- [ ] Implement `GET /v1/books/search` route — proxy to active book provider
-- [ ] Implement `GET /v1/shelf` route — paginated inline book metadata (see ADR-002)
-  - Cursor-based pagination via DynamoDB `LastEvaluatedKey`
-  - `BatchGetItem` for book metadata per page
-  - Optional `?status=owned|want` filter
-  - Default page size 20, max 100
-- [ ] Implement `POST /v1/shelf` route — add book; 409 on duplicate
-- [ ] Implement `PATCH /v1/shelf/{isbn}` route — update status (owned ↔ want)
-- [ ] Implement `DELETE /v1/shelf/{isbn}` route — remove entry
-- [ ] Add Lambda function to `ApiStack`; deploy; smoke-test all endpoints with curl
-- [ ] Write unit tests for route handlers (mocked DynamoDB + auth)
-- [ ] Write unit tests for book provider adapter (mocked HTTP)
-- [ ] Write unit tests for JWT middleware
+- [ ] Deploy to dev; smoke-test all endpoints with curl
 - [ ] Write integration tests against DynamoDB Local
 
 ### Phase 3 — MCP server
@@ -82,3 +63,19 @@
 - [x] Write `docs/runbooks/cicd-setup.md` — OIDC roles, GitHub variables, branch protection, troubleshooting
 - [x] Write `docs/runbooks/rollback.md` — Lambda alias swap, CloudFront origin path, DynamoDB PITR, decision tree
 - [x] `cdk deploy --all` to dev environment
+- [x] Scaffold `apps/api` (pnpm init, Hono, AWS Lambda adapter, esbuild)
+- [x] Implement `lib/books/types.ts` — `BookProvider` + `BookSearchResult` interfaces
+- [x] Implement `lib/books/providers/google-books.ts`
+- [x] Implement `lib/books/providers/index.ts` — registry + `getActiveProvider()`
+- [x] Implement `lib/books/search.ts` — `searchBooks()`, `getBookByIsbn()`, `getBookByAsin()`
+- [x] Implement `lib/dynamo.ts` — DynamoDB DocumentClient + shelf CRUD helpers
+- [x] Implement `middleware/auth.ts` — Cognito JWKS JWT verification
+- [x] Implement `GET /v1/books/search` route — proxy to active book provider
+- [x] Implement `GET /v1/shelf` route — paginated inline book metadata (see ADR-002)
+- [x] Implement `POST /v1/shelf` route — add book; 409 on duplicate
+- [x] Implement `PATCH /v1/shelf/{isbn}` route — update status (owned ↔ want)
+- [x] Implement `DELETE /v1/shelf/{isbn}` route — remove entry
+- [x] Update `ApiStack` Lambda to use built asset (`apps/api/dist`)
+- [x] Write unit tests for route handlers (mocked DynamoDB + auth)
+- [x] Write unit tests for book provider adapter (mocked HTTP)
+- [x] Write unit tests for JWT middleware

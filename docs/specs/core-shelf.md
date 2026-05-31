@@ -104,14 +104,14 @@ Book readers have no lightweight, personal tool for tracking which books they ow
 
 **API (consumed by UI and future MCP server)**
 
-- [ ] `GET /v1/shelf` — returns the authenticated user's shelf entries (all statuses).
-- [ ] `POST /v1/shelf` — adds a book; body `{ isbn: string, status: "owned" | "want" }`.
-- [ ] `PATCH /v1/shelf/{isbn}` — updates status; body `{ status: "owned" | "want" }`.
-- [ ] `DELETE /v1/shelf/{isbn}` — removes the entry.
-- [ ] `GET /v1/books/search?q=` — searches the active book provider; returns `BookSearchResult[]`.
-- [ ] All endpoints except `GET /v1/books/search` require a valid Cognito JWT (`Authorization: Bearer`).
-- [ ] All shelf endpoints scope data to the authenticated user's Cognito sub; a user cannot read or modify another user's shelf.
-- [ ] `POST /v1/shelf` returns 409 if the (user, isbn) pair already exists.
+- [x] `GET /v1/shelf` — returns the authenticated user's shelf entries (all statuses).
+- [x] `POST /v1/shelf` — adds a book; body `{ isbn: string, status: "owned" | "want" }`.
+- [x] `PATCH /v1/shelf/{isbn}` — updates status; body `{ status: "owned" | "want" }`.
+- [x] `DELETE /v1/shelf/{isbn}` — removes the entry.
+- [x] `GET /v1/books/search?q=` — searches the active book provider; returns `BookSearchResult[]`.
+- [x] All endpoints except `GET /v1/books/search` require a valid Cognito JWT (`Authorization: Bearer`).
+- [x] All shelf endpoints scope data to the authenticated user's Cognito sub; a user cannot read or modify another user's shelf.
+- [x] `POST /v1/shelf` returns 409 if the (user, isbn) pair already exists.
 
 ---
 
@@ -186,13 +186,13 @@ The demo shelf is hard-coded at build time — not stored in DynamoDB. These boo
 
 ## Open Questions
 
-| #   | Question                                                                                                                                                                                                   | Owner       | Blocking?                                                 |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------- |
-| 1   | Should the demo shelf cover images be fetched live from Google Books (simple) or pre-fetched and bundled as static assets (faster, no API key exposure)? Pre-fetched is recommended but adds a build step. | Engineering | Yes — affects build pipeline                              |
-| 2   | Does the demo CTA go to `/auth/signup` or `/auth/login` (with a signup link)?                                                                                                                              | Product     | No                                                        |
-| 3   | Should `GET /v1/shelf` include book metadata (title, authors, cover URL) inline, or return only ISBNs and require a separate book lookup? Inline is simpler for the UI and MCP.                            | Engineering | Yes — affects API contract                                |
-| 4   | What is the ISBN check digit validation approach? (Mod-10 for ISBN-10, Mod-11 for ISBN-13 — confirm library vs. hand-rolled)                                                                               | Engineering | No                                                        |
-| 5   | Is there a rate limit on the Google Books API free tier that could affect demo page load if covers are fetched live?                                                                                       | Engineering | Yes — if pre-fetching is chosen, when does the fetch run? |
+| #   | Question                                                                                                                                                                                                   | Owner       | Blocking?                                                 | Resolution                                                                                                              |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 1   | Should the demo shelf cover images be fetched live from Google Books (simple) or pre-fetched and bundled as static assets (faster, no API key exposure)? Pre-fetched is recommended but adds a build step. | Engineering | Yes — affects build pipeline                              | Open — pending Phase 4 web build                                                                                        |
+| 2   | Does the demo CTA go to `/auth/signup` or `/auth/login` (with a signup link)?                                                                                                                              | Product     | No                                                        | Open — decide during Phase 4                                                                                            |
+| 3   | Should `GET /v1/shelf` include book metadata (title, authors, cover URL) inline, or return only ISBNs and require a separate book lookup? Inline is simpler for the UI and MCP.                            | Engineering | Yes — affects API contract                                | **Resolved** — inline metadata with cursor pagination (ADR-002)                                                         |
+| 4   | What is the ISBN check digit validation approach? (Mod-10 for ISBN-10, Mod-11 for ISBN-13 — confirm library vs. hand-rolled)                                                                               | Engineering | No                                                        | **Resolved** — hand-rolled in `apps/api/src/lib/isbn.ts`; Mod-11 weight for ISBN-10, Mod-10 alternating 1/3 for ISBN-13 |
+| 5   | Is there a rate limit on the Google Books API free tier that could affect demo page load if covers are fetched live?                                                                                       | Engineering | Yes — if pre-fetching is chosen, when does the fetch run? | Open — revisit with Q1 during Phase 4                                                                                   |
 
 ---
 

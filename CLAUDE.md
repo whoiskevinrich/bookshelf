@@ -3,8 +3,8 @@
 ## About
 
 Solo developer. Web app for users to track books they own and want to read.
-Tech stack: TBD — run `/engineering:architecture` before first implementation.
-Deployment target: TBD (Vercel plugin is disabled until decided).
+Tech stack: Hono on Lambda + DynamoDB + Cognito + React SPA — see `docs/adrs/001-tech-stack.md`.
+Deployment target: AWS (CDK) — dev environment live; see `docs/runbooks/cicd-setup.md`.
 
 ## Mandatory Session Start
 
