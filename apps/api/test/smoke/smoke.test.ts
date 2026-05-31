@@ -28,7 +28,8 @@ async function request(
   });
 }
 
-const get = (path: string, headers?: Record<string, string>) => request("GET", path, undefined, headers);
+const get = (path: string, headers?: Record<string, string>) =>
+  request("GET", path, undefined, headers);
 const post = (path: string, body: unknown) => request("POST", path, body);
 const patch = (path: string, body: unknown) => request("PATCH", path, body);
 const del = (path: string) => request("DELETE", path);
