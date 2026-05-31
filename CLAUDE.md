@@ -100,17 +100,18 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 
 ## Architecture Decisions
 
-| Decision        | Choice                                                   | Rationale                                                                                   | Date       |
-| --------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------- |
-| Frontend        | React SPA (Vite) → S3 + CloudFront                       | Auth-gated app; no SSR needed; API stays fully standalone for MCP                           | 2026-05-14 |
-| Backend API     | Hono on Lambda + API Gateway HTTP API                    | Lightweight TS framework; CDK-native; co-deploys with infra                                 | 2026-05-14 |
-| Database        | DynamoDB on-demand                                       | Permanent free tier; scales to zero; access patterns fit single-table design                | 2026-05-14 |
-| Auth            | Amazon Cognito User Pools                                | AWS-native; 10k MAU free; JWKS JWT works across Lambda + MCP without coordination           | 2026-05-14 |
-| Deployment      | AWS CDK (3 stacks: Auth, API, Web)                       | Full transparency; no Amplify abstraction; showcases CDK                                    | 2026-05-14 |
-| CI/CD           | GitHub Actions — `cdk synth` on PR; deploy on semver tag | Fast feedback on infra changes; versioned artifacts for rollback                            | 2026-05-14 |
-| Package manager | pnpm workspaces monorepo                                 | `apps/api`, `apps/mcp`, `apps/web`, `packages/infra` as separate packages                   | 2026-05-14 |
-| ADR             | `docs/adrs/001-tech-stack.md`                            | Full decision record with options considered and cost analysis                              | 2026-05-14 |
-| Shelf API shape | Paginated inline book metadata (`GET /v1/shelf`)         | MCP tools need full data in one call; cursor pagination maps to DynamoDB `LastEvaluatedKey` | 2026-05-15 |
+| Decision        | Choice                                                   | Rationale                                                                                                                              | Date       |
+| --------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Frontend        | React SPA (Vite) → S3 + CloudFront                       | Auth-gated app; no SSR needed; API stays fully standalone for MCP                                                                      | 2026-05-14 |
+| Backend API     | Hono on Lambda + API Gateway HTTP API                    | Lightweight TS framework; CDK-native; co-deploys with infra                                                                            | 2026-05-14 |
+| Database        | DynamoDB on-demand                                       | Permanent free tier; scales to zero; access patterns fit single-table design                                                           | 2026-05-14 |
+| Auth            | Amazon Cognito User Pools                                | AWS-native; 10k MAU free; JWKS JWT works across Lambda + MCP without coordination                                                      | 2026-05-14 |
+| Deployment      | AWS CDK (3 stacks: Auth, API, Web)                       | Full transparency; no Amplify abstraction; showcases CDK                                                                               | 2026-05-14 |
+| CI/CD           | GitHub Actions — `cdk synth` on PR; deploy on semver tag | Fast feedback on infra changes; versioned artifacts for rollback                                                                       | 2026-05-14 |
+| Package manager | pnpm workspaces monorepo                                 | `apps/api`, `apps/mcp`, `apps/web`, `packages/infra` as separate packages                                                              | 2026-05-14 |
+| ADR             | `docs/adrs/001-tech-stack.md`                            | Full decision record with options considered and cost analysis                                                                         | 2026-05-14 |
+| Shelf API shape | Paginated inline book metadata (`GET /v1/shelf`)         | MCP tools need full data in one call; cursor pagination maps to DynamoDB `LastEvaluatedKey`                                            | 2026-05-15 |
+| Smoke tests     | Vitest suite in `test/smoke/`; runs post-deploy in CI    | Gates version tag on live-API verification; auto-rollback to last good tag on failure — see `docs/adrs/003-post-deploy-smoke-tests.md` | 2026-05-31 |
 
 ## Memory and Documentation Files
 
