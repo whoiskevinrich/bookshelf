@@ -38,6 +38,13 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Capture last good version tag
+        id: last-good
+        run: |
+          TAG=$(git tag --sort=-version:refname | head -1)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Last good tag: $TAG"
+
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
 
@@ -54,9 +61,26 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Smoke tests
+        id: smoke
+        continue-on-error: true
         env:
           API_BASE_URL: ${{ steps.api-url.outputs.url }}
         run: pnpm --filter @bookshelf/api run test:smoke
+
+      - name: Rollback to last good version
+        if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
+        run: |
+          echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.tag }}"
+          git checkout ${{ steps.last-good.outputs.tag }}
+          pnpm install --frozen-lockfile
+          pnpm --filter @bookshelf/api run build
+          pnpm deploy:infra
+
+      - name: Fail job after rollback
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          echo "Smoke tests failed. Rolled back to ${{ steps.last-good.outputs.tag }}."
+          exit 1
 
       - name: Tag deployed version
         run: |
