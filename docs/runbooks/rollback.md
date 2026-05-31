@@ -18,6 +18,31 @@ The **fastest rollback path** for any layer is the `promote.yml` workflow — ch
 
 ---
 
+## Automatic Rollback (dev environment)
+
+The dev deploy workflow (`deploy.yml`) includes automatic rollback when smoke
+tests fail. No manual intervention is required in this case.
+
+**What happens:**
+
+1. Before deploying, the workflow records the last good git tag.
+2. After `cdk deploy --all`, the smoke suite runs against the live API.
+3. If smoke tests fail, the workflow automatically:
+   - Checks out the last good tag
+   - Rebuilds the API bundle from that commit
+   - Runs `cdk deploy --all` to restore the Lambda
+4. The job fails with a clear message; the broken version is never tagged.
+
+**When this does NOT apply:**
+
+- First-ever deploy (no prior tag exists — rollback step is skipped, dev is left
+  in the failed state).
+- CDK deploy itself fails (nothing was deployed; no rollback needed).
+- Production — `promote.yml` has no automatic rollback; use the manual
+  procedures below.
+
+---
+
 ## 1. Full Stack Rollback via promote.yml (preferred)
 
 Use this when a merge to `main` caused a regression and you want to restore a known-good version across all stacks.

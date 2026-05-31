@@ -111,6 +111,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | Package manager | pnpm workspaces monorepo                                 | `apps/api`, `apps/mcp`, `apps/web`, `packages/infra` as separate packages                   | 2026-05-14 |
 | ADR             | `docs/adrs/001-tech-stack.md`                            | Full decision record with options considered and cost analysis                              | 2026-05-14 |
 | Shelf API shape | Paginated inline book metadata (`GET /v1/shelf`)         | MCP tools need full data in one call; cursor pagination maps to DynamoDB `LastEvaluatedKey` | 2026-05-15 |
+| Smoke tests     | Vitest suite in `test/smoke/`; runs post-deploy in CI    | Gates version tag on live-API verification; auto-rollback to last good tag on failure — see `docs/adrs/003-post-deploy-smoke-tests.md` | 2026-05-31 |
 
 ## Memory and Documentation Files
 
