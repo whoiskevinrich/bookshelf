@@ -50,7 +50,7 @@ export async function signUp(email: string, password: string): Promise<SignUpOut
   try {
     return await amplifySignUp({ username: email, password });
   } catch (err) {
-    throw new Error(mapCognitoError(err));
+    throw new Error(mapCognitoError(err), { cause: err });
   }
 }
 
@@ -58,7 +58,7 @@ export async function confirmSignUp(email: string, code: string): Promise<void> 
   try {
     await amplifyConfirmSignUp({ username: email, confirmationCode: code });
   } catch (err) {
-    throw new Error(mapCognitoError(err));
+    throw new Error(mapCognitoError(err), { cause: err });
   }
 }
 
@@ -66,7 +66,7 @@ export async function resendCode(email: string): Promise<void> {
   try {
     await amplifyResendCode({ username: email });
   } catch (err) {
-    throw new Error(mapCognitoError(err));
+    throw new Error(mapCognitoError(err), { cause: err });
   }
 }
 
@@ -74,7 +74,7 @@ export async function signIn(email: string, password: string): Promise<SignInOut
   try {
     return await amplifySignIn({ username: email, password });
   } catch (err) {
-    throw new Error(mapCognitoError(err));
+    throw new Error(mapCognitoError(err), { cause: err });
   }
 }
 
@@ -82,7 +82,7 @@ export async function signOut(): Promise<void> {
   try {
     await amplifySignOut();
   } catch (err) {
-    throw new Error(mapCognitoError(err));
+    throw new Error(mapCognitoError(err), { cause: err });
   }
 }
 
@@ -109,7 +109,7 @@ export async function resetPassword(email: string): Promise<void> {
   try {
     await amplifyResetPassword({ username: email });
   } catch (err) {
-    throw new Error(mapCognitoError(err));
+    throw new Error(mapCognitoError(err), { cause: err });
   }
 }
 
@@ -121,6 +121,6 @@ export async function confirmResetPassword(
   try {
     await amplifyConfirmResetPassword({ username: email, confirmationCode: code, newPassword });
   } catch (err) {
-    throw new Error(mapCognitoError(err));
+    throw new Error(mapCognitoError(err), { cause: err });
   }
 }

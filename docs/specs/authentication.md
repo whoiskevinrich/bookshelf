@@ -173,22 +173,22 @@ Amplify stores the ID token in its internal store. `fetchAuthSession()` returns 
 
 **Environment variables required**
 
-| Variable                    | Source                   |
-| --------------------------- | ------------------------ |
-| `VITE_COGNITO_USER_POOL_ID` | `AuthStack` SSM output   |
-| `VITE_COGNITO_CLIENT_ID`    | `AuthStack` SSM output   |
-| `VITE_COGNITO_REGION`       | Deployment region        |
-| `VITE_API_BASE_URL`         | `ApiStack` SSM output    |
+| Variable                    | Source                 |
+| --------------------------- | ---------------------- |
+| `VITE_COGNITO_USER_POOL_ID` | `AuthStack` SSM output |
+| `VITE_COGNITO_CLIENT_ID`    | `AuthStack` SSM output |
+| `VITE_COGNITO_REGION`       | Deployment region      |
+| `VITE_API_BASE_URL`         | `ApiStack` SSM output  |
 
 ---
 
 ## Open Questions
 
-| # | Question | Owner | Blocking? | Resolution |
-|---|----------|-------|-----------|------------|
-| 1 | Should the Cognito App Client have `ALLOW_USER_SRP_AUTH` only, or also `ALLOW_REFRESH_TOKEN_AUTH`? | Engineering | Yes | **Resolved** — `authFlows: { userSrp: true }` in CDK; refresh token validity is 30 days. Amplify v6 uses SRP + refresh automatically. |
-| 2 | Exact password policy in CDK — must match client-side validation. | Engineering | Yes | **Resolved** — min 8 chars, uppercase, lowercase, digits required; **symbols NOT required** (`requireSymbols: false`). Update spec requirement accordingly. |
-| 3 | How `VITE_*` env vars get injected at deploy time. | Engineering | Yes | **Resolved** — values are in SSM (`/bookshelf/cognito/user-pool-id`, `/bookshelf/cognito/client-id`). Deploy script reads SSM and writes `.env.production` before `vite build`. |
+| #   | Question                                                                                           | Owner       | Blocking? | Resolution                                                                                                                                                                      |
+| --- | -------------------------------------------------------------------------------------------------- | ----------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Should the Cognito App Client have `ALLOW_USER_SRP_AUTH` only, or also `ALLOW_REFRESH_TOKEN_AUTH`? | Engineering | Yes       | **Resolved** — `authFlows: { userSrp: true }` in CDK; refresh token validity is 30 days. Amplify v6 uses SRP + refresh automatically.                                           |
+| 2   | Exact password policy in CDK — must match client-side validation.                                  | Engineering | Yes       | **Resolved** — min 8 chars, uppercase, lowercase, digits required; **symbols NOT required** (`requireSymbols: false`). Update spec requirement accordingly.                     |
+| 3   | How `VITE_*` env vars get injected at deploy time.                                                 | Engineering | Yes       | **Resolved** — values are in SSM (`/bookshelf/cognito/user-pool-id`, `/bookshelf/cognito/client-id`). Deploy script reads SSM and writes `.env.production` before `vite build`. |
 
 ---
 

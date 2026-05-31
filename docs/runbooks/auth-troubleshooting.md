@@ -7,6 +7,7 @@
 **Most likely cause:** Cognito's default email sender (`no-reply@verificationemail.com`) is flagged as spam.
 
 **Resolution:**
+
 1. Check spam/junk folder for an email from `no-reply@verificationemail.com`
 2. Mark as "not spam" and whitelist the sender if found
 
