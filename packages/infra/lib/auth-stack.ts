@@ -1,7 +1,7 @@
-import * as cdk from 'aws-cdk-lib';
-import * as cognito from 'aws-cdk-lib/aws-cognito';
-import * as ssm from 'aws-cdk-lib/aws-ssm';
-import { Construct } from 'constructs';
+import * as cdk from "aws-cdk-lib";
+import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import { Construct } from "constructs";
 
 export class AuthStack extends cdk.Stack {
   /** Cognito User Pool ID — consumed by ApiStack and WebStack */
@@ -16,8 +16,8 @@ export class AuthStack extends cdk.Stack {
     super(scope, id, props);
 
     // ── User Pool ──────────────────────────────────────────────────────────
-    const userPool = new cognito.UserPool(this, 'UserPool', {
-      userPoolName: 'bookshelf-users',
+    const userPool = new cognito.UserPool(this, "UserPool", {
+      userPoolName: "bookshelf-users",
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
@@ -36,12 +36,12 @@ export class AuthStack extends cdk.Stack {
     });
 
     // ── App Client (SPA — public, no client secret) ────────────────────────
-    const appClient = userPool.addClient('SpaClient', {
-      userPoolClientName: 'bookshelf-spa',
+    const appClient = userPool.addClient("SpaClient", {
+      userPoolClientName: "bookshelf-spa",
       generateSecret: false, // PKCE flow — the SPA cannot keep a secret safe in the browser
       authFlows: {
-        userSrp: true,        // standard SRP auth for the Amplify Auth SDK
-        userPassword: false,  // disabled — prefer SRP
+        userSrp: true, // standard SRP auth for the Amplify Auth SDK
+        userPassword: false, // disabled — prefer SRP
       },
       oAuth: {
         flows: { authorizationCodeGrant: true },
@@ -54,15 +54,15 @@ export class AuthStack extends cdk.Stack {
     });
 
     // ── SSM Parameters (read by CDK outputs + CI deploy scripts) ──────────
-    new ssm.StringParameter(this, 'UserPoolIdParam', {
-      parameterName: '/bookshelf/cognito/user-pool-id',
+    new ssm.StringParameter(this, "UserPoolIdParam", {
+      parameterName: "/bookshelf/cognito/user-pool-id",
       stringValue: userPool.userPoolId,
-      description: 'Bookshelf Cognito User Pool ID',
+      description: "Bookshelf Cognito User Pool ID",
     });
-    new ssm.StringParameter(this, 'UserPoolClientIdParam', {
-      parameterName: '/bookshelf/cognito/client-id',
+    new ssm.StringParameter(this, "UserPoolClientIdParam", {
+      parameterName: "/bookshelf/cognito/client-id",
       stringValue: appClient.userPoolClientId,
-      description: 'Bookshelf Cognito SPA App Client ID',
+      description: "Bookshelf Cognito SPA App Client ID",
     });
 
     // ── CloudFormation outputs ─────────────────────────────────────────────
@@ -73,18 +73,18 @@ export class AuthStack extends cdk.Stack {
     this.userPoolClientId = appClient.userPoolClientId;
     this.userPoolIssuer = issuer;
 
-    new cdk.CfnOutput(this, 'UserPoolIdOutput', {
-      exportName: 'BookshelfUserPoolId',
+    new cdk.CfnOutput(this, "UserPoolIdOutput", {
+      exportName: "BookshelfUserPoolId",
       value: userPool.userPoolId,
     });
-    new cdk.CfnOutput(this, 'UserPoolClientIdOutput', {
-      exportName: 'BookshelfUserPoolClientId',
+    new cdk.CfnOutput(this, "UserPoolClientIdOutput", {
+      exportName: "BookshelfUserPoolClientId",
       value: appClient.userPoolClientId,
     });
-    new cdk.CfnOutput(this, 'UserPoolIssuerOutput', {
-      exportName: 'BookshelfUserPoolIssuer',
+    new cdk.CfnOutput(this, "UserPoolIssuerOutput", {
+      exportName: "BookshelfUserPoolIssuer",
       value: issuer,
-      description: 'JWKS issuer URL — used by Lambda JWT verification',
+      description: "JWKS issuer URL — used by Lambda JWT verification",
     });
   }
 }

@@ -147,6 +147,7 @@ The deploy and promote workflows reference GitHub Environments (`dev` and `prod`
 ```
 
 Recommended protection rules for `prod`:
+
 - **Required reviewers**: add at least yourself
 - **Deployment branches**: `main` only
 
@@ -175,9 +176,9 @@ Configure via **Settings → Branches → Add branch ruleset** for `main`:
 
 ## Troubleshooting
 
-| Symptom | Likely cause |
-|---|---|
+| Symptom                                                          | Likely cause                                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `Error: Not authorized to perform sts:AssumeRoleWithWebIdentity` | Trust policy `sub` condition doesn't match the repo path; double-check org/repo name |
-| Version gate fails on a fresh branch | Tags were not fetched — `ci.yml` uses `fetch-tags: true`; verify the checkout step |
-| Version bump PR has no CI checks | `GH_PAT` secret is not set; CI won't run on `GITHUB_TOKEN`-opened PRs |
-| `cdk deploy` fails with permissions error | IAM role policy is too restrictive; check CloudTrail for the denied action |
+| Version gate fails on a fresh branch                             | Tags were not fetched — `ci.yml` uses `fetch-tags: true`; verify the checkout step   |
+| Version bump PR has no CI checks                                 | `GH_PAT` secret is not set; CI won't run on `GITHUB_TOKEN`-opened PRs                |
+| `cdk deploy` fails with permissions error                        | IAM role policy is too restrictive; check CloudTrail for the denied action           |

@@ -48,61 +48,61 @@ Without an automated CI/CD pipeline, deploying changes to the Bookshelf app requ
 
 #### Pull Request Checks
 
-| Requirement | Acceptance Criteria |
-|---|---|
-| CDK synthesis | `cdk synth` runs against all stacks; workflow fails if synthesis fails |
-| Lint | ESLint runs across all packages; workflow fails on any error |
-| Format | Prettier check runs; workflow fails if any file would be reformatted |
-| Unit tests | Vitest runs across all packages; workflow fails if any test fails |
+| Requirement         | Acceptance Criteria                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| CDK synthesis       | `cdk synth` runs against all stacks; workflow fails if synthesis fails                                        |
+| Lint                | ESLint runs across all packages; workflow fails on any error                                                  |
+| Format              | Prettier check runs; workflow fails if any file would be reformatted                                          |
+| Unit tests          | Vitest runs across all packages; workflow fails if any test fails                                             |
 | Unique version gate | Workflow reads `version` from root `package.json`; fails if a git tag `v{version}` already exists in the repo |
 
 All checks run in parallel where possible. A failing check blocks merge (branch protection rule required — documented in runbook, not enforced by the workflow file itself).
 
 #### Merge to Main — Auto Deploy
 
-| Requirement | Acceptance Criteria |
-|---|---|
-| Deploy to sandbox | On push to `main`, CDK deploys all stacks to the `dev` AWS account/environment |
-| Tag on success | After a successful sandbox deploy, the workflow creates and pushes a git tag `v{version}` from root `package.json` |
-| Deploy failure visibility | If the CDK deploy fails, the workflow job fails (no silent failures); the tag is NOT created |
+| Requirement               | Acceptance Criteria                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Deploy to sandbox         | On push to `main`, CDK deploys all stacks to the `dev` AWS account/environment                                     |
+| Tag on success            | After a successful sandbox deploy, the workflow creates and pushes a git tag `v{version}` from root `package.json` |
+| Deploy failure visibility | If the CDK deploy fails, the workflow job fails (no silent failures); the tag is NOT created                       |
 
 #### Promotion Workflow
 
-| Requirement | Acceptance Criteria |
-|---|---|
-| Manual trigger | A separate GitHub Actions workflow (`promote.yml`) accepts a version input and can be triggered via `workflow_dispatch` |
-| Promote by version | Workflow checks out the commit at tag `v{version}`, then runs CDK deploy targeting the `prod` AWS account/environment |
-| No re-synthesis | Promotion deploys the same CDK app code that was already validated; it does not re-run PR checks |
-| Confirmation step | Workflow prints the version being promoted and the target environment before deploying (visible in the Actions UI) |
+| Requirement        | Acceptance Criteria                                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Manual trigger     | A separate GitHub Actions workflow (`promote.yml`) accepts a version input and can be triggered via `workflow_dispatch` |
+| Promote by version | Workflow checks out the commit at tag `v{version}`, then runs CDK deploy targeting the `prod` AWS account/environment   |
+| No re-synthesis    | Promotion deploys the same CDK app code that was already validated; it does not re-run PR checks                        |
+| Confirmation step  | Workflow prints the version being promoted and the target environment before deploying (visible in the Actions UI)      |
 
 #### Automatic Version Bump
 
-| Requirement | Acceptance Criteria |
-|---|---|
-| Bump workflow | A `version-bump.yml` workflow accepts `bump-type` input (`patch` \| `minor` \| `major`) |
-| Updates package.json | Uses `npm version` (or `pnpm version`) to update the root `package.json` version field |
-| Opens PR | Commits the version bump and opens a PR against `main` so the change goes through the normal PR gate (including the unique-version check) |
+| Requirement          | Acceptance Criteria                                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Bump workflow        | A `version-bump.yml` workflow accepts `bump-type` input (`patch` \| `minor` \| `major`)                                                   |
+| Updates package.json | Uses `npm version` (or `pnpm version`) to update the root `package.json` version field                                                    |
+| Opens PR             | Commits the version bump and opens a PR against `main` so the change goes through the normal PR gate (including the unique-version check) |
 
 ---
 
 ### Nice-to-Have — P1
 
-| Requirement | Notes |
-|---|---|
-| Job summaries | GitHub Actions job summaries with a table of check results and CDK stack change sets |
-| Cache pnpm store | Cache the pnpm store between runs to reduce install time |
-| Concurrency groups | Cancel in-progress runs on the same branch when a new push arrives |
-| Deployment status badges | `README.md` shields.io badges for sandbox and prod deployment status |
+| Requirement              | Notes                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| Job summaries            | GitHub Actions job summaries with a table of check results and CDK stack change sets |
+| Cache pnpm store         | Cache the pnpm store between runs to reduce install time                             |
+| Concurrency groups       | Cancel in-progress runs on the same branch when a new push arrives                   |
+| Deployment status badges | `README.md` shields.io badges for sandbox and prod deployment status                 |
 
 ---
 
 ### Future Considerations — P2
 
-| Requirement | Notes |
-|---|---|
-| Preview environments | Ephemeral CDK stack per PR; torn down on close |
-| Slack deploy notifications | Post to a channel on sandbox deploy and prod promotion |
-| Automated release notes | Generate a changelog from conventional commits on each tag |
+| Requirement                | Notes                                                      |
+| -------------------------- | ---------------------------------------------------------- |
+| Preview environments       | Ephemeral CDK stack per PR; torn down on close             |
+| Slack deploy notifications | Post to a channel on sandbox deploy and prod promotion     |
+| Automated release notes    | Generate a changelog from conventional commits on each tag |
 
 ---
 
@@ -150,10 +150,10 @@ GitHub Actions authenticates to AWS via **OIDC** — both the `dev` and `prod` a
 
 Required GitHub Actions variables (not secrets — these are not sensitive):
 
-| Variable | Value |
-|---|---|
-| `AWS_REGION` | `us-east-1` |
-| `AWS_ROLE_ARN_DEV` | ARN of the IAM role to assume in the dev account |
+| Variable            | Value                                             |
+| ------------------- | ------------------------------------------------- |
+| `AWS_REGION`        | `us-east-1`                                       |
+| `AWS_ROLE_ARN_DEV`  | ARN of the IAM role to assume in the dev account  |
 | `AWS_ROLE_ARN_PROD` | ARN of the IAM role to assume in the prod account |
 
 Each IAM role must have a trust policy scoped to this repository (e.g. `repo:your-org/bookshelf:*`). PR checks (`cdk synth`) assume the dev role since synthesis does not deploy anything. The runbook will document the required IAM policies for each role.
@@ -178,12 +178,12 @@ Each IAM role must have a trust policy scoped to this repository (e.g. `repo:you
 
 ## Open Questions
 
-| Question | Owner | Blocking? |
-|---|---|---|
-| ~~Separate AWS accounts vs. single account?~~ **Resolved: separate accounts (dev + prod)** | — | — |
-| Should the version bump PR require a specific reviewer or can it auto-merge? | Engineering | No |
-| Should `promote.yml` also run a smoke test (e.g., curl the health endpoint) after deploying? | Engineering | No — nice-to-have for P1 |
-| What is the GitHub branch protection rule configuration? Document in runbook. | Engineering | No — needed before go-live, not before spec approval |
+| Question                                                                                     | Owner       | Blocking?                                            |
+| -------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------- |
+| ~~Separate AWS accounts vs. single account?~~ **Resolved: separate accounts (dev + prod)**   | —           | —                                                    |
+| Should the version bump PR require a specific reviewer or can it auto-merge?                 | Engineering | No                                                   |
+| Should `promote.yml` also run a smoke test (e.g., curl the health endpoint) after deploying? | Engineering | No — nice-to-have for P1                             |
+| What is the GitHub branch protection rule configuration? Document in runbook.                | Engineering | No — needed before go-live, not before spec approval |
 
 ---
 

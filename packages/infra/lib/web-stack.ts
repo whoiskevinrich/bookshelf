@@ -1,10 +1,10 @@
-import * as cdk from 'aws-cdk-lib';
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
-import * as cloudfrontOrigins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as ssm from 'aws-cdk-lib/aws-ssm';
-import { Construct } from 'constructs';
+import * as cdk from "aws-cdk-lib";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as cloudfrontOrigins from "aws-cdk-lib/aws-cloudfront-origins";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import { Construct } from "constructs";
 
 export interface WebStackProps extends cdk.StackProps {
   /** Semver version string from CI, e.g. "v1.2.3". Used as the active S3 prefix. */
@@ -28,7 +28,7 @@ export class WebStack extends cdk.Stack {
     //
     // The active version prefix is stored in SSM at /bookshelf/web/active-version.
     // The deploy pipeline syncs the new build then updates SSM + invalidates CF.
-    const bucket = new s3.Bucket(this, 'WebBucket', {
+    const bucket = new s3.Bucket(this, "WebBucket", {
       bucketName: `bookshelf-web-${this.account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL, // CloudFront OAC handles access
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -38,24 +38,24 @@ export class WebStack extends cdk.Stack {
         {
           // Keep only the 10 most recent build prefixes by age
           // Builds older than 30 days are safe to remove (10 semver releases)
-          prefix: 'builds/',
+          prefix: "builds/",
           expiration: cdk.Duration.days(30),
-          id: 'expire-old-builds',
+          id: "expire-old-builds",
           enabled: true,
         },
       ],
     });
 
     // ── CloudFront Origin Access Control ──────────────────────────────────
-    const oac = new cloudfront.S3OriginAccessControl(this, 'OAC', {
-      description: 'Bookshelf web SPA OAC',
+    const oac = new cloudfront.S3OriginAccessControl(this, "OAC", {
+      description: "Bookshelf web SPA OAC",
       signing: cloudfront.Signing.SIGV4_NO_OVERRIDE,
     });
 
     // ── CloudFront distribution ────────────────────────────────────────────
-    const distribution = new cloudfront.Distribution(this, 'Distribution', {
-      comment: 'Bookshelf web SPA',
-      defaultRootObject: 'index.html',
+    const distribution = new cloudfront.Distribution(this, "Distribution", {
+      comment: "Bookshelf web SPA",
+      defaultRootObject: "index.html",
       defaultBehavior: {
         origin: cloudfrontOrigins.S3BucketOrigin.withOriginAccessControl(bucket, {
           originAccessControl: oac,
@@ -71,13 +71,13 @@ export class WebStack extends cdk.Stack {
         {
           httpStatus: 403,
           responseHttpStatus: 200,
-          responsePagePath: '/index.html',
+          responsePagePath: "/index.html",
           ttl: cdk.Duration.seconds(0),
         },
         {
           httpStatus: 404,
           responseHttpStatus: 200,
-          responsePagePath: '/index.html',
+          responsePagePath: "/index.html",
           ttl: cdk.Duration.seconds(0),
         },
       ],
@@ -87,34 +87,34 @@ export class WebStack extends cdk.Stack {
     // Grant CloudFront OAC read access to the bucket
     bucket.addToResourcePolicy(
       new iam.PolicyStatement({
-        sid: 'AllowCloudFrontOAC',
+        sid: "AllowCloudFrontOAC",
         effect: iam.Effect.ALLOW,
-        principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
-        actions: ['s3:GetObject'],
-        resources: [bucket.arnForObjects('*')],
+        principals: [new iam.ServicePrincipal("cloudfront.amazonaws.com")],
+        actions: ["s3:GetObject"],
+        resources: [bucket.arnForObjects("*")],
         conditions: {
           StringEquals: {
-            'AWS:SourceArn': `arn:aws:cloudfront::${this.account}:distribution/${distribution.distributionId}`,
+            "AWS:SourceArn": `arn:aws:cloudfront::${this.account}:distribution/${distribution.distributionId}`,
           },
         },
-      })
+      }),
     );
 
     // ── SSM Parameters (read by rollback runbook + CI scripts) ────────────
-    new ssm.StringParameter(this, 'ActiveVersionParam', {
-      parameterName: '/bookshelf/web/active-version',
+    new ssm.StringParameter(this, "ActiveVersionParam", {
+      parameterName: "/bookshelf/web/active-version",
       stringValue: props.version,
-      description: 'Currently active web build version — update to roll back',
+      description: "Currently active web build version — update to roll back",
     });
-    new ssm.StringParameter(this, 'BucketNameParam', {
-      parameterName: '/bookshelf/web/bucket-name',
+    new ssm.StringParameter(this, "BucketNameParam", {
+      parameterName: "/bookshelf/web/bucket-name",
       stringValue: bucket.bucketName,
-      description: 'Bookshelf web S3 bucket name',
+      description: "Bookshelf web S3 bucket name",
     });
-    new ssm.StringParameter(this, 'DistributionIdParam', {
-      parameterName: '/bookshelf/web/distribution-id',
+    new ssm.StringParameter(this, "DistributionIdParam", {
+      parameterName: "/bookshelf/web/distribution-id",
       stringValue: distribution.distributionId,
-      description: 'Bookshelf CloudFront distribution ID',
+      description: "Bookshelf CloudFront distribution ID",
     });
 
     // ── Outputs ────────────────────────────────────────────────────────────
@@ -122,17 +122,17 @@ export class WebStack extends cdk.Stack {
     this.distributionId = distribution.distributionId;
     this.bucketName = bucket.bucketName;
 
-    new cdk.CfnOutput(this, 'DistributionUrlOutput', {
-      exportName: 'BookshelfDistributionUrl',
+    new cdk.CfnOutput(this, "DistributionUrlOutput", {
+      exportName: "BookshelfDistributionUrl",
       value: this.distributionUrl,
     });
-    new cdk.CfnOutput(this, 'DistributionIdOutput', {
-      exportName: 'BookshelfDistributionId',
+    new cdk.CfnOutput(this, "DistributionIdOutput", {
+      exportName: "BookshelfDistributionId",
       value: distribution.distributionId,
-      description: 'Required for CI invalidations and rollback runbook',
+      description: "Required for CI invalidations and rollback runbook",
     });
-    new cdk.CfnOutput(this, 'BucketNameOutput', {
-      exportName: 'BookshelfBucketName',
+    new cdk.CfnOutput(this, "BucketNameOutput", {
+      exportName: "BookshelfBucketName",
       value: bucket.bucketName,
     });
   }

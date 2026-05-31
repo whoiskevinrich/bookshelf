@@ -8,11 +8,11 @@ How to roll back each layer of the Bookshelf stack after a bad deploy.
 
 The stack has three independently deployable CDK stacks. Each can be rolled back separately depending on where the problem is.
 
-| Stack | What it owns | Rollback method |
-|---|---|---|
-| `AuthStack` | Cognito User Pool + App Client + SSM params | CDK redeploy from prior tag |
-| `ApiStack` | DynamoDB table + Lambda + API Gateway + SSM params | CDK redeploy from prior tag |
-| `WebStack` | S3 + CloudFront + OAC + SSM params | CDK redeploy from prior tag OR S3 prefix swap |
+| Stack       | What it owns                                       | Rollback method                               |
+| ----------- | -------------------------------------------------- | --------------------------------------------- |
+| `AuthStack` | Cognito User Pool + App Client + SSM params        | CDK redeploy from prior tag                   |
+| `ApiStack`  | DynamoDB table + Lambda + API Gateway + SSM params | CDK redeploy from prior tag                   |
+| `WebStack`  | S3 + CloudFront + OAC + SSM params                 | CDK redeploy from prior tag OR S3 prefix swap |
 
 The **fastest rollback path** for any layer is the `promote.yml` workflow — check out a prior version tag and deploy it. Use the layer-specific procedures below only when a targeted fix is faster than a full redeploy.
 
@@ -23,6 +23,7 @@ The **fastest rollback path** for any layer is the `promote.yml` workflow — ch
 Use this when a merge to `main` caused a regression and you want to restore a known-good version across all stacks.
 
 1. Find the last good version tag:
+
    ```bash
    git tag --sort=-version:refname | head -10
    ```
@@ -37,6 +38,7 @@ Use this when a merge to `main` caused a regression and you want to restore a kn
    - Run `cdk deploy --all` against prod
 
 For dev/sandbox rollback, check out the tag locally and run:
+
 ```bash
 git checkout v0.1.3
 pnpm deploy:infra
@@ -49,12 +51,14 @@ pnpm deploy:infra
 Lambda keeps the previous version available. If only the Lambda function regressed:
 
 ### Option A — CDK redeploy from prior tag (clean)
+
 ```bash
 git checkout v<prior-version>
 pnpm --filter @bookshelf/infra run deploy
 ```
 
 ### Option B — AWS CLI alias swap (faster, temporary)
+
 ```bash
 # Find the previous published version number
 aws lambda list-versions-by-function \
@@ -80,11 +84,13 @@ The `WebStack` deploys assets under a versioned S3 key prefix (`/v{version}/`). 
 ### Swap the CloudFront origin path back to a prior version
 
 1. Find the prior version prefix in S3:
+
    ```bash
    aws s3 ls s3://bookshelf-web-<account-id>/ --recursive | grep "index.html"
    ```
 
 2. Update the CloudFront distribution's origin path:
+
    ```bash
    # Get the distribution ID from SSM
    DIST_ID=$(aws ssm get-parameter \
@@ -118,6 +124,7 @@ The `WebStack` deploys assets under a versioned S3 key prefix (`/v{version}/`). 
 DynamoDB does not support point-in-time rollback of individual items via CDK redeploy. The table schema is append-only — CDK will not drop or recreate the table on redeploy (DynamoDB tables are retained by default).
 
 For data corruption:
+
 - **Point-in-time recovery (PITR)**: enabled on the table — restore via AWS Console or CLI to any second in the past 35 days.
 - **Per-item recovery**: not supported without PITR restore to a new table + manual diff.
 

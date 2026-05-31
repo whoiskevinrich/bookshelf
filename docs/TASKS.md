@@ -5,6 +5,7 @@
 ## Backlog
 
 ### Phase 2 — API (primary deliverable)
+
 - [ ] Scaffold `apps/api` (pnpm init, Hono, AWS Lambda adapter, esbuild)
 - [ ] Implement `lib/books/types.ts` — `BookProvider` + `BookSearchResult` interfaces
 - [ ] Implement `lib/books/providers/google-books.ts`
@@ -29,6 +30,7 @@
 - [ ] Write integration tests against DynamoDB Local
 
 ### Phase 3 — MCP server
+
 - [ ] Write MCP spec (`docs/specs/mcp-server.md`) before starting
 - [ ] Scaffold `apps/mcp` (`@modelcontextprotocol/sdk`)
 - [ ] Implement `lib/api-client.ts` — typed wrapper for all `/v1/` endpoints (handles pagination)
@@ -38,6 +40,7 @@
 - [ ] Write unit tests for all tools
 
 ### Phase 4 — Web UI
+
 - [ ] Scaffold `apps/web` (`pnpm create vite web --template react-ts`)
 - [ ] Install Tailwind v4 + shadcn/ui + aws-amplify
 - [ ] Implement `lib/auth.ts` — Cognito sign-up / sign-in / sign-out via Amplify Auth
@@ -57,6 +60,7 @@
 - [ ] Write E2E tests (Playwright): sign-up → search → add → view shelf → move → remove
 
 ### Phase 5 — CI/CD
+
 - [ ] Configure GitHub Actions variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION` (no long-lived keys — OIDC)
 
 ## Done

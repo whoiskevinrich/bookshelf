@@ -141,23 +141,23 @@ The demo shelf is hard-coded at build time — not stored in DynamoDB. These boo
 
 ### Owned
 
-| Title | Author | ISBN-13 |
-|-------|--------|---------|
-| Dune | Frank Herbert | 9780441013593 |
-| Neuromancer | William Gibson | 9780441569595 |
+| Title                     | Author            | ISBN-13       |
+| ------------------------- | ----------------- | ------------- |
+| Dune                      | Frank Herbert     | 9780441013593 |
+| Neuromancer               | William Gibson    | 9780441569595 |
 | The Left Hand of Darkness | Ursula K. Le Guin | 9780441478125 |
-| Project Hail Mary | Andy Weir | 9780593135204 |
-| The Name of the Wind | Patrick Rothfuss | 9780756404741 |
+| Project Hail Mary         | Andy Weir         | 9780593135204 |
+| The Name of the Wind      | Patrick Rothfuss  | 9780756404741 |
 
 ### Want
 
-| Title | Author | ISBN-13 |
-|-------|--------|---------|
-| The Way of Kings | Brandon Sanderson | 9780765326355 |
-| The Fifth Season | N.K. Jemisin | 9780316229296 |
-| Children of Time | Adrian Tchaikovsky | 9781447273295 |
-| A Fire Upon the Deep | Vernor Vinge | 9780812515282 |
-| Piranesi | Susanna Clarke | 9781635575644 |
+| Title                | Author             | ISBN-13       |
+| -------------------- | ------------------ | ------------- |
+| The Way of Kings     | Brandon Sanderson  | 9780765326355 |
+| The Fifth Season     | N.K. Jemisin       | 9780316229296 |
+| Children of Time     | Adrian Tchaikovsky | 9781447273295 |
+| A Fire Upon the Deep | Vernor Vinge       | 9780812515282 |
+| Piranesi             | Susanna Clarke     | 9781635575644 |
 
 > Cover images fetched from Google Books API at build time and bundled as static assets — no CDN dependency at runtime for the demo.
 
@@ -167,32 +167,32 @@ The demo shelf is hard-coded at build time — not stored in DynamoDB. These boo
 
 ### Leading indicators (measure within first 2 weeks post-launch)
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Demo shelf page views | Baseline established | Analytics page view event on `/` |
-| Demo-to-signup conversion | ≥ 20% of demo viewers | Signups / demo page views (same session) |
-| Search-to-add completion | ≥ 70% of searches result in an add | `POST /v1/shelf` / `GET /v1/books/search` ratio |
-| Add errors (duplicate, ISBN invalid) | < 5% of add attempts | 409 + 400 response rate on `POST /v1/shelf` |
+| Metric                               | Target                             | Measurement                                     |
+| ------------------------------------ | ---------------------------------- | ----------------------------------------------- |
+| Demo shelf page views                | Baseline established               | Analytics page view event on `/`                |
+| Demo-to-signup conversion            | ≥ 20% of demo viewers              | Signups / demo page views (same session)        |
+| Search-to-add completion             | ≥ 70% of searches result in an add | `POST /v1/shelf` / `GET /v1/books/search` ratio |
+| Add errors (duplicate, ISBN invalid) | < 5% of add attempts               | 409 + 400 response rate on `POST /v1/shelf`     |
 
 ### Lagging indicators (measure at 30 and 90 days)
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Activation rate (≥1 book added in first session) | ≥ 60% of new accounts | Users with ≥1 shelf entry / total signups |
-| D7 retention (user returns within 7 days) | ≥ 30% | Sessions with userId in 7-day window post-signup |
-| Median shelf size at D30 | ≥ 5 books | DynamoDB: count of shelf entries per user at 30 days |
+| Metric                                           | Target                | Measurement                                          |
+| ------------------------------------------------ | --------------------- | ---------------------------------------------------- |
+| Activation rate (≥1 book added in first session) | ≥ 60% of new accounts | Users with ≥1 shelf entry / total signups            |
+| D7 retention (user returns within 7 days)        | ≥ 30%                 | Sessions with userId in 7-day window post-signup     |
+| Median shelf size at D30                         | ≥ 5 books             | DynamoDB: count of shelf entries per user at 30 days |
 
 ---
 
 ## Open Questions
 
-| # | Question | Owner | Blocking? |
-|---|----------|-------|-----------|
-| 1 | Should the demo shelf cover images be fetched live from Google Books (simple) or pre-fetched and bundled as static assets (faster, no API key exposure)? Pre-fetched is recommended but adds a build step. | Engineering | Yes — affects build pipeline |
-| 2 | Does the demo CTA go to `/auth/signup` or `/auth/login` (with a signup link)? | Product | No |
-| 3 | Should `GET /v1/shelf` include book metadata (title, authors, cover URL) inline, or return only ISBNs and require a separate book lookup? Inline is simpler for the UI and MCP. | Engineering | Yes — affects API contract |
-| 4 | What is the ISBN check digit validation approach? (Mod-10 for ISBN-10, Mod-11 for ISBN-13 — confirm library vs. hand-rolled) | Engineering | No |
-| 5 | Is there a rate limit on the Google Books API free tier that could affect demo page load if covers are fetched live? | Engineering | Yes — if pre-fetching is chosen, when does the fetch run? |
+| #   | Question                                                                                                                                                                                                   | Owner       | Blocking?                                                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------- |
+| 1   | Should the demo shelf cover images be fetched live from Google Books (simple) or pre-fetched and bundled as static assets (faster, no API key exposure)? Pre-fetched is recommended but adds a build step. | Engineering | Yes — affects build pipeline                              |
+| 2   | Does the demo CTA go to `/auth/signup` or `/auth/login` (with a signup link)?                                                                                                                              | Product     | No                                                        |
+| 3   | Should `GET /v1/shelf` include book metadata (title, authors, cover URL) inline, or return only ISBNs and require a separate book lookup? Inline is simpler for the UI and MCP.                            | Engineering | Yes — affects API contract                                |
+| 4   | What is the ISBN check digit validation approach? (Mod-10 for ISBN-10, Mod-11 for ISBN-13 — confirm library vs. hand-rolled)                                                                               | Engineering | No                                                        |
+| 5   | Is there a rate limit on the Google Books API free tier that could affect demo page load if covers are fetched live?                                                                                       | Engineering | Yes — if pre-fetching is chosen, when does the fetch run? |
 
 ---
 
