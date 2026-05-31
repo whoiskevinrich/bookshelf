@@ -20,18 +20,14 @@
 - [ ] Test with MCP inspector; verify `get_shelf` returns usable inline data in one call
 - [ ] Write unit tests for all tools
 
-### Phase 4 — Web UI
+### Phase 4 — Web UI (remaining)
 
-- [ ] Scaffold `apps/web` (`pnpm create vite web --template react-ts`)
-- [ ] Install Tailwind v4 + shadcn/ui + aws-amplify
-- [ ] Implement `lib/auth.ts` — Cognito sign-up / sign-in / sign-out via Amplify Auth
 - [ ] Implement `lib/api-client.ts` — typed client for `/v1/` endpoints
 - [ ] Build demo shelf component — read-only, hard-coded seed data (10 Sci-Fi/Fantasy books)
   - Owned section: Dune, Neuromancer, The Left Hand of Darkness, Project Hail Mary, The Name of the Wind
   - Want section: The Way of Kings, The Fifth Season, Children of Time, A Fire Upon the Deep, Piranesi
   - Broken-image fallback on all cover `<img>` tags
 - [ ] Build landing page (`/`) — demo shelf + "Sign up to build your shelf" CTA
-- [ ] Build auth pages — `/auth/login`, `/auth/signup`
 - [ ] Build book search component — debounced title/author search, ISBN/ASIN direct entry, ISBN validation
 - [ ] Build shelf page (`/shelf`) — Owned section, Want section, empty states, add/move/remove actions
 - [ ] Build wishlist page (`/wishlist`) — Want section only view
@@ -43,6 +39,10 @@
 ### Phase 5 — CI/CD
 
 - [ ] Configure GitHub Actions variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `AWS_REGION` (no long-lived keys — OIDC)
+
+### Future (post-v1)
+
+- [ ] Configure SES as Cognito email sender — improves deliverability, eliminates spam-folder issues; see `docs/runbooks/auth-troubleshooting.md#ses-upgrade-path`
 
 ## Done
 
@@ -58,7 +58,7 @@
 - [x] Write CI/CD pipeline spec — see `docs/specs/cicd-pipeline.md`
 - [x] Write `.github/workflows/ci.yml` — lint, format, unit tests, CDK synth, unique version gate
 - [x] Write `.github/workflows/deploy.yml` — auto-deploy to dev on merge to main; git tag on success
-- [x] Write `.github/workflows/promote.yml` — `workflow_dispatch` promotion to prod by version tag
+- [x] Write `.github/workflows/promote.yml` — `workflow_dispatch` promotion to prod by mission tag
 - [x] Write `.github/workflows/version-bump.yml` — `workflow_dispatch` patch/minor/major bump; opens PR
 - [x] Write `docs/runbooks/cicd-setup.md` — OIDC roles, GitHub variables, branch protection, troubleshooting
 - [x] Write `docs/runbooks/rollback.md` — Lambda alias swap, CloudFront origin path, DynamoDB PITR, decision tree
@@ -79,3 +79,10 @@
 - [x] Write unit tests for route handlers (mocked DynamoDB + auth)
 - [x] Write unit tests for book provider adapter (mocked HTTP)
 - [x] Write unit tests for JWT middleware
+- [x] Write auth spec — `docs/specs/authentication.md`
+- [x] Write ADR-004 — web auth library decision (`@aws-amplify/auth`) — see `docs/adrs/004-web-auth-library.md`
+- [x] Scaffold `apps/web` (Vite + React TS, Tailwind v4, `@aws-amplify/auth`)
+- [x] Implement `lib/auth.ts` — Amplify Auth v6 wrapper with Cognito error mapping
+- [x] Implement `AuthContext` + `ProtectedRoute`
+- [x] Build auth pages — `/auth/login`, `/auth/signup`, `/auth/verify`, `/auth/forgot-password`, `/auth/reset-password`
+- [x] Write `docs/runbooks/auth-troubleshooting.md`
