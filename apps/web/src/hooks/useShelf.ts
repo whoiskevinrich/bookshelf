@@ -37,8 +37,15 @@ export function useShelf(opts?: { status?: ShelfStatus }) {
 export function useAddToShelf() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ isbn, status, book }: { isbn: string; status: ShelfStatus; book?: BookMetadata }) =>
-      addToShelf(isbn, status, book),
+    mutationFn: ({
+      isbn,
+      status,
+      book,
+    }: {
+      isbn: string;
+      status: ShelfStatus;
+      book?: BookMetadata;
+    }) => addToShelf(isbn, status, book),
     onSuccess: () => qc.invalidateQueries({ queryKey: shelfKey() }),
   });
 }
