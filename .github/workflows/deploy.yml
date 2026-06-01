@@ -45,20 +45,55 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Last good tag: $TAG"
 
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
 
       - name: CDK deploy all stacks
-        run: pnpm deploy:infra
+        run: pnpm --filter @bookshelf/infra run cdk deploy --all --require-approval never -c version=${{ steps.version.outputs.tag }}
+
+      - name: Resolve SSM outputs
+        id: ssm
+        run: |
+          API_URL=$(aws ssm get-parameter --name "/bookshelf/api/url" --query "Parameter.Value" --output text)
+          USER_POOL_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/user-pool-id" --query "Parameter.Value" --output text)
+          CLIENT_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/client-id" --query "Parameter.Value" --output text)
+          BUCKET=$(aws ssm get-parameter --name "/bookshelf/web/bucket-name" --query "Parameter.Value" --output text)
+          DIST_ID=$(aws ssm get-parameter --name "/bookshelf/web/distribution-id" --query "Parameter.Value" --output text)
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "user_pool_id=$USER_POOL_ID" >> "$GITHUB_OUTPUT"
+          echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
+          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Build web app
+        env:
+          VITE_API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.ssm.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.ssm.outputs.client_id }}
+          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
+        run: pnpm --filter @bookshelf/web run build
+
+      - name: Sync web assets to S3
+        run: |
+          aws s3 sync apps/web/dist \
+            s3://${{ steps.ssm.outputs.bucket }}/builds/${{ steps.version.outputs.tag }}/ \
+            --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.ssm.outputs.distribution_id }} \
+            --paths "/*"
 
       - name: Resolve API URL from SSM
         id: api-url
-        run: |
-          URL=$(aws ssm get-parameter \
-            --name "/bookshelf/api/url" \
-            --query "Parameter.Value" \
-            --output text)
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
+        run: echo "url=${{ steps.ssm.outputs.api_url }}" >> "$GITHUB_OUTPUT"
 
       - name: Smoke tests
         id: smoke
@@ -74,7 +109,7 @@ jobs:
           git checkout ${{ steps.last-good.outputs.tag }}
           pnpm install --frozen-lockfile
           pnpm --filter @bookshelf/api run build
-          pnpm deploy:infra
+          pnpm --filter @bookshelf/infra run cdk deploy --all --require-approval never -c version=${{ steps.last-good.outputs.tag }}
 
       - name: Fail job after rollback
         if: steps.smoke.outcome == 'failure'
