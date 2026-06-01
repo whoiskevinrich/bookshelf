@@ -10,6 +10,7 @@ import {
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
+import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
 import { BookSearch } from "../components/BookSearch";
 import type { ShelfEntry, ShelfStatus } from "../lib/api-client";
 
@@ -88,6 +89,10 @@ export function ShelfPage() {
     );
   }, [data]);
 
+  function handleOpenSearch() {
+    setShowSearch(true);
+  }
+
   function handleAdd(isbn: string, status: ShelfStatus) {
     addMutation.mutate({ isbn, status });
     setShowSearch(false);
@@ -101,7 +106,7 @@ export function ShelfPage() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold">My Shelf</h1>
           <button
-            onClick={() => setShowSearch((s) => !s)}
+            onClick={() => (showSearch ? setShowSearch(false) : handleOpenSearch())}
             className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
           >
             {showSearch ? "Cancel" : "Add a book"}
@@ -126,36 +131,39 @@ export function ShelfPage() {
           <ShelfErrorState onRetry={() => void refetch()} isRetrying={isFetching} />
         )}
 
-        {!isLoading && !isError && (
-          <div className="space-y-10">
-            <ShelfSection
-              title="Owned"
-              entries={owned}
-              emptyMessage="No books owned yet. Add one above!"
-              moveMutation={moveMutation}
-              removeMutation={removeMutation}
-            />
-            <ShelfSection
-              title="Want to Read"
-              entries={want}
-              emptyMessage="No books on your wishlist. Add one above!"
-              moveMutation={moveMutation}
-              removeMutation={removeMutation}
-            />
+        {!isLoading && !isError &&
+          (owned.length === 0 && want.length === 0 ? (
+            <ShelfEmptyState onAdd={handleOpenSearch} />
+          ) : (
+            <div className="space-y-10">
+              <ShelfSection
+                title="Owned"
+                entries={owned}
+                emptyMessage="No books owned yet. Add one above!"
+                moveMutation={moveMutation}
+                removeMutation={removeMutation}
+              />
+              <ShelfSection
+                title="Want to Read"
+                entries={want}
+                emptyMessage="No books on your wishlist. Add one above!"
+                moveMutation={moveMutation}
+                removeMutation={removeMutation}
+              />
 
-            {hasNextPage && (
-              <div className="text-center">
-                <button
-                  onClick={() => void fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40"
-                >
-                  {isFetchingNextPage ? "Loading more…" : "Load more"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              {hasNextPage && (
+                <div className="text-center">
+                  <button
+                    onClick={() => void fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                    className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40"
+                  >
+                    {isFetchingNextPage ? "Loading more…" : "Load more"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
       </main>
     </div>
   );
