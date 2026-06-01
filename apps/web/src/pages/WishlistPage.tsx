@@ -3,11 +3,20 @@ import { Link } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { useShelf, useMoveShelfEntry, useRemoveFromShelf, flattenShelf } from "../hooks/useShelf";
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
+import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
+import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 
 export function WishlistPage() {
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useShelf({
-    status: "want",
-  });
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useShelf({ status: "want" });
   const moveMutation = useMoveShelfEntry();
   const removeMutation = useRemoveFromShelf();
 
@@ -20,9 +29,14 @@ export function WishlistPage() {
       <main className="max-w-4xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold mb-8">Wishlist</h1>
 
-        {isLoading && <p className="text-sm text-gray-400">Loading wishlist…</p>}
-        {isError && (
-          <p className="text-sm text-red-500">Failed to load wishlist. Please refresh.</p>
+        {isLoading && <ShelfSkeleton sections={1} />}
+
+        {isError && !isLoading && (
+          <ShelfErrorState
+            message="Couldn't load your wishlist."
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
         )}
 
         {!isLoading && !isError && (
@@ -44,6 +58,13 @@ export function WishlistPage() {
                     onRemove={(isbn) => removeMutation.mutate(isbn)}
                     isMoving={moveMutation.isPending && moveMutation.variables?.isbn === entry.isbn}
                     isRemoving={removeMutation.isPending && removeMutation.variables === entry.isbn}
+                    error={
+                      moveMutation.isError && moveMutation.variables?.isbn === entry.isbn
+                        ? "Couldn't move book — please try again."
+                        : removeMutation.isError && removeMutation.variables === entry.isbn
+                          ? "Couldn't remove book — please try again."
+                          : null
+                    }
                   />
                 ))}
               </div>

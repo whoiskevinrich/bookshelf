@@ -8,6 +8,8 @@ import {
   flattenShelf,
 } from "../hooks/useShelf";
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
+import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
+import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { BookSearch } from "../components/BookSearch";
 import type { ShelfEntry, ShelfStatus } from "../lib/api-client";
 
@@ -43,6 +45,13 @@ function ShelfSection({
               onRemove={(isbn) => removeMutation.mutate(isbn)}
               isMoving={moveMutation.isPending && moveMutation.variables?.isbn === entry.isbn}
               isRemoving={removeMutation.isPending && removeMutation.variables === entry.isbn}
+              error={
+                moveMutation.isError && moveMutation.variables?.isbn === entry.isbn
+                  ? "Couldn't move book — please try again."
+                  : removeMutation.isError && removeMutation.variables === entry.isbn
+                    ? "Couldn't remove book — please try again."
+                    : null
+              }
             />
           ))}
         </div>
@@ -54,7 +63,16 @@ function ShelfSection({
 export function ShelfPage() {
   const [showSearch, setShowSearch] = useState(false);
 
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useShelf();
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useShelf();
   const addMutation = useAddToShelf();
   const moveMutation = useMoveShelfEntry();
   const removeMutation = useRemoveFromShelf();
@@ -97,11 +115,16 @@ export function ShelfPage() {
         )}
 
         {addMutation.isError && (
-          <p className="text-sm text-red-500 mb-4">{addMutation.error.message}</p>
+          <p className="text-sm text-red-500 mb-4">
+            Couldn't add book — {addMutation.error.message}
+          </p>
         )}
 
-        {isLoading && <p className="text-sm text-gray-400">Loading your shelf…</p>}
-        {isError && <p className="text-sm text-red-500">Failed to load shelf. Please refresh.</p>}
+        {isLoading && <ShelfSkeleton />}
+
+        {isError && !isLoading && (
+          <ShelfErrorState onRetry={() => void refetch()} isRetrying={isFetching} />
+        )}
 
         {!isLoading && !isError && (
           <div className="space-y-10">

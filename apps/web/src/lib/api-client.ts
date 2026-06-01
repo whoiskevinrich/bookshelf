@@ -37,6 +37,18 @@ export interface BookSearchResult {
   description: string | null;
 }
 
+// ── Errors ────────────────────────────────────────────────────────────────
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 // ── Internal ───────────────────────────────────────────────────────────────
 
 async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -59,7 +71,7 @@ async function throwIfError(res: Response): Promise<void> {
     } catch {
       // ignore
     }
-    throw new Error(message);
+    throw new ApiError(res.status, message);
   }
 }
 

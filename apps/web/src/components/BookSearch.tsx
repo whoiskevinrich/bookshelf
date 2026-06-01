@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { searchBooks, getBookByIsbn, type BookSearchResult } from "../lib/api-client";
 import { isValidIsbn } from "../lib/isbn";
 import { BookCover } from "./BookCover";
@@ -16,6 +16,25 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const runSearch = useCallback(async (q: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (isValidIsbn(q)) {
+        const book = await getBookByIsbn(q);
+        setResults(book ? [book] : []);
+      } else {
+        const books = await searchBooks(q);
+        setResults(books);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Search failed");
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const q = query.trim();
     if (!q) {
@@ -25,29 +44,12 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
     }
 
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (isValidIsbn(q)) {
-          const book = await getBookByIsbn(q);
-          setResults(book ? [book] : []);
-        } else {
-          const books = await searchBooks(q);
-          setResults(books);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Search failed");
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 400);
+    timerRef.current = setTimeout(() => void runSearch(q), 400);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [query]);
+  }, [query, runSearch]);
 
   return (
     <div className="space-y-4">
@@ -60,9 +62,19 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
       />
 
       {loading && <p className="text-sm text-gray-400">Searching…</p>}
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-500">
+          {error}{" "}
+          <button
+            onClick={() => void runSearch(query.trim())}
+            className="underline hover:no-underline"
+          >
+            Try again
+          </button>
+        </p>
+      )}
 
-      {results.length === 0 && !loading && query.trim().length > 0 && (
+      {results.length === 0 && !loading && !error && query.trim().length > 0 && (
         <p className="text-sm text-gray-400">No results found.</p>
       )}
 
