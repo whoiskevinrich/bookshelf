@@ -80,6 +80,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 
 ### Security
 
+- **[NON-NEGOTIABLE] Environment variables must NEVER be committed to source control** — not in `.env`, `launch.json`, config files, or anywhere else. Use `.env.local` (gitignored) for local values; load them at runtime via `--env-file`, SSM, or equivalent. If a secret is already committed, treat it as compromised and rotate it.
 - No hardcoded API keys or secrets anywhere in source
 - ISBN/ASIN from user input sanitized before external API calls
 
