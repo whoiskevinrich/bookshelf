@@ -59,10 +59,13 @@ export class ApiStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
-        // CloudFormation dynamic SSM-Secure reference — resolved at deploy
-        // time by CloudFormation, never stored in plaintext in the template.
-        // Requires the SSM parameter to exist at /bookshelf/google-books-api-key.
-        GOOGLE_BOOKS_API_KEY: "{{resolve:ssm-secure:/bookshelf/google-books-api-key}}",
+        // Resolved by CloudFormation at deploy time from SSM SecureString.
+        // Increment the version number here when the key is rotated.
+        GOOGLE_BOOKS_API_KEY: ssm.StringParameter.valueForSecureStringParameter(
+          this,
+          "/bookshelf/google-books-api-key",
+          1,
+        ),
         // BOOK_PROVIDER defaults to 'google-books' inside the app
       },
       logGroup,
