@@ -29,6 +29,7 @@ beforeEach(() => {
   vi.mocked(searchBooks).mockReset();
   vi.mocked(getBookByIsbn).mockReset();
   vi.mocked(getBookByAsin).mockReset();
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 describe("GET /v1/books/search", () => {
