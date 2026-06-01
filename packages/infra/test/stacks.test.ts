@@ -16,7 +16,6 @@ const apiStack = new ApiStack(app, "TestApi", {
   userPoolId: authStack.userPoolId,
   userPoolIssuer: authStack.userPoolIssuer,
   userPoolClientId: authStack.userPoolClientId,
-  googleBooksApiKey: "test-key",
 });
 const webStack = new WebStack(app, "TestWeb", {
   env,

@@ -22,7 +22,6 @@ new ApiStack(app, "BookshelfApi", {
   userPoolId: auth.userPoolId,
   userPoolIssuer: auth.userPoolIssuer,
   userPoolClientId: auth.userPoolClientId,
-  googleBooksApiKey: process.env["GOOGLE_BOOKS_API_KEY"] ?? "",
 });
 
 new WebStack(app, "BookshelfWeb", {

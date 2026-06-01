@@ -11,8 +11,6 @@ export interface ApiStackProps extends cdk.StackProps {
   userPoolId: string;
   userPoolIssuer: string;
   userPoolClientId: string;
-  /** Google Books API key — passed in from CI secret or local env */
-  googleBooksApiKey: string;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -61,7 +59,10 @@ export class ApiStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
-        GOOGLE_BOOKS_API_KEY: props.googleBooksApiKey,
+        // CloudFormation dynamic SSM-Secure reference — resolved at deploy
+        // time by CloudFormation, never stored in plaintext in the template.
+        // Requires the SSM parameter to exist at /bookshelf/google-books-api-key.
+        GOOGLE_BOOKS_API_KEY: "{{resolve:ssm-secure:/bookshelf/google-books-api-key}}",
         // BOOK_PROVIDER defaults to 'google-books' inside the app
       },
       logGroup,
