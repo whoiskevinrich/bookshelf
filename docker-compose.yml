@@ -6,6 +6,11 @@ services:
       - "8000:8000"
     volumes:
       - dynamodb-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000 || exit 1"]
+      interval: 1s
+      timeout: 3s
+      retries: 15
 
 volumes:
   dynamodb-data:
