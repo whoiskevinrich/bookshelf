@@ -52,6 +52,7 @@ so that I immediately know what to start, rather than debugging a generic error.
 ### Must-Have (P0)
 
 **1. Retry button on shelf/wishlist load failure**
+
 - When `GET /v1/shelf` fails, display an error state with a "Try again" button.
 - Clicking "Try again" re-runs the query without a full page reload (TanStack Query `refetch`).
 - Acceptance criteria:
@@ -62,6 +63,7 @@ so that I immediately know what to start, rather than debugging a generic error.
   - [ ] If the retry fails again, the error state remains (no infinite spinner).
 
 **2. Inline error feedback for failed mutations**
+
 - When add/move/remove fails, display an error message near the action that triggered it.
 - The optimistic update is rolled back (already implemented via TanStack Query).
 - Acceptance criteria:
@@ -71,6 +73,7 @@ so that I immediately know what to start, rather than debugging a generic error.
   - [ ] The failed action's button returns to its normal (non-pending) state.
 
 **3. Loading skeleton for shelf sections**
+
 - Replace "Loading your shelf…" text with a skeleton grid matching the ShelfBookCard layout.
 - Acceptance criteria:
   - [ ] Skeleton shows the same two-column grid structure as the loaded shelf.
@@ -81,6 +84,7 @@ so that I immediately know what to start, rather than debugging a generic error.
 ### Nice-to-Have (P1)
 
 **4. Automatic retry with backoff on network errors**
+
 - Configure TanStack Query to retry up to 2 times on fetch failure before showing the error state.
 - No retry on 4xx responses (those are not transient).
 - Acceptance criteria:
@@ -89,6 +93,7 @@ so that I immediately know what to start, rather than debugging a generic error.
   - [ ] During retries, the loading skeleton remains visible (not the error state).
 
 **5. Book search error state**
+
 - When a search query fails, show an error message with a "Try again" link that re-runs the last query.
 - Currently: error message only, no retry path.
 
@@ -102,11 +107,11 @@ so that I immediately know what to start, rather than debugging a generic error.
 
 ## Success Metrics
 
-| Metric | Target | Measurement |
-|---|---|---|
-| Time-to-retry on load failure | User can initiate retry within 3 seconds of error appearing | Manual QA |
-| Mutation error visibility | Failed add/move/remove always surfaces a message | Manual QA / component test |
-| Loading skeleton renders | Skeleton visible on every initial load before data arrives | Manual QA |
+| Metric                        | Target                                                      | Measurement                |
+| ----------------------------- | ----------------------------------------------------------- | -------------------------- |
+| Time-to-retry on load failure | User can initiate retry within 3 seconds of error appearing | Manual QA                  |
+| Mutation error visibility     | Failed add/move/remove always surfaces a message            | Manual QA / component test |
+| Loading skeleton renders      | Skeleton visible on every initial load before data arrives  | Manual QA                  |
 
 ---
 
