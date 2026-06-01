@@ -61,7 +61,7 @@ export class ApiStack extends cdk.Stack {
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
         // Resolved in lambda
-        GOOGLE_BOOKS_API_KEY_SSM_NAME: '/bookshelf/google-books-api-key',
+        GOOGLE_BOOKS_API_KEY_SSM_NAME: "/bookshelf/google-books-api-key",
         // BOOK_PROVIDER defaults to 'google-books' inside the app
       },
       logGroup,

@@ -26,10 +26,12 @@ The core requirement: read a SecureString from SSM at Lambda invocation time, ca
 Instantiate `@aws-sdk/client-ssm` inside the Lambda and call `GetParameter` with `WithDecryption: true` on cold start.
 
 **Pros:**
+
 - No additional dependency beyond the AWS SDK already in the project
 - Full control over caching logic
 
 **Cons:**
+
 - Requires hand-rolling cache invalidation (TTL tracking, in-memory store)
 - Boilerplate: client instantiation, error handling, type narrowing on the response
 - Easy to introduce bugs — e.g. accidentally re-fetching on every invocation, or caching indefinitely
@@ -39,6 +41,7 @@ Instantiate `@aws-sdk/client-ssm` inside the Lambda and call `GetParameter` with
 `@aws-lambda-powertools/parameters` wraps SSM (and other parameter sources) with built-in in-process caching and a clean async API.
 
 **Pros:**
+
 - Built-in TTL-based cache — `maxAge` option, default 5 seconds, configurable up to any value
 - `decrypt: true` option handles SecureString transparently
 - No synth-time AWS account dependency; no CloudFormation token resolution issues
@@ -46,6 +49,7 @@ Instantiate `@aws-sdk/client-ssm` inside the Lambda and call `GetParameter` with
 - Well-maintained, AWS-owned library; consistent with the Lambda Powertools ecosystem if adopted more broadly later
 
 **Cons:**
+
 - Adds a new runtime dependency (`@aws-lambda-powertools/parameters`)
 - Slightly larger Lambda bundle (~50 KB gzipped for the parameters module)
 
@@ -105,14 +109,17 @@ The Lambda role has a least-privilege `ssm:GetParameter` policy scoped to the ex
 ## Consequences
 
 **Easier:**
+
 - Key rotation: update the SSM parameter; the new value is picked up within 7 days (or on the next cold start if the container is recycled sooner)
 - Local dev: no AWS credentials needed to run the books routes; `.env.local` supplies `GOOGLE_BOOKS_API_KEY` directly
 - Future parameters: `SSMProvider` can retrieve other secrets the same way with no additional setup
 
 **Harder:**
+
 - Immediate key rotation requires redeploying the Lambda (or waiting up to 7 days for cache expiry); this is acceptable for an API key with no breach history
 - `getActiveProvider()` is now `async`; all callers must `await` it
 
 **To revisit:**
+
 - If key rotation SLA tightens, reduce `maxAge` or trigger a Lambda redeployment on rotation via EventBridge + SSM parameter change notifications
 - If more secrets are added, consider centralising all SSM lookups in an `initConfig()` function called once at cold start
