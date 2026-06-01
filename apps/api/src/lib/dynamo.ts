@@ -9,7 +9,16 @@ import {
   type NativeAttributeValue,
 } from "@aws-sdk/lib-dynamodb";
 
-const client = new DynamoDBClient({});
+const endpoint = process.env["DYNAMODB_ENDPOINT"];
+const client = new DynamoDBClient(
+  endpoint
+    ? {
+        endpoint,
+        region: "us-east-1",
+        credentials: { accessKeyId: "local", secretAccessKey: "local" },
+      }
+    : {},
+);
 export const dynamo = DynamoDBDocumentClient.from(client);
 
 export const TABLE_NAME = process.env["DYNAMODB_TABLE_NAME"] ?? "bookshelf";
@@ -186,7 +195,7 @@ export async function getShelfEntry(userId: string, isbn: string): Promise<Shelf
       ),
     ),
   );
-  const item = r1.Item ?? r2.Item ?? null;
+  const item = r1?.Item ?? r2?.Item ?? null;
   return item ? toShelfEntry(item) : null;
 }
 

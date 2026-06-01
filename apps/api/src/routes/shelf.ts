@@ -58,7 +58,11 @@ shelfRouter.get("/", async (c) => {
   }
 
   try {
-    const result = await queryShelf({ userId, status, cursor, limit });
+    const opts: import("../lib/dynamo.js").QueryShelfOptions = { userId };
+    if (status !== undefined) opts.status = status;
+    if (cursor !== undefined) opts.cursor = cursor;
+    if (limit !== undefined) opts.limit = limit;
+    const result = await queryShelf(opts);
     return c.json(result);
   } catch (err) {
     console.error("Shelf query error:", err);
@@ -83,8 +87,8 @@ shelfRouter.post("/", async (c) => {
     return c.json({ error: "Body must include isbn (string) and status (string)" }, 400);
   }
 
-  const rawIsbn = (body as Record<string, string>)["isbn"];
-  const rawStatus = (body as Record<string, string>)["status"];
+  const rawIsbn = (body as Record<string, string>)["isbn"]!;
+  const rawStatus = (body as Record<string, string>)["status"]!;
 
   const isbnOrErr = parseIsbnParam(c, rawIsbn);
   if (isbnOrErr instanceof Response) return isbnOrErr;

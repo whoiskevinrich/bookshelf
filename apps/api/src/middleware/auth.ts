@@ -31,9 +31,11 @@ export async function authMiddleware(c: Context, next: Next): Promise<Response |
 
   const token = authHeader.slice(7);
   try {
+    const issuer = process.env["COGNITO_ISSUER"];
+    const audience = process.env["COGNITO_CLIENT_ID"];
     const { payload } = await jwtVerify(token, getJwks(), {
-      issuer: process.env["COGNITO_ISSUER"],
-      audience: process.env["COGNITO_CLIENT_ID"],
+      ...(issuer ? { issuer } : {}),
+      ...(audience ? { audience } : {}),
     });
 
     const sub = payload["sub"];
