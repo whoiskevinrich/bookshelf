@@ -33,29 +33,31 @@ export function ShelfBookCard({
           className="w-12 h-[72px] flex-shrink-0 rounded shadow-sm"
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-tight truncate">{title}</p>
+          <p className="text-sm font-medium leading-tight truncate dark:text-white">{title}</p>
           {authors.length > 0 && (
-            <p className="text-xs text-gray-500 truncate">{authors.join(", ")}</p>
+            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+              {authors.join(", ")}
+            </p>
           )}
           <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => onMove(isbn, targetStatus)}
               disabled={isMoving || isRemoving}
-              className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40"
+              className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-40"
             >
               {isMoving ? "Moving…" : moveLabel}
             </button>
             <button
               onClick={() => onRemove(isbn)}
               disabled={isMoving || isRemoving}
-              className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+              className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-40"
             >
               {isRemoving ? "Removing…" : "Remove"}
             </button>
           </div>
         </div>
       </div>
-      {error && <p className="text-xs text-red-500 pl-15">{error}</p>}
+      {error && <p className="text-xs text-red-500 dark:text-red-400 pl-15">{error}</p>}
     </div>
   );
 }
