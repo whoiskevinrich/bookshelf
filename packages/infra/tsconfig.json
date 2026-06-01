@@ -5,7 +5,8 @@
     "outDir": "cdk.out/.ts",
     // CDK types use optional properties that can be undefined, which is
     // incompatible with exactOptionalPropertyTypes: true in the base config.
-    "exactOptionalPropertyTypes": false
+    "exactOptionalPropertyTypes": false,
+    "types": ["node"]
   },
   "include": ["bin", "lib", "test"]
 }
