@@ -25,6 +25,7 @@ If the script reports nothing to copy (files already exist), proceed normally.
 If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainWorktree "C:\path\to\bookshelf"`.
 
 **After setup, choose a dev mode** — see `docs/runbooks/local-dev.md`:
+
 - **Frontend work only** → `pnpm --filter @bookshelf/web dev:mock` (no Docker needed)
 - **API or full-stack work** → `docker compose up -d` then start both servers normally
 

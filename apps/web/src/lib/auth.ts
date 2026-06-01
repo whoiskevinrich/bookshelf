@@ -17,7 +17,6 @@ export interface AuthUser {
   username: string;
 }
 
-
 // ── Error mapping ─────────────────────────────────────────────────────────────
 
 function mapCognitoError(err: unknown): string {

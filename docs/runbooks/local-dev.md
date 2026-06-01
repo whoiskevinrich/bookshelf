@@ -36,11 +36,11 @@ pnpm --filter @bookshelf/web dev:mock
 
 Sign in with your real Cognito account. The shelf loads from mock seed data — no DynamoDB read. Mutations (add, move, remove) work against in-memory state for the browser session.
 
-| File | Purpose |
-|---|---|
-| `apps/web/src/mocks/seed-data.ts` | Initial mock shelf (4 books) |
-| `apps/web/src/mocks/handlers.ts` | MSW request handlers for all `/v1/*` routes |
-| `apps/web/.env.mock` | Vite mode file — sets `VITE_MOCK_API=true`, clears `VITE_API_BASE_URL` |
+| File                              | Purpose                                                                |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `apps/web/src/mocks/seed-data.ts` | Initial mock shelf (4 books)                                           |
+| `apps/web/src/mocks/handlers.ts`  | MSW request handlers for all `/v1/*` routes                            |
+| `apps/web/.env.mock`              | Vite mode file — sets `VITE_MOCK_API=true`, clears `VITE_API_BASE_URL` |
 
 `vite build --mode mock` is blocked at the config level — mock mode cannot produce a production bundle.
 
@@ -61,13 +61,13 @@ See [local-dynamodb.md](./local-dynamodb.md) for DynamoDB operations (reset, ins
 
 ## Which mode to use?
 
-| Scenario | Mode |
-|---|---|
-| New worktree, no Docker running | A — after running `worktree-setup.ps1` |
-| Building / iterating on UI | A |
-| Testing real API behavior or DynamoDB queries | B |
-| Testing auth sign-up / sign-in flows | B |
-| Pre-merge review / CI | B |
+| Scenario                                      | Mode                                   |
+| --------------------------------------------- | -------------------------------------- |
+| New worktree, no Docker running               | A — after running `worktree-setup.ps1` |
+| Building / iterating on UI                    | A                                      |
+| Testing real API behavior or DynamoDB queries | B                                      |
+| Testing auth sign-up / sign-in flows          | B                                      |
+| Pre-merge review / CI                         | B                                      |
 
 ---
 
