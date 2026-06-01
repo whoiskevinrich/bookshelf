@@ -92,7 +92,9 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>
               {book.authors.length > 0 && (
-                <p className="text-xs text-gray-500 dark:text-zinc-400">{book.authors.join(", ")}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-400">
+                  {book.authors.join(", ")}
+                </p>
               )}
               {book.publishedYear && (
                 <p className="text-xs text-gray-400 dark:text-zinc-500">{book.publishedYear}</p>

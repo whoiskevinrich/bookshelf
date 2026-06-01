@@ -1,7 +1,7 @@
 # Spec: Dark Mode
 
 **Status**: Draft  
-**Date**: 2026-05-31  
+**Date**: 2026-05-31
 
 ---
 
@@ -36,13 +36,13 @@ The Bookshelf web app currently renders only in a light theme. Users who prefer 
 ### Must-Have (P0)
 
 - **Toggle control in AppHeader**: A button/icon in the site header that switches between light and dark mode.
-  - *Acceptance*: Toggle is visible on every page; clicking it immediately changes the theme without a page reload.
+  - _Acceptance_: Toggle is visible on every page; clicking it immediately changes the theme without a page reload.
 - **Dark theme applied globally**: All existing pages (Landing, Shelf, Wishlist, Auth flows) render with a dark palette.
-  - *Acceptance*: No page or component retains a hard-coded white/gray-light background when dark mode is active.
+  - _Acceptance_: No page or component retains a hard-coded white/gray-light background when dark mode is active.
 - **Preference persisted in localStorage**: The chosen theme survives page refresh and new browser tab.
-  - *Acceptance*: Set dark mode → close tab → reopen app → app loads in dark mode.
+  - _Acceptance_: Set dark mode → close tab → reopen app → app loads in dark mode.
 - **System preference detection on first visit**: Respects `prefers-color-scheme: dark` media query for users who have never explicitly toggled.
-  - *Acceptance*: A user with OS dark mode set sees dark mode on first load without any interaction.
+  - _Acceptance_: A user with OS dark mode set sees dark mode on first load without any interaction.
 
 ### Nice-to-Have (P1)
 

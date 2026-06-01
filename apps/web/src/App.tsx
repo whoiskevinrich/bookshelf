@@ -15,62 +15,62 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 export function App() {
   return (
     <ThemeProvider>
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          {/* Public */}
-          <Route path="/" element={<LandingPage />} />
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            {/* Public */}
+            <Route path="/" element={<LandingPage />} />
 
-          {/* Auth routes — redirect to /shelf if already signed in */}
-          <Route
-            path="/auth/login"
-            element={
-              <AuthRoute>
-                <LoginPage />
-              </AuthRoute>
-            }
-          />
-          <Route
-            path="/auth/signup"
-            element={
-              <AuthRoute>
-                <SignUpPage />
-              </AuthRoute>
-            }
-          />
-          <Route path="/auth/verify" element={<VerifyPage />} />
-          <Route
-            path="/auth/forgot-password"
-            element={
-              <AuthRoute>
-                <ForgotPasswordPage />
-              </AuthRoute>
-            }
-          />
-          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            {/* Auth routes — redirect to /shelf if already signed in */}
+            <Route
+              path="/auth/login"
+              element={
+                <AuthRoute>
+                  <LoginPage />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="/auth/signup"
+              element={
+                <AuthRoute>
+                  <SignUpPage />
+                </AuthRoute>
+              }
+            />
+            <Route path="/auth/verify" element={<VerifyPage />} />
+            <Route
+              path="/auth/forgot-password"
+              element={
+                <AuthRoute>
+                  <ForgotPasswordPage />
+                </AuthRoute>
+              }
+            />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
-          {/* Protected routes */}
-          <Route
-            path="/shelf"
-            element={
-              <ProtectedRoute>
-                <ShelfPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/wishlist"
-            element={
-              <ProtectedRoute>
-                <WishlistPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected routes */}
+            <Route
+              path="/shelf"
+              element={
+                <ProtectedRoute>
+                  <ShelfPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wishlist"
+              element={
+                <ProtectedRoute>
+                  <WishlistPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }
