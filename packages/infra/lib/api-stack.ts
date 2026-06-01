@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as apigatewayv2Integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
@@ -59,10 +60,8 @@ export class ApiStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
-        // Resolved by CloudFormation at deploy time from SSM SecureString.
-        GOOGLE_BOOKS_API_KEY: cdk.SecretValue.ssmSecure(
-          "/bookshelf/google-books-api-key",
-        ).unsafeUnwrap(),
+        // Resolved in lambda
+        GOOGLE_BOOKS_API_KEY_SSM_NAME: '/bookshelf/google-books-api-key',
         // BOOK_PROVIDER defaults to 'google-books' inside the app
       },
       logGroup,
@@ -70,6 +69,16 @@ export class ApiStack extends cdk.Stack {
 
     // Least-privilege DynamoDB access scoped to the single bookshelf table
     table.grantReadWriteData(apiFunction);
+
+    // Allow Lambda to read (and decrypt) the Google Books API key from SSM
+    apiFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ssm:GetParameter"],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/bookshelf/google-books-api-key`,
+        ],
+      }),
+    );
 
     // ── API Gateway HTTP API ───────────────────────────────────────────────
     const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {
