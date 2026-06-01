@@ -16,6 +16,7 @@ conditions:
 Environment variable values must NEVER be committed to source control — not in `launch.json`, `.env` files, config files, or anywhere else.
 
 **What to do instead:**
+
 - Store values in `apps/api/.env.local` or `apps/web/.env` (both gitignored)
 - Load them at runtime: `tsx --env-file=.env.local` or Vite's automatic `.env` loading
 - For `launch.json` specifically: remove the `"env"` block entirely and rely on the dev script to load the file
