@@ -1,0 +1,1 @@
+pnpm format:check || (echo "Run 'pnpm format' to fix formatting before pushing." && exit 1)
