@@ -15,7 +15,10 @@ const client = new DynamoDBClient(
     ? {
         endpoint,
         region: "us-east-1",
-        credentials: { accessKeyId: "local", secretAccessKey: "local" },
+        credentials: {
+          accessKeyId: "DUMMYACCESSKEYID0001",
+          secretAccessKey: "dummysecretaccesskey0001",
+        },
       }
     : {},
 );

@@ -17,7 +17,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
 
-const ENDPOINT = process.env["DYNAMODB_ENDPOINT"] ?? "http://localhost:8000";
+const ENDPOINT = process.env["DYNAMODB_ENDPOINT"] ?? "http://127.0.0.1:8000";
 const TABLE = process.env["DYNAMODB_TABLE_NAME"] ?? "bookshelf";
 const USER_ID = process.env["LOCAL_DEV_USER_ID"];
 
@@ -33,7 +33,7 @@ if (!USER_ID) {
 const raw = new DynamoDBClient({
   endpoint: ENDPOINT,
   region: "us-east-1",
-  credentials: { accessKeyId: "local", secretAccessKey: "local" },
+  credentials: { accessKeyId: "DUMMYACCESSKEYID0001", secretAccessKey: "dummysecretaccesskey0001" },
 });
 const db = DynamoDBDocumentClient.from(raw);
 
