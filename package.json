@@ -17,16 +17,18 @@
     "synth": "pnpm --filter ./packages/infra/** run synth",
     "dev:api:local": "docker compose up -d --wait && pnpm --filter @bookshelf/api db:seed && pnpm --filter @bookshelf/api dev",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "jiti": "^2.4.2",
+    "@eslint/css": "^1.3.0",
     "@eslint/js": "^10.0.1",
     "@eslint/json": "^2.0.0",
     "@eslint/markdown": "^8.0.2",
-    "@eslint/css": "^1.3.0",
     "eslint": "^10.4.1",
     "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "jiti": "^2.4.2",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.0"
