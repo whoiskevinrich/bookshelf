@@ -131,7 +131,8 @@ export function ShelfPage() {
           <ShelfErrorState onRetry={() => void refetch()} isRetrying={isFetching} />
         )}
 
-        {!isLoading && !isError &&
+        {!isLoading &&
+          !isError &&
           (owned.length === 0 && want.length === 0 ? (
             <ShelfEmptyState onAdd={handleOpenSearch} />
           ) : (

@@ -58,13 +58,15 @@ When both Owned and Want to Read are empty (total = 0), render a single centred 
 **2. Encouraging copy with a clear CTA**
 
 The panel must include:
+
 - A headline: warm and playful, reinforces what Bookshelf is for.
 - A short supporting line: practical — tells the user what the app can track.
 - A primary CTA button: opens the Add a book search inline (same action as the "Add a book" header button), so the user doesn't have to scroll up.
 
 Suggested copy (can be adjusted during implementation):
+
 - Headline: **"Your shelf is empty — let's fix that."**
-- Subline: *"Add the books you own, and the ones you're dreaming of reading next."*
+- Subline: _"Add the books you own, and the ones you're dreaming of reading next."_
 - CTA: **"Add your first book →"**
 
 - Acceptance criteria:
@@ -92,10 +94,10 @@ When the user adds their first book from the empty-state CTA, the shelf smoothly
 
 ## Success Metrics
 
-| Metric | Target | Measurement |
-|---|---|---|
-| Empty-state → first book add (same session) | ≥ 60% of new users | Manual review / future analytics |
-| Empty-state renders correctly | Shown on empty shelf, absent on non-empty shelf | QA |
+| Metric                                      | Target                                          | Measurement                      |
+| ------------------------------------------- | ----------------------------------------------- | -------------------------------- |
+| Empty-state → first book add (same session) | ≥ 60% of new users                              | Manual review / future analytics |
+| Empty-state renders correctly               | Shown on empty shelf, absent on non-empty shelf | QA                               |
 
 ---
 
