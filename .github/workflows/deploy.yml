@@ -49,6 +49,8 @@ jobs:
         run: pnpm --filter @bookshelf/api run build
 
       - name: CDK deploy all stacks
+        env:
+          GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
         run: pnpm deploy:infra
 
       - name: Resolve API URL from SSM

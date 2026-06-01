@@ -11,6 +11,8 @@ export interface ApiStackProps extends cdk.StackProps {
   userPoolId: string;
   userPoolIssuer: string;
   userPoolClientId: string;
+  /** Google Books API key — passed in from CI secret or local env */
+  googleBooksApiKey: string;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -59,10 +61,7 @@ export class ApiStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
-        GOOGLE_BOOKS_API_KEY: ssm.StringParameter.valueFromLookup(
-          this,
-          "/bookshelf/google-books-api-key",
-        ),
+        GOOGLE_BOOKS_API_KEY: props.googleBooksApiKey,
         // BOOK_PROVIDER defaults to 'google-books' inside the app
       },
       logGroup,
