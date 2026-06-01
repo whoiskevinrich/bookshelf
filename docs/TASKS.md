@@ -6,9 +6,7 @@
 
 ### Phase 2 — API (remaining)
 
-- [ ] Validate demo shelf ISBNs against Google Books API (confirm all 10 have cover images)
-- [ ] Deploy to dev; smoke-test all endpoints with curl
-- [ ] Write integration tests against DynamoDB Local
+- [ ] Deploy to dev; smoke-test all endpoints (`API_BASE_URL=<url> pnpm test:smoke`)
 
 ### Phase 3 — MCP server
 
@@ -86,3 +84,5 @@
 - [x] Implement `AuthContext` + `ProtectedRoute`
 - [x] Build auth pages — `/auth/login`, `/auth/signup`, `/auth/verify`, `/auth/forgot-password`, `/auth/reset-password`
 - [x] Write `docs/runbooks/auth-troubleshooting.md`
+- [x] Write integration tests against DynamoDB Local (`apps/api/test/integration/dynamo.test.ts`)
+- [x] Write ISBN cover validation script (`apps/api/scripts/validate-covers.ts`)
