@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "kill-port 3000 || true",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

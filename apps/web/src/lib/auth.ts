@@ -99,7 +99,9 @@ export async function getSession(): Promise<string | null> {
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     const user = await amplifyGetCurrentUser();
-    return { userId: user.userId, username: user.username };
+    // signInDetails.loginId is the email; username is the Cognito sub UUID
+    const email = user.signInDetails?.loginId ?? user.username;
+    return { userId: user.userId, username: email };
   } catch {
     return null;
   }
