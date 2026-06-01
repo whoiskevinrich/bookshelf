@@ -59,7 +59,7 @@ export class ApiStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
-        GOOGLE_BOOKS_API_KEY: ssm.StringParameter.valueForStringParameter(
+        GOOGLE_BOOKS_API_KEY: ssm.StringParameter.valueFromLookup(
           this,
           "/bookshelf/google-books-api-key",
         ),
