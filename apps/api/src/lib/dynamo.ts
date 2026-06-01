@@ -9,20 +9,30 @@ import {
   type NativeAttributeValue,
 } from "@aws-sdk/lib-dynamodb";
 
-const endpoint = process.env["DYNAMODB_ENDPOINT"];
-const client = new DynamoDBClient(
-  endpoint
-    ? {
-        endpoint,
-        region: "us-east-1",
-        credentials: {
-          accessKeyId: "DUMMYACCESSKEYID0001",
-          secretAccessKey: "dummysecretaccesskey0001",
-        },
-      }
-    : {},
-);
-export const dynamo = DynamoDBDocumentClient.from(client);
+// Lazy-initialized so that env vars loaded by dotenv in server.ts take effect
+// before the client is constructed. ESM imports are hoisted, so top-level
+// initialization runs before dotenv's config() call in server.ts.
+let _dynamo: DynamoDBDocumentClient | undefined;
+
+export function dynamo(): DynamoDBDocumentClient {
+  if (!_dynamo) {
+    const endpoint = process.env["DYNAMODB_ENDPOINT"];
+    const client = new DynamoDBClient(
+      endpoint
+        ? {
+            endpoint,
+            region: "us-east-1",
+            credentials: {
+              accessKeyId: "DUMMYACCESSKEYID0001",
+              secretAccessKey: "dummysecretaccesskey0001",
+            },
+          }
+        : {},
+    );
+    _dynamo = DynamoDBDocumentClient.from(client);
+  }
+  return _dynamo;
+}
 
 export const TABLE_NAME = process.env["DYNAMODB_TABLE_NAME"] ?? "bookshelf";
 
@@ -154,14 +164,14 @@ export async function queryShelf(opts: QueryShelfOptions): Promise<QueryShelfRes
 
   // Data query and count query run in parallel
   const [queryResult, countResult] = await Promise.all([
-    dynamo.send(
+    dynamo().send(
       new QueryCommand({
         ...baseQuery,
         Limit: limit,
         ExclusiveStartKey: opts.cursor ? decodeCursor(opts.cursor) : undefined,
       }),
     ),
-    dynamo.send(new QueryCommand({ ...baseQuery, Select: "COUNT" })),
+    dynamo().send(new QueryCommand({ ...baseQuery, Select: "COUNT" })),
   ]);
 
   const items = queryResult.Items ?? [];
@@ -171,7 +181,7 @@ export async function queryShelf(opts: QueryShelfOptions): Promise<QueryShelfRes
   const bookMap: Record<string, BookMetadata> = {};
   if (entries.length > 0) {
     const keys = entries.map((e) => ({ PK: bookPk(e.isbn), SK: BOOK_SK }));
-    const batchResult = await dynamo.send(
+    const batchResult = await dynamo().send(
       new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }),
     );
     for (const book of batchResult.Responses?.[TABLE_NAME] ?? []) {
@@ -190,7 +200,7 @@ export async function getShelfEntry(userId: string, isbn: string): Promise<Shelf
   // Both status keys are probed in parallel — we don't know which prefix applies
   const [r1, r2] = await Promise.all(
     (["owned", "want"] as ShelfStatus[]).map((status) =>
-      dynamo.send(
+      dynamo().send(
         new GetCommand({
           TableName: TABLE_NAME,
           Key: { PK: userPk(userId), SK: shelfSk(status, isbn) },
@@ -208,7 +218,7 @@ export async function putShelfEntry(
   status: ShelfStatus,
   addedAt: string,
 ): Promise<void> {
-  await dynamo.send(
+  await dynamo().send(
     new PutCommand({
       TableName: TABLE_NAME,
       Item: shelfItem(userId, isbn, status, addedAt),
@@ -223,7 +233,7 @@ export async function deleteShelfEntry(
   isbn: string,
   status: ShelfStatus,
 ): Promise<void> {
-  await dynamo.send(
+  await dynamo().send(
     new DeleteCommand({
       TableName: TABLE_NAME,
       Key: { PK: userPk(userId), SK: shelfSk(status, isbn) },
@@ -241,7 +251,7 @@ export async function updateShelfStatus(
 ): Promise<void> {
   // DynamoDB has no rename-key operation — delete old SK, put new SK
   await deleteShelfEntry(userId, isbn, oldStatus);
-  await dynamo.send(
+  await dynamo().send(
     new PutCommand({
       TableName: TABLE_NAME,
       Item: shelfItem(userId, isbn, newStatus, addedAt, notes),
@@ -256,7 +266,7 @@ export async function putBookMetadata(
   metadata: BookMetadata,
   cachedAt: string,
 ): Promise<void> {
-  await dynamo.send(
+  await dynamo().send(
     new PutCommand({
       TableName: TABLE_NAME,
       Item: { PK: bookPk(isbn), SK: BOOK_SK, isbn, ...metadata, cachedAt },

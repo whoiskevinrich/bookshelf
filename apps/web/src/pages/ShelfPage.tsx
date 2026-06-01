@@ -12,7 +12,7 @@ import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
 import { BookSearch } from "../components/BookSearch";
-import type { ShelfEntry, ShelfStatus } from "../lib/api-client";
+import type { ShelfEntry, ShelfStatus, BookSearchResult } from "../lib/api-client";
 
 interface ShelfSectionProps {
   title: string;
@@ -93,8 +93,8 @@ export function ShelfPage() {
     setShowSearch(true);
   }
 
-  function handleAdd(isbn: string, status: ShelfStatus) {
-    addMutation.mutate({ isbn, status });
+  function handleAdd(isbn: string, status: ShelfStatus, book: BookSearchResult) {
+    addMutation.mutate({ isbn, status, book });
     setShowSearch(false);
   }
 

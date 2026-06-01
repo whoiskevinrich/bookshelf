@@ -9,6 +9,7 @@ import {
   addToShelf,
   updateShelfStatus,
   removeFromShelf,
+  type BookMetadata,
   type ShelfEntry,
   type ShelfPage,
   type ShelfStatus,
@@ -36,8 +37,8 @@ export function useShelf(opts?: { status?: ShelfStatus }) {
 export function useAddToShelf() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ isbn, status }: { isbn: string; status: ShelfStatus }) =>
-      addToShelf(isbn, status),
+    mutationFn: ({ isbn, status, book }: { isbn: string; status: ShelfStatus; book?: BookMetadata }) =>
+      addToShelf(isbn, status, book),
     onSuccess: () => qc.invalidateQueries({ queryKey: shelfKey() }),
   });
 }

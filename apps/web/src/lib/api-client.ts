@@ -92,10 +92,14 @@ export async function fetchShelf(opts: {
   return res.json() as Promise<ShelfPage>;
 }
 
-export async function addToShelf(isbn: string, status: ShelfStatus): Promise<ShelfEntry> {
+export async function addToShelf(
+  isbn: string,
+  status: ShelfStatus,
+  book?: BookMetadata,
+): Promise<ShelfEntry> {
   const res = await authedFetch("/v1/shelf", {
     method: "POST",
-    body: JSON.stringify({ isbn, status }),
+    body: JSON.stringify({ isbn, status, ...(book ? { book } : {}) }),
   });
   await throwIfError(res);
   return res.json() as Promise<ShelfEntry>;

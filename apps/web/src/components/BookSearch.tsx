@@ -5,7 +5,7 @@ import { BookCover } from "./BookCover";
 import type { ShelfStatus } from "../lib/api-client";
 
 interface BookSearchProps {
-  onAdd: (isbn: string, status: ShelfStatus) => void;
+  onAdd: (isbn: string, status: ShelfStatus, book: BookSearchResult) => void;
   isAdding?: boolean;
 }
 
@@ -98,14 +98,14 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
             </div>
             <div className="flex flex-col gap-1.5 flex-shrink-0">
               <button
-                onClick={() => onAdd(book.isbn, "owned")}
+                onClick={() => onAdd(book.isbn, "owned", book)}
                 disabled={isAdding}
                 className="text-xs bg-gray-900 text-white px-2.5 py-1 rounded hover:bg-gray-700 disabled:opacity-40 transition-colors whitespace-nowrap"
               >
                 Add Owned
               </button>
               <button
-                onClick={() => onAdd(book.isbn, "want")}
+                onClick={() => onAdd(book.isbn, "want", book)}
                 disabled={isAdding}
                 className="text-xs border border-gray-300 text-gray-700 px-2.5 py-1 rounded hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap"
               >
