@@ -19,6 +19,8 @@ const queryClient = new QueryClient({
   },
 });
 
+const MOCK_MODE = import.meta.env.VITE_MOCK_API === "true";
+
 Amplify.configure({
   Auth: {
     Cognito: {
@@ -27,6 +29,11 @@ Amplify.configure({
     },
   },
 });
+
+if (MOCK_MODE) {
+  const { worker } = await import("./mocks/browser");
+  await worker.start({ onUnhandledRequest: "bypass" });
+}
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element not found");

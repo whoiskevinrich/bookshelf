@@ -11,6 +11,23 @@ Deployment target: AWS (CDK) — dev environment live; see `docs/runbooks/cicd-s
 Always begin every session with `/productivity:start`.
 No implementation work begins before running this skill.
 
+## Worktree Setup (new worktrees only)
+
+When opening a session inside a git worktree (path contains `.claude/worktrees/`), run the setup script before any dev work:
+
+```powershell
+.\scripts\worktree-setup.ps1
+```
+
+This copies `apps/api/.env.local` and `apps/web/.env.local` from the main worktree (`G:\source\bookshelf`). Without these files neither the API nor the frontend can connect to Cognito or DynamoDB.
+
+If the script reports nothing to copy (files already exist), proceed normally.
+If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainWorktree "C:\path\to\bookshelf"`.
+
+**After setup, choose a dev mode** — see `docs/runbooks/local-dev.md`:
+- **Frontend work only** → `pnpm --filter @bookshelf/web dev:mock` (no Docker needed)
+- **API or full-stack work** → `docker compose up -d` then start both servers normally
+
 ## Workflow: Idea to Production
 
 ### Phase 0 — Session Start
