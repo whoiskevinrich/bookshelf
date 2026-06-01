@@ -7,7 +7,7 @@ services:
     volumes:
       - dynamodb-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000 || exit 1"]
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/8000' 2>/dev/null && exit 0 || exit 1"]
       interval: 1s
       timeout: 3s
       retries: 15
