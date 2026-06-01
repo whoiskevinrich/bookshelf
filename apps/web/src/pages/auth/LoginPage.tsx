@@ -38,7 +38,7 @@ export function LoginPage() {
   return (
     <div>
       {banner && (
-        <div className="bg-green-50 border-b border-green-200 px-4 py-3 text-sm text-green-700 text-center">
+        <div className="bg-green-50 border-b border-green-200 px-4 py-3 text-sm text-green-700 text-center dark:bg-green-900/30 dark:border-green-800 dark:text-green-400">
           {banner}
         </div>
       )}
@@ -50,7 +50,7 @@ export function LoginPage() {
           className="space-y-4"
         >
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-400">
               {error}
               {error.includes("verify your email") && (
                 <>
@@ -64,7 +64,7 @@ export function LoginPage() {
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-zinc-300">
               Email
             </label>
             <input
@@ -75,12 +75,12 @@ export function LoginPage() {
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-zinc-300">
               Password
             </label>
             <input
@@ -90,7 +90,7 @@ export function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -112,7 +112,7 @@ export function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600">
+        <p className="text-center text-sm text-gray-600 dark:text-zinc-400">
           Don&apos;t have an account?{" "}
           <Link to="/auth/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
             Sign up

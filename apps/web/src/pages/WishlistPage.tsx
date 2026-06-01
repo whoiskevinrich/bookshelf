@@ -23,11 +23,11 @@ export function WishlistPage() {
   const want = useMemo(() => flattenShelf(data), [data]);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-zinc-900 transition-colors">
       <AppHeader activePage="wishlist" />
 
       <main className="max-w-4xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold mb-8">Wishlist</h1>
+        <h1 className="text-2xl font-bold dark:text-white mb-8">Wishlist</h1>
 
         {isLoading && <ShelfSkeleton sections={1} />}
 
@@ -43,8 +43,11 @@ export function WishlistPage() {
           <>
             {want.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-gray-400 mb-4">Your wishlist is empty.</p>
-                <Link to="/shelf" className="text-sm text-gray-900 underline underline-offset-2">
+                <p className="text-gray-400 dark:text-zinc-500 mb-4">Your wishlist is empty.</p>
+                <Link
+                  to="/shelf"
+                  className="text-sm text-gray-900 dark:text-white underline underline-offset-2"
+                >
                   Go to your shelf to add books
                 </Link>
               </div>
@@ -75,7 +78,7 @@ export function WishlistPage() {
                 <button
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40"
+                  className="text-sm text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white disabled:opacity-40"
                 >
                   {isFetchingNextPage ? "Loading more…" : "Load more"}
                 </button>

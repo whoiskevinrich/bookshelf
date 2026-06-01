@@ -6,7 +6,7 @@ export function PasswordChecklist({ password }: { password: string }) {
       {PASSWORD_RULES.map((r) => {
         const met = r.test(password);
         return (
-          <li key={r.label} className={`text-xs ${met ? "text-green-600" : "text-gray-400"}`}>
+          <li key={r.label} className={`text-xs ${met ? "text-green-600 dark:text-green-400" : "text-gray-400 dark:text-zinc-500"}`}>
             {met ? "✓" : "·"} {r.label}
           </li>
         );

@@ -20,6 +20,14 @@
 - [ ] Test with MCP inspector; verify `get_shelf` returns usable inline data in one call
 - [ ] Write unit tests for all tools
 
+### Dark Mode
+
+- [x] Define CSS color tokens in `index.css` (light + dark via `.dark` class on `<html>`)
+- [x] Implement `useTheme` hook — localStorage persistence + `prefers-color-scheme` detection
+- [x] Add theme toggle button to `AppHeader` (sun/moon icon)
+- [x] Audit and update all components to use semantic token classes (remove hard-coded light-only utilities)
+- [x] QA: verify all pages in both themes at mobile and desktop widths
+
 ### Phase 4 — Web UI (remaining)
 
 - [ ] Implement `lib/api-client.ts` — typed client for `/v1/` endpoints
