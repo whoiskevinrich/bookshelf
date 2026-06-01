@@ -3,6 +3,11 @@ import { searchBooks, getBookByIsbn, getBookByAsin } from "../lib/books/search.j
 
 export const booksRouter = new Hono();
 
+function isValidIsbn(isbn: string): boolean {
+  const cleaned = isbn.replace(/-/g, "");
+  return /^\d{10}$/.test(cleaned) || /^\d{13}$/.test(cleaned);
+}
+
 booksRouter.get("/search", async (c) => {
   const q = c.req.query("q");
   if (!q || q.trim().length === 0) {
@@ -20,6 +25,9 @@ booksRouter.get("/search", async (c) => {
 
 booksRouter.get("/isbn/:isbn", async (c) => {
   const { isbn } = c.req.param();
+  if (!isValidIsbn(isbn)) {
+    return c.json({ error: "Invalid ISBN format" }, 400);
+  }
   try {
     const book = await getBookByIsbn(isbn);
     if (!book) return c.json({ error: "Book not found" }, 404);

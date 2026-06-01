@@ -2,6 +2,9 @@
 
 ## Active
 
+- [ ] Merge PR #13 — smoke test fixes (SSM API key injection, ISBN validation, infra tsconfig, Powertools caching)
+- [ ] After merge: verify CI deploy passes all 11 smoke tests in dev
+
 ## Backlog
 
 ### Phase 2 — API (remaining)

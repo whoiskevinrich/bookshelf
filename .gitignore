@@ -10,6 +10,8 @@ node_modules/
 # Build outputs
 dist/
 cdk.out/
+# CDK context cache — may contain resolved SSM values (secrets)
+cdk.context.json
 
 # Environment — never commit secrets
 .env
