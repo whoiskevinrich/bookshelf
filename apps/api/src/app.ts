@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { booksRouter } from "./routes/books.js";
 import { shelfRouter } from "./routes/shelf.js";
 
@@ -7,6 +8,19 @@ import { shelfRouter } from "./routes/shelf.js";
  * and the local dev server (server.ts).
  */
 export const app = new Hono();
+
+// CORS must be registered before routes so it applies to all responses,
+// including error responses (4xx/5xx). Origin is set per-environment.
+const corsOrigin = process.env["CORS_ORIGIN"] ?? "http://localhost:3000";
+app.use(
+  "*",
+  cors({
+    origin: corsOrigin,
+    allowHeaders: ["Authorization", "Content-Type"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    maxAge: 86400,
+  }),
+);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 

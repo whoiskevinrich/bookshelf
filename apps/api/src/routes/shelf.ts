@@ -9,6 +9,7 @@ import {
   updateShelfStatus,
   putBookMetadata,
   isValidStatus,
+  type BookMetadata,
   type ShelfStatus,
 } from "../lib/dynamo.js";
 import { getBookByIsbn } from "../lib/books/search.js";
@@ -58,7 +59,11 @@ shelfRouter.get("/", async (c) => {
   }
 
   try {
-    const result = await queryShelf({ userId, status, cursor, limit });
+    const opts: import("../lib/dynamo.js").QueryShelfOptions = { userId };
+    if (status !== undefined) opts.status = status;
+    if (cursor !== undefined) opts.cursor = cursor;
+    if (limit !== undefined) opts.limit = limit;
+    const result = await queryShelf(opts);
     return c.json(result);
   } catch (err) {
     console.error("Shelf query error:", err);
@@ -83,8 +88,8 @@ shelfRouter.post("/", async (c) => {
     return c.json({ error: "Body must include isbn (string) and status (string)" }, 400);
   }
 
-  const rawIsbn = (body as Record<string, string>)["isbn"];
-  const rawStatus = (body as Record<string, string>)["status"];
+  const rawIsbn = (body as Record<string, string>)["isbn"]!;
+  const rawStatus = (body as Record<string, string>)["status"]!;
 
   const isbnOrErr = parseIsbnParam(c, rawIsbn);
   if (isbnOrErr instanceof Response) return isbnOrErr;
@@ -106,17 +111,24 @@ shelfRouter.post("/", async (c) => {
     return c.json({ error: "Failed to add book" }, 500);
   }
 
-  // Cache book metadata asynchronously — don't block the response
-  void (async () => {
-    try {
-      const bookData = await getBookByIsbn(isbn);
-      if (bookData) {
-        await putBookMetadata(isbn, bookData, addedAt);
-      }
-    } catch (err) {
-      console.error("Book metadata cache error:", err);
-    }
-  })();
+  // Save book metadata synchronously so it's available on the immediate shelf refetch.
+  // If the client passed metadata from search results, use it directly (no extra API call).
+  // Otherwise fall back to a Google Books lookup.
+  const rawBook = (body as Record<string, unknown>)["book"];
+  const clientBook =
+    rawBook !== null &&
+    typeof rawBook === "object" &&
+    typeof (rawBook as Record<string, unknown>)["title"] === "string"
+      ? (rawBook as BookMetadata)
+      : null;
+
+  try {
+    const metadata = clientBook ?? (await getBookByIsbn(isbn));
+    if (metadata) await putBookMetadata(isbn, metadata, addedAt);
+  } catch (err) {
+    console.error("Book metadata cache error:", err);
+    // Non-fatal — shelf entry was saved; cover/title will be missing until next lookup
+  }
 
   return c.json({ isbn, status, addedAt, notes: null }, 201);
 });
