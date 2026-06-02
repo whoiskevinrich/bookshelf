@@ -43,7 +43,7 @@ export function WishlistPage() {
           <>
             {want.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-gray-400 dark:text-zinc-500 mb-4">Your wishlist is empty.</p>
+                <p className="text-gray-500 dark:text-zinc-400 mb-4">Your wishlist is empty.</p>
                 <Link
                   to="/shelf"
                   className="text-sm text-gray-900 dark:text-white underline underline-offset-2"

@@ -12,7 +12,7 @@ export function ShelfErrorState({
   return (
     <div className="text-center py-16">
       <p className="text-gray-500 dark:text-zinc-400 mb-1">{message}</p>
-      <p className="text-sm text-gray-400 dark:text-zinc-500 mb-6">
+      <p className="text-sm text-gray-500 dark:text-zinc-400 mb-6">
         Check your connection or try again.
       </p>
       <button

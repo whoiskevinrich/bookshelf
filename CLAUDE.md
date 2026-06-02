@@ -45,7 +45,7 @@ If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainW
 
 1. `/engineering:architecture` — first feature always; repeat when data model changes
 2. `/feature-dev:feature-dev` Phases 1–4 — discovery through architecture design
-3. **Document the decision in "Architecture Decisions" below before writing code**
+3. **Record the decision in `docs/decisions.md` before writing code**
 
 ### Phase 3 — Implementation
 
@@ -57,7 +57,7 @@ If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainW
 
 1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm version:bump`, then `pnpm preflight`
 2. Document as appropriate (hook will remind you):
-   - Technical decisions → `docs/adrs/<slug>.md`
+   - Technical decisions → `docs/adrs/<slug>.md` + row in `docs/decisions.md`
    - Spec changes → `docs/specs/<slug>.md`
    - System operations (scripts, infra, env setup) → `docs/runbooks/<slug>.md`
 3. `/pr-review-toolkit:review-pr all` — address all Critical issues first
@@ -97,6 +97,15 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 - Duplicate detection: ISBN/ASIN checked before adding a book
 - Cover images: broken-image fallback on all external CDN URLs
 
+### UI / Design System
+
+- Buttons: always use `<Button>` from `src/components/ui/Button.tsx` — never inline `bg-indigo-600` or `bg-gray-900` button classes on a raw `<button>`
+- Auth form inputs/labels: import `inputClass`/`labelClass` from `src/lib/form-styles.ts` — never redeclare locally
+- Muted/secondary text: minimum `text-gray-500 dark:text-zinc-400` for any visible text content on light backgrounds (`text-gray-400` fails WCAG AA contrast)
+- Interactive elements: no hover-only affordances (e.g. `opacity-0 group-hover:opacity-100`) — touch users can't hover
+- Loading spinners (`animate-spin`): must include `role="status"` and `aria-label`
+- State communicated by color alone (e.g. checklists, badges): must also use a shape/icon distinction for color-blind users
+
 ### Security
 
 - **[NON-NEGOTIABLE] Environment variables must NEVER be committed to source control** — not in `.env`, `launch.json`, config files, or anywhere else. Use `.env.local` (gitignored) for local values; load them at runtime via `--env-file`, SSM, or equivalent. If a secret is already committed, treat it as compromised and rotate it.
@@ -118,41 +127,13 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | ISBN reminder      | hookify                | "isbn" in new text           | warn                               | no    |
 | Hardcoded data     | hookify                | ISBN/ASIN literals in source | warn                               | no    |
 
-## Architecture Decisions
+## Documentation Index
 
-| Decision             | Choice                                                   | Rationale                                                                                                                                                  | Date       |
-| -------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| Frontend             | React SPA (Vite) → S3 + CloudFront                       | Auth-gated app; no SSR needed; API stays fully standalone for MCP                                                                                          | 2026-05-14 |
-| Backend API          | Hono on Lambda + API Gateway HTTP API                    | Lightweight TS framework; CDK-native; co-deploys with infra                                                                                                | 2026-05-14 |
-| Database             | DynamoDB on-demand                                       | Permanent free tier; scales to zero; access patterns fit single-table design                                                                               | 2026-05-14 |
-| Auth                 | Amazon Cognito User Pools                                | AWS-native; 10k MAU free; JWKS JWT works across Lambda + MCP without coordination                                                                          | 2026-05-14 |
-| Deployment           | AWS CDK (3 stacks: Auth, API, Web)                       | Full transparency; no Amplify abstraction; showcases CDK                                                                                                   | 2026-05-14 |
-| CI/CD                | GitHub Actions — `cdk synth` on PR; deploy on semver tag | Fast feedback on infra changes; versioned artifacts for rollback                                                                                           | 2026-05-14 |
-| Package manager      | pnpm workspaces monorepo                                 | `apps/api`, `apps/mcp`, `apps/web`, `packages/infra` as separate packages                                                                                  | 2026-05-14 |
-| ADR                  | `docs/adrs/001-tech-stack.md`                            | Full decision record with options considered and cost analysis                                                                                             | 2026-05-14 |
-| Shelf API shape      | Paginated inline book metadata (`GET /v1/shelf`)         | MCP tools need full data in one call; cursor pagination maps to DynamoDB `LastEvaluatedKey`                                                                | 2026-05-15 |
-| Smoke tests          | Vitest suite in `test/smoke/`; runs post-deploy in CI    | Gates version tag on live-API verification; auto-rollback to last good tag on failure — see `docs/adrs/003-post-deploy-smoke-tests.md`                     | 2026-05-31 |
-| Web auth library     | `@aws-amplify/auth` (isolated behind `lib/auth.ts`)      | Lowest implementation effort to unblock E2E testing; 2-way door — swappable by rewriting one file — see `docs/adrs/004-web-auth-library.md`                | 2026-05-31 |
-| SSM secret retrieval | Lambda Powertools `SSMProvider` with 7-day TTL cache     | Fetches SecureString at invocation time; avoids CDK synth-time account constraints; built-in caching — see `docs/adrs/005-lambda-powertools-parameters.md` | 2026-06-01 |
-| Dev auth access      | Invitation-only (`selfSignUpEnabled: false` in dev)      | Prevents strangers from self-registering on dev infra; `allowSelfSignUp` CDK prop flips it on for prod; invite via `docs/runbooks/invite-dev-user.md`      | 2026-06-01 |
-| Git hooks            | Husky `pre-commit` runs `pnpm format` (auto-fix)         | Eliminates Format CI failures; full test run removed from hooks (runs in CI) — see `docs/adrs/006-git-hooks-strategy.md`                                   | 2026-06-02 |
-| Monorepo versioning  | Root-only; workspace packages pinned to `0.0.0`          | Single file to bump per release; workspaces are private and deploy together — see `docs/adrs/007-monorepo-versioning-strategy.md`                          | 2026-06-02 |
+Full details in `docs/` — read on demand, not every session:
 
-## Memory and Documentation Files
-
+- `docs/decisions.md` — all architecture, design, and implementation decisions (canonical reference)
 - `docs/TASKS.md` — Active, Backlog, Done
-- `docs/specs/` — Feature specifications (one file per feature)
-- `docs/adrs/` — Architecture Decision Records (one per technical decision)
-- `docs/runbooks/` — System operations: scripts, infra setup, env configuration
-- `docs/notes/` — Session logs, miscellaneous
-- `memory/glossary.md` — Term definitions
-- `memory/projects/bookshelf.md` — Project overview
-
-## Glossary
-
-| Term  | Meaning                                                                  |
-| ----- | ------------------------------------------------------------------------ |
-| ISBN  | International Standard Book Number (13-digit modern, 10-digit legacy)    |
-| ASIN  | Amazon Standard Identification Number (for books: often matches ISBN-10) |
-| Owned | A book the user physically possesses                                     |
-| Want  | A book on the user's wishlist                                            |
+- `docs/specs/` — feature specifications
+- `docs/adrs/` — full ADR documents
+- `docs/runbooks/` — operational guides
+- `memory/projects/bookshelf.md` — project overview

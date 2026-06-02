@@ -31,11 +31,11 @@ function ShelfSection({
 }: ShelfSectionProps) {
   return (
     <section>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-zinc-500 mb-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-4">
         {title} ({entries.length})
       </h2>
       {entries.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-zinc-500">{emptyMessage}</p>
+        <p className="text-sm text-gray-500 dark:text-zinc-400">{emptyMessage}</p>
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
           {entries.map((entry) => (
