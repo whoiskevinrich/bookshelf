@@ -1,66 +1,14 @@
 import { Link } from "react-router-dom";
 import { DemoShelf } from "../components/demo/DemoShelf";
-import { useTheme } from "../context/ThemeContext";
-
-function SunIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="5" />
-      <line x1="12" y1="1" x2="12" y2="3" />
-      <line x1="12" y1="21" x2="12" y2="23" />
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-      <line x1="1" y1="12" x2="3" y2="12" />
-      <line x1="21" y1="12" x2="23" y2="12" />
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
+import { ThemeToggle } from "../components/icons/ThemeIcons";
 
 export function LandingPage() {
-  const { theme, toggleTheme } = useTheme();
-
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-900 transition-colors">
       <header className="border-b border-gray-100 dark:border-zinc-800 px-6 py-4 flex items-center justify-between">
         <span className="font-semibold text-lg tracking-tight dark:text-white">Bookshelf</span>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
-          >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-          </button>
+        <nav aria-label="Site navigation" className="flex items-center gap-3">
+          <ThemeToggle />
           <Link
             to="/auth/login"
             className="text-sm text-gray-600 hover:text-gray-900 dark:text-zinc-300 dark:hover:text-white px-3 py-1.5 rounded transition-colors"
@@ -73,7 +21,7 @@ export function LandingPage() {
           >
             Sign up
           </Link>
-        </div>
+        </nav>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-16">
@@ -93,10 +41,22 @@ export function LandingPage() {
         </div>
 
         <div className="bg-gray-50 dark:bg-zinc-800 rounded-2xl p-8">
-          <p className="text-xs font-medium text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-6 text-center">
-            Example shelf
+          <p className="text-sm text-gray-500 dark:text-zinc-400 tracking-wide mb-6 text-center">
+            See what your shelf could look like
           </p>
           <DemoShelf />
+        </div>
+
+        <div className="mt-8 text-center space-y-2">
+          <p className="text-sm text-gray-500 dark:text-zinc-400">
+            Ready to track your books?
+          </p>
+          <Link
+            to="/auth/signup"
+            className="text-sm font-medium text-gray-900 dark:text-white underline hover:text-gray-600 dark:hover:text-zinc-300 transition-colors"
+          >
+            Sign up →
+          </Link>
         </div>
       </main>
     </div>
