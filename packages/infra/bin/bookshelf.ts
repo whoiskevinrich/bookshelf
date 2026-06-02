@@ -26,10 +26,17 @@ new ApiStack(app, "BookshelfApi", {
   userPoolClientId: auth.userPoolClientId,
 });
 
-new WebStack(app, "BookshelfWeb", {
+const web = new WebStack(app, "BookshelfWeb", {
   env,
   version,
 });
+
+// WebStack has no CDK cross-stack references to Auth/Api, but it must deploy
+// after them so that the web build (run in CI before cdk deploy BookshelfWeb)
+// can bake the resolved API URL and Cognito IDs into the VITE_* bundle.
+// Declaring the dependency here keeps `cdk deploy --all` safe even if someone
+// runs it without the two-step CI split.
+web.addDependency(auth);
 
 cdk.Tags.of(app).add("Project", "bookshelf");
 cdk.Tags.of(app).add("Version", version);

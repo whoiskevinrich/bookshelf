@@ -1,9 +1,13 @@
+import * as path from "path";
 import { describe, it } from "vitest";
 import * as cdk from "aws-cdk-lib";
 import { Template, Match } from "aws-cdk-lib/assertions";
 import { AuthStack } from "../lib/auth-stack";
 import { ApiStack } from "../lib/api-stack";
 import { WebStack } from "../lib/web-stack";
+
+// Fixture dist directory — avoids depending on a real Vite build during tests.
+const webDistPath = path.join(__dirname, "fixtures/web-dist");
 
 // Single app shared across all describe blocks — stacks have unique IDs and
 // AuthStack is synthesized only once (reused as ApiStack's dependency).
@@ -20,6 +24,7 @@ const apiStack = new ApiStack(app, "TestApi", {
 const webStack = new WebStack(app, "TestWeb", {
   env,
   version: "v0.1.0",
+  webDistPath,
 });
 
 // ── AuthStack ──────────────────────────────────────────────────────────────
@@ -132,10 +137,11 @@ describe("WebStack", () => {
   const template = Template.fromStack(webStack);
 
   it("creates an S3 bucket", () => {
+    // BucketDeployment adds a staging bucket via custom resource — assert at least 1
     template.resourceCountIs("AWS::S3::Bucket", 1);
   });
 
-  it("blocks all public access to the S3 bucket", () => {
+  it("blocks all public access to the web bucket", () => {
     template.hasResourceProperties("AWS::S3::Bucket", {
       PublicAccessBlockConfiguration: {
         BlockPublicAcls: true,
@@ -162,17 +168,19 @@ describe("WebStack", () => {
 
   // TLS 1.2 minimum is enforced via the CDK Distribution `minimumProtocolVersion`
   // prop (SecurityPolicyProtocol.TLS_V1_2_2021), but CloudFormation only emits
-  // ViewerCertificate when a custom ACM certificate is attached.  Without one the
+  // ViewerCertificate when a custom ACM certificate is attached. Without one the
   // key is absent from the template, so there is nothing to assert here.
-  // Verified at the construct level: web-stack.ts line 84.
+  // Verified at the construct level: web-stack.ts.
 
-  it("stores active version and distribution ID in SSM", () => {
+  it("stores active version in SSM", () => {
     template.hasResourceProperties("AWS::SSM::Parameter", {
       Name: "/bookshelf/web/active-version",
       Value: "v0.1.0",
     });
-    template.hasResourceProperties("AWS::SSM::Parameter", {
-      Name: "/bookshelf/web/distribution-id",
-    });
+  });
+
+  it("deploys web assets via BucketDeployment custom resource", () => {
+    // BucketDeployment is backed by a Lambda-powered custom resource
+    template.resourceCountIs("Custom::CDKBucketDeployment", 1);
   });
 });
