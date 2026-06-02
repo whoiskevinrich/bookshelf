@@ -45,7 +45,7 @@ If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainW
 
 1. `/engineering:architecture` — first feature always; repeat when data model changes
 2. `/feature-dev:feature-dev` Phases 1–4 — discovery through architecture design
-3. **Document the decision in "Architecture Decisions" below before writing code**
+3. **Record the decision in `docs/decisions.md` before writing code**
 
 ### Phase 3 — Implementation
 
@@ -56,7 +56,7 @@ If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainW
 ### Phase 4 — Pre-merge Review (REQUIRED before gh pr create)
 
 1. Document as appropriate (hook will remind you):
-   - Technical decisions → `docs/adrs/<slug>.md`
+   - Technical decisions → `docs/adrs/<slug>.md` + row in `docs/decisions.md`
    - Spec changes → `docs/specs/<slug>.md`
    - System operations (scripts, infra, env setup) → `docs/runbooks/<slug>.md`
 2. `/pr-review-toolkit:review-pr all` — address all Critical issues first
@@ -126,46 +126,13 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | ISBN reminder      | hookify                | "isbn" in new text           | warn                               | no    |
 | Hardcoded data     | hookify                | ISBN/ASIN literals in source | warn                               | no    |
 
-## Architecture Decisions
+## Documentation Index
 
-| Decision             | Choice                                                                                      | Rationale                                                                                                                                                  | Date       |
-| -------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| Frontend             | React SPA (Vite) → S3 + CloudFront                                                          | Auth-gated app; no SSR needed; API stays fully standalone for MCP                                                                                          | 2026-05-14 |
-| Backend API          | Hono on Lambda + API Gateway HTTP API                                                       | Lightweight TS framework; CDK-native; co-deploys with infra                                                                                                | 2026-05-14 |
-| Database             | DynamoDB on-demand                                                                          | Permanent free tier; scales to zero; access patterns fit single-table design                                                                               | 2026-05-14 |
-| Auth                 | Amazon Cognito User Pools                                                                   | AWS-native; 10k MAU free; JWKS JWT works across Lambda + MCP without coordination                                                                          | 2026-05-14 |
-| Deployment           | AWS CDK (3 stacks: Auth, API, Web)                                                          | Full transparency; no Amplify abstraction; showcases CDK                                                                                                   | 2026-05-14 |
-| CI/CD                | GitHub Actions — `cdk synth` on PR; deploy on semver tag                                    | Fast feedback on infra changes; versioned artifacts for rollback                                                                                           | 2026-05-14 |
-| Package manager      | pnpm workspaces monorepo                                                                    | `apps/api`, `apps/mcp`, `apps/web`, `packages/infra` as separate packages                                                                                  | 2026-05-14 |
-| ADR                  | `docs/adrs/001-tech-stack.md`                                                               | Full decision record with options considered and cost analysis                                                                                             | 2026-05-14 |
-| Shelf API shape      | Paginated inline book metadata (`GET /v1/shelf`)                                            | MCP tools need full data in one call; cursor pagination maps to DynamoDB `LastEvaluatedKey`                                                                | 2026-05-15 |
-| Smoke tests          | Vitest suite in `test/smoke/`; runs post-deploy in CI                                       | Gates version tag on live-API verification; auto-rollback to last good tag on failure — see `docs/adrs/003-post-deploy-smoke-tests.md`                     | 2026-05-31 |
-| Web auth library     | `@aws-amplify/auth` (isolated behind `lib/auth.ts`)                                         | Lowest implementation effort to unblock E2E testing; 2-way door — swappable by rewriting one file — see `docs/adrs/004-web-auth-library.md`                | 2026-05-31 |
-| SSM secret retrieval | Lambda Powertools `SSMProvider` with 7-day TTL cache                                        | Fetches SecureString at invocation time; avoids CDK synth-time account constraints; built-in caching — see `docs/adrs/005-lambda-powertools-parameters.md` | 2026-06-01 |
-| Dev auth access      | Invitation-only (`selfSignUpEnabled: false` in dev)                                         | Prevents strangers from self-registering on dev infra; `allowSelfSignUp` CDK prop flips it on for prod; invite via `docs/runbooks/invite-dev-user.md`      | 2026-06-01 |
-| Button primitive     | `src/components/ui/Button.tsx` with `variant`/`size`/`loading` props                        | Single source of truth for all button styles; prevents silent style drift across pages                                                                     | 2026-06-02 |
-| Button color split   | Auth pages → `variant="primary"` (indigo-600); app pages → `variant="app"` (gray-900/white) | Intentional: indigo is the brand entry point; gray-900 is the neutral in-app style. Both route through `Button` so the split is explicit and documented    | 2026-06-02 |
-| Shared form styles   | `src/lib/form-styles.ts` exports `inputClass` / `labelClass`                                | All auth inputs share one definition; eliminates copy-paste drift across 5 auth pages                                                                      | 2026-06-02 |
-| Muted text floor     | `text-gray-500 dark:text-zinc-400` minimum for all visible text content                     | `text-gray-400` on white = ~2.8:1, fails WCAG AA; gray-500 = ~4.6:1, passes. Placeholder text (exempt) may stay gray-400                                   | 2026-06-02 |
-| Shelf card actions   | Always visible (no hover-only reveal)                                                       | Hover-only `opacity-0 group-hover:opacity-100` is invisible on touch devices; always-visible text links are the correct mobile-first default               | 2026-06-02 |
-| Loading spinners     | `role="status"` + `aria-label="Loading"` required on all `animate-spin` elements            | Screen readers need to announce loading state; omitting these is a silent a11y failure                                                                     | 2026-06-02 |
-| PasswordChecklist    | Unmet rules use `○` prefix (not `·`); met rules use `✓`                                     | Shape must distinguish state, not color alone — color-blind users cannot distinguish gray `·` from green `✓`                                               | 2026-06-02 |
+Full details in `docs/` — read on demand, not every session:
 
-## Memory and Documentation Files
-
+- `docs/decisions.md` — all architecture, design, and implementation decisions (canonical reference)
 - `docs/TASKS.md` — Active, Backlog, Done
-- `docs/specs/` — Feature specifications (one file per feature)
-- `docs/adrs/` — Architecture Decision Records (one per technical decision)
-- `docs/runbooks/` — System operations: scripts, infra setup, env configuration
-- `docs/notes/` — Session logs, miscellaneous
-- `memory/glossary.md` — Term definitions
-- `memory/projects/bookshelf.md` — Project overview
-
-## Glossary
-
-| Term  | Meaning                                                                  |
-| ----- | ------------------------------------------------------------------------ |
-| ISBN  | International Standard Book Number (13-digit modern, 10-digit legacy)    |
-| ASIN  | Amazon Standard Identification Number (for books: often matches ISBN-10) |
-| Owned | A book the user physically possesses                                     |
-| Want  | A book on the user's wishlist                                            |
+- `docs/specs/` — feature specifications
+- `docs/adrs/` — full ADR documents
+- `docs/runbooks/` — operational guides
+- `memory/projects/bookshelf.md` — project overview
