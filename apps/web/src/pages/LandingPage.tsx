@@ -48,9 +48,7 @@ export function LandingPage() {
         </div>
 
         <div className="mt-8 text-center space-y-2">
-          <p className="text-sm text-gray-500 dark:text-zinc-400">
-            Ready to track your books?
-          </p>
+          <p className="text-sm text-gray-500 dark:text-zinc-400">Ready to track your books?</p>
           <Link
             to="/auth/signup"
             className="text-sm font-medium text-gray-900 dark:text-white underline hover:text-gray-600 dark:hover:text-zinc-300 transition-colors"
