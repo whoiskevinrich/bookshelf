@@ -22,10 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
-      - name: Validate version tag exists
-        run: |
-          TAG="v${{ inputs.version }}"
-          echo "Promoting version: $TAG"
+      - name: Log promotion target
+        run: echo "Promoting version: v${{ inputs.version }}"
 
       - uses: actions/checkout@v6
         with:
@@ -72,16 +70,20 @@ jobs:
       - name: Resolve SSM outputs (prod)
         id: ssm
         run: |
-          API_URL=$(aws ssm get-parameter --name "/bookshelf/api/url" --query "Parameter.Value" --output text)
-          USER_POOL_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/user-pool-id" --query "Parameter.Value" --output text)
-          CLIENT_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/client-id" --query "Parameter.Value" --output text)
-          BUCKET=$(aws ssm get-parameter --name "/bookshelf/web/bucket-name" --query "Parameter.Value" --output text)
-          DIST_ID=$(aws ssm get-parameter --name "/bookshelf/web/distribution-id" --query "Parameter.Value" --output text)
-          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
-          echo "user_pool_id=$USER_POOL_ID" >> "$GITHUB_OUTPUT"
-          echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
-          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
-          echo "distribution_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+          PARAMS=$(aws ssm get-parameters \
+            --names \
+              "/bookshelf/api/url" \
+              "/bookshelf/cognito/user-pool-id" \
+              "/bookshelf/cognito/client-id" \
+              "/bookshelf/web/bucket-name" \
+              "/bookshelf/web/distribution-id" \
+            --query "Parameters[*].{Name:Name,Value:Value}" \
+            --output json)
+          echo "api_url=$(echo "$PARAMS"       | jq -r '.[] | select(.Name=="/bookshelf/api/url") | .Value')"              >> "$GITHUB_OUTPUT"
+          echo "user_pool_id=$(echo "$PARAMS"  | jq -r '.[] | select(.Name=="/bookshelf/cognito/user-pool-id") | .Value')" >> "$GITHUB_OUTPUT"
+          echo "client_id=$(echo "$PARAMS"     | jq -r '.[] | select(.Name=="/bookshelf/cognito/client-id") | .Value')"    >> "$GITHUB_OUTPUT"
+          echo "bucket=$(echo "$PARAMS"        | jq -r '.[] | select(.Name=="/bookshelf/web/bucket-name") | .Value')"      >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$(echo "$PARAMS" | jq -r '.[] | select(.Name=="/bookshelf/web/distribution-id") | .Value')" >> "$GITHUB_OUTPUT"
 
       - name: Build web app
         env:

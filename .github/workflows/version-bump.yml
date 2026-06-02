@@ -48,8 +48,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
-          pnpm format
-          git add -A
+          pnpm exec prettier --write package.json
+          git add package.json
           git commit -m "chore: bump version to v${{ env.NEW_VERSION }}"
           git push origin "$BRANCH"
           echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"

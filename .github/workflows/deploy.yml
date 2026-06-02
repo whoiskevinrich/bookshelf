@@ -62,16 +62,20 @@ jobs:
       - name: Resolve SSM outputs
         id: ssm
         run: |
-          API_URL=$(aws ssm get-parameter --name "/bookshelf/api/url" --query "Parameter.Value" --output text)
-          USER_POOL_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/user-pool-id" --query "Parameter.Value" --output text)
-          CLIENT_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/client-id" --query "Parameter.Value" --output text)
-          BUCKET=$(aws ssm get-parameter --name "/bookshelf/web/bucket-name" --query "Parameter.Value" --output text)
-          DIST_ID=$(aws ssm get-parameter --name "/bookshelf/web/distribution-id" --query "Parameter.Value" --output text)
-          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
-          echo "user_pool_id=$USER_POOL_ID" >> "$GITHUB_OUTPUT"
-          echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
-          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
-          echo "distribution_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+          PARAMS=$(aws ssm get-parameters \
+            --names \
+              "/bookshelf/api/url" \
+              "/bookshelf/cognito/user-pool-id" \
+              "/bookshelf/cognito/client-id" \
+              "/bookshelf/web/bucket-name" \
+              "/bookshelf/web/distribution-id" \
+            --query "Parameters[*].{Name:Name,Value:Value}" \
+            --output json)
+          echo "api_url=$(echo "$PARAMS"       | jq -r '.[] | select(.Name=="/bookshelf/api/url") | .Value')"              >> "$GITHUB_OUTPUT"
+          echo "user_pool_id=$(echo "$PARAMS"  | jq -r '.[] | select(.Name=="/bookshelf/cognito/user-pool-id") | .Value')" >> "$GITHUB_OUTPUT"
+          echo "client_id=$(echo "$PARAMS"     | jq -r '.[] | select(.Name=="/bookshelf/cognito/client-id") | .Value')"    >> "$GITHUB_OUTPUT"
+          echo "bucket=$(echo "$PARAMS"        | jq -r '.[] | select(.Name=="/bookshelf/web/bucket-name") | .Value')"      >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$(echo "$PARAMS" | jq -r '.[] | select(.Name=="/bookshelf/web/distribution-id") | .Value')" >> "$GITHUB_OUTPUT"
 
       - name: Build web app
         env:
@@ -100,16 +104,7 @@ jobs:
           API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
 
-      - name: Rollback API to last good version
-        if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
-        run: |
-          echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.tag }}"
-          git checkout ${{ steps.last-good.outputs.tag }}
-          pnpm install --frozen-lockfile
-          pnpm --filter @bookshelf/api run build
-          pnpm --filter @bookshelf/infra run cdk deploy --all --require-approval never -c version=${{ steps.last-good.outputs.tag }}
-
-      - name: Rollback web assets to last good version
+      - name: Rollback to last good version
         if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
         env:
           VITE_API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
@@ -117,6 +112,11 @@ jobs:
           VITE_COGNITO_CLIENT_ID: ${{ steps.ssm.outputs.client_id }}
           VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
         run: |
+          echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.tag }}"
+          git checkout ${{ steps.last-good.outputs.tag }}
+          pnpm install --frozen-lockfile
+          pnpm --filter @bookshelf/api run build
+          pnpm --filter @bookshelf/infra run cdk deploy --all --require-approval never -c version=${{ steps.last-good.outputs.tag }}
           pnpm --filter @bookshelf/web run build
           aws s3 sync apps/web/dist \
             s3://${{ steps.ssm.outputs.bucket }}/builds/${{ steps.last-good.outputs.tag }}/ \
@@ -132,9 +132,9 @@ jobs:
           exit 1
 
       - name: Tag deployed version
+        if: steps.smoke.outcome != 'failure'
         run: |
-          VERSION=$(jq -r .version package.json)
-          TAG="v$VERSION"
+          TAG="${{ steps.version.outputs.tag }}"
           echo "Tagging commit as $TAG"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
