@@ -15,7 +15,9 @@ const env: cdk.Environment = account ? { account, region } : { region };
 // Version tag passed in from CI: cdk deploy -c version=v1.2.3
 const version = (app.node.tryGetContext("version") as string | undefined) ?? "local";
 
-const auth = new AuthStack(app, "BookshelfAuth", { env });
+// Self-signup is disabled by default (dev). Pass -c allowSelfSignUp=true for prod.
+const allowSelfSignUp = app.node.tryGetContext("allowSelfSignUp") === "true";
+const auth = new AuthStack(app, "BookshelfAuth", { env, allowSelfSignUp });
 
 new ApiStack(app, "BookshelfApi", {
   env,

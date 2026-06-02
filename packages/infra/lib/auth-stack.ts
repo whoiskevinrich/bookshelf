@@ -3,6 +3,11 @@ import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 
+export interface AuthStackProps extends cdk.StackProps {
+  /** Allow visitors to self-register. Set to true for prod; leave false (default) for dev. */
+  allowSelfSignUp?: boolean;
+}
+
 export class AuthStack extends cdk.Stack {
   /** Cognito User Pool ID — consumed by ApiStack and WebStack */
   readonly userPoolId: string;
@@ -12,13 +17,14 @@ export class AuthStack extends cdk.Stack {
   /** JWKS issuer URL — used by Lambda JWT verification and ApiStack env vars */
   readonly userPoolIssuer: string;
 
-  constructor(scope: Construct, id: string, props: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: AuthStackProps = {}) {
     super(scope, id, props);
+    const { allowSelfSignUp = false } = props;
 
     // ── User Pool ──────────────────────────────────────────────────────────
     const userPool = new cognito.UserPool(this, "UserPool", {
       userPoolName: "bookshelf-users",
-      selfSignUpEnabled: true,
+      selfSignUpEnabled: allowSelfSignUp,
       signInAliases: { email: true },
       autoVerify: { email: true },
       standardAttributes: {

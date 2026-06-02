@@ -133,6 +133,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | Smoke tests          | Vitest suite in `test/smoke/`; runs post-deploy in CI    | Gates version tag on live-API verification; auto-rollback to last good tag on failure — see `docs/adrs/003-post-deploy-smoke-tests.md`                     | 2026-05-31 |
 | Web auth library     | `@aws-amplify/auth` (isolated behind `lib/auth.ts`)      | Lowest implementation effort to unblock E2E testing; 2-way door — swappable by rewriting one file — see `docs/adrs/004-web-auth-library.md`                | 2026-05-31 |
 | SSM secret retrieval | Lambda Powertools `SSMProvider` with 7-day TTL cache     | Fetches SecureString at invocation time; avoids CDK synth-time account constraints; built-in caching — see `docs/adrs/005-lambda-powertools-parameters.md` | 2026-06-01 |
+| Dev auth access      | Invitation-only (`selfSignUpEnabled: false` in dev)      | Prevents strangers from self-registering on dev infra; `allowSelfSignUp` CDK prop flips it on for prod; invite via `docs/runbooks/invite-dev-user.md`      | 2026-06-01 |
 
 ## Memory and Documentation Files
 
