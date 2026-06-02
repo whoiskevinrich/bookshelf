@@ -61,7 +61,49 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Build API bundle
+        run: pnpm --filter @bookshelf/api run build
+
       - name: CDK deploy all stacks to prod
         run: pnpm deploy:infra
         env:
           BOOKSHELF_ENV: prod
+
+      - name: Resolve SSM outputs (prod)
+        id: ssm
+        run: |
+          API_URL=$(aws ssm get-parameter --name "/bookshelf/api/url" --query "Parameter.Value" --output text)
+          USER_POOL_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/user-pool-id" --query "Parameter.Value" --output text)
+          CLIENT_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/client-id" --query "Parameter.Value" --output text)
+          BUCKET=$(aws ssm get-parameter --name "/bookshelf/web/bucket-name" --query "Parameter.Value" --output text)
+          DIST_ID=$(aws ssm get-parameter --name "/bookshelf/web/distribution-id" --query "Parameter.Value" --output text)
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "user_pool_id=$USER_POOL_ID" >> "$GITHUB_OUTPUT"
+          echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
+          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Build web app
+        env:
+          VITE_API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.ssm.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.ssm.outputs.client_id }}
+          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
+        run: pnpm --filter @bookshelf/web run build
+
+      - name: Sync web assets to S3
+        run: |
+          aws s3 sync apps/web/dist \
+            s3://${{ steps.ssm.outputs.bucket }}/builds/v${{ inputs.version }}/ \
+            --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.ssm.outputs.distribution_id }} \
+            --paths "/*"
+
+      - name: Smoke tests (prod)
+        env:
+          API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
+        run: pnpm --filter @bookshelf/api run test:smoke

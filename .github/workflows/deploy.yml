@@ -19,6 +19,8 @@ jobs:
     environment: dev
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-tags: true # required for "Capture last good version tag"
 
       - uses: pnpm/action-setup@v6
         with:
@@ -91,18 +93,14 @@ jobs:
             --distribution-id ${{ steps.ssm.outputs.distribution_id }} \
             --paths "/*"
 
-      - name: Resolve API URL from SSM
-        id: api-url
-        run: echo "url=${{ steps.ssm.outputs.api_url }}" >> "$GITHUB_OUTPUT"
-
       - name: Smoke tests
         id: smoke
         continue-on-error: true
         env:
-          API_BASE_URL: ${{ steps.api-url.outputs.url }}
+          API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
 
-      - name: Rollback to last good version
+      - name: Rollback API to last good version
         if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
         run: |
           echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.tag }}"
@@ -110,6 +108,22 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm --filter @bookshelf/api run build
           pnpm --filter @bookshelf/infra run cdk deploy --all --require-approval never -c version=${{ steps.last-good.outputs.tag }}
+
+      - name: Rollback web assets to last good version
+        if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
+        env:
+          VITE_API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.ssm.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.ssm.outputs.client_id }}
+          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          pnpm --filter @bookshelf/web run build
+          aws s3 sync apps/web/dist \
+            s3://${{ steps.ssm.outputs.bucket }}/builds/${{ steps.last-good.outputs.tag }}/ \
+            --delete
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.ssm.outputs.distribution_id }} \
+            --paths "/*"
 
       - name: Fail job after rollback
         if: steps.smoke.outcome == 'failure'

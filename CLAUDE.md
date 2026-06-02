@@ -55,12 +55,13 @@ If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainW
 
 ### Phase 4 — Pre-merge Review (REQUIRED before gh pr create)
 
-1. Document as appropriate (hook will remind you):
+1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm version:bump`, then `pnpm preflight`
+2. Document as appropriate (hook will remind you):
    - Technical decisions → `docs/adrs/<slug>.md`
    - Spec changes → `docs/specs/<slug>.md`
    - System operations (scripts, infra, env setup) → `docs/runbooks/<slug>.md`
-2. `/pr-review-toolkit:review-pr all` — address all Critical issues first
-3. `/engineering:deploy-checklist`
+3. `/pr-review-toolkit:review-pr all` — address all Critical issues first
+4. `/engineering:deploy-checklist`
 
 ### Phase 5 — Merge and Deploy
 
@@ -134,6 +135,8 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | Web auth library     | `@aws-amplify/auth` (isolated behind `lib/auth.ts`)      | Lowest implementation effort to unblock E2E testing; 2-way door — swappable by rewriting one file — see `docs/adrs/004-web-auth-library.md`                | 2026-05-31 |
 | SSM secret retrieval | Lambda Powertools `SSMProvider` with 7-day TTL cache     | Fetches SecureString at invocation time; avoids CDK synth-time account constraints; built-in caching — see `docs/adrs/005-lambda-powertools-parameters.md` | 2026-06-01 |
 | Dev auth access      | Invitation-only (`selfSignUpEnabled: false` in dev)      | Prevents strangers from self-registering on dev infra; `allowSelfSignUp` CDK prop flips it on for prod; invite via `docs/runbooks/invite-dev-user.md`      | 2026-06-01 |
+| Git hooks            | Husky `pre-commit` runs `pnpm format` (auto-fix)         | Eliminates Format CI failures; full test run removed from hooks (runs in CI) — see `docs/adrs/006-git-hooks-strategy.md`                                   | 2026-06-02 |
+| Monorepo versioning  | Root-only; workspace packages pinned to `0.0.0`          | Single file to bump per release; workspaces are private and deploy together — see `docs/adrs/007-monorepo-versioning-strategy.md`                           | 2026-06-02 |
 
 ## Memory and Documentation Files
 
