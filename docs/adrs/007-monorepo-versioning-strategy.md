@@ -9,12 +9,12 @@ The CI **Unique Version** check reads `version` from the root `package.json` and
 
 The monorepo contains four packages:
 
-| Package | Current version |
-|---------|----------------|
-| `package.json` (root) | `0.1.3` |
-| `apps/api` | `0.1.0` |
-| `apps/web` | `0.1.0` |
-| `packages/infra` | (not checked) |
+| Package               | Current version |
+| --------------------- | --------------- |
+| `package.json` (root) | `0.1.3`         |
+| `apps/api`            | `0.1.0`         |
+| `apps/web`            | `0.1.0`         |
+| `packages/infra`      | (not checked)   |
 
 All workspace packages are `private: true` and are never published to a registry. They deploy together as a single product release.
 

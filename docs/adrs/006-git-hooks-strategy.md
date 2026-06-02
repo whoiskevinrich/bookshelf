@@ -8,6 +8,7 @@
 Two CI checks consistently fail on pull requests: **Format** and **Unique Version**. The Format check fails because formatting is only checked at push time (via `.husky/pre-push`) and only reports errors — it does not fix them. This creates a rework loop: push → CI red → run `pnpm format` → push again.
 
 Husky v9 is already installed (`devDependencies`) and two hooks exist:
+
 - `pre-commit` → `pnpm test` (full suite)
 - `pre-push` → `pnpm format:check` (check only)
 

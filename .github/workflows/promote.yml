@@ -23,7 +23,8 @@ jobs:
     environment: prod
     steps:
       - name: Log promotion target
-        run: echo "Promoting version: v${{ inputs.version }}"
+        run: |
+          echo "Promoting version: v${{ inputs.version }}"
 
       - uses: actions/checkout@v6
         with:

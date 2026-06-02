@@ -37,13 +37,13 @@ gh pr create
 
 ## CI Checks Reference
 
-| Check | What it validates | How to fix if red |
-|-------|-------------------|-------------------|
-| **Unique Version** | `package.json` version is not yet tagged | `pnpm version:bump` then push |
-| **Format** | All files pass `prettier --check .` | `pnpm format` then commit |
-| **Lint** | ESLint passes across all packages | Fix lint errors, then commit |
-| **Unit Tests** | All Vitest suites pass | Fix failing tests, then commit |
-| **CDK Synth** | Infrastructure can be synthesised | Fix CDK/config errors, then commit |
+| Check              | What it validates                        | How to fix if red                  |
+| ------------------ | ---------------------------------------- | ---------------------------------- |
+| **Unique Version** | `package.json` version is not yet tagged | `pnpm version:bump` then push      |
+| **Format**         | All files pass `prettier --check .`      | `pnpm format` then commit          |
+| **Lint**           | ESLint passes across all packages        | Fix lint errors, then commit       |
+| **Unit Tests**     | All Vitest suites pass                   | Fix failing tests, then commit     |
+| **CDK Synth**      | Infrastructure can be synthesised        | Fix CDK/config errors, then commit |
 
 ---
 

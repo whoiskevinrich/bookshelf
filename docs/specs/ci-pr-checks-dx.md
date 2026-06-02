@@ -95,21 +95,21 @@ The **Unique Version** check fails because `package.json` version `v0.1.3` is al
 
 ## Decisions Made
 
-| Question | Decision | ADR |
-|----------|----------|-----|
-| Hook tool: Husky vs. Lefthook vs. none | Keep Husky; fix `pre-commit` to auto-format | [ADR-006](../adrs/006-git-hooks-strategy.md) |
-| Version scope: root-only vs. sync workspaces | Root-only; workspaces set to `0.0.0` | [ADR-007](../adrs/007-monorepo-versioning-strategy.md) |
-| Contributor docs: CONTRIBUTING.md vs. runbook | Runbook at `docs/runbooks/pr-workflow.md` | — |
+| Question                                      | Decision                                    | ADR                                                    |
+| --------------------------------------------- | ------------------------------------------- | ------------------------------------------------------ |
+| Hook tool: Husky vs. Lefthook vs. none        | Keep Husky; fix `pre-commit` to auto-format | [ADR-006](../adrs/006-git-hooks-strategy.md)           |
+| Version scope: root-only vs. sync workspaces  | Root-only; workspaces set to `0.0.0`        | [ADR-007](../adrs/007-monorepo-versioning-strategy.md) |
+| Contributor docs: CONTRIBUTING.md vs. runbook | Runbook at `docs/runbooks/pr-workflow.md`   | —                                                      |
 
 ---
 
 ## Success Metrics
 
-| Metric | Target | Window |
-|--------|--------|--------|
+| Metric                         | Target               | Window  |
+| ------------------------------ | -------------------- | ------- |
 | Unique Version failures per PR | 0 (after this lands) | Ongoing |
-| Format failures per PR | 0 (after this lands) | Ongoing |
-| Rework pushes per PR | 0 | Ongoing |
+| Format failures per PR         | 0 (after this lands) | Ongoing |
+| Rework pushes per PR           | 0                    | Ongoing |
 
 ---
 

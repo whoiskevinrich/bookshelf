@@ -136,7 +136,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | SSM secret retrieval | Lambda Powertools `SSMProvider` with 7-day TTL cache     | Fetches SecureString at invocation time; avoids CDK synth-time account constraints; built-in caching — see `docs/adrs/005-lambda-powertools-parameters.md` | 2026-06-01 |
 | Dev auth access      | Invitation-only (`selfSignUpEnabled: false` in dev)      | Prevents strangers from self-registering on dev infra; `allowSelfSignUp` CDK prop flips it on for prod; invite via `docs/runbooks/invite-dev-user.md`      | 2026-06-01 |
 | Git hooks            | Husky `pre-commit` runs `pnpm format` (auto-fix)         | Eliminates Format CI failures; full test run removed from hooks (runs in CI) — see `docs/adrs/006-git-hooks-strategy.md`                                   | 2026-06-02 |
-| Monorepo versioning  | Root-only; workspace packages pinned to `0.0.0`          | Single file to bump per release; workspaces are private and deploy together — see `docs/adrs/007-monorepo-versioning-strategy.md`                           | 2026-06-02 |
+| Monorepo versioning  | Root-only; workspace packages pinned to `0.0.0`          | Single file to bump per release; workspaces are private and deploy together — see `docs/adrs/007-monorepo-versioning-strategy.md`                          | 2026-06-02 |
 
 ## Memory and Documentation Files
 
