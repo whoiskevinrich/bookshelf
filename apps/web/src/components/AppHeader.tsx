@@ -76,7 +76,7 @@ export function AppHeader({ activePage }: AppHeaderProps) {
         >
           Wishlist
         </Link>
-        <span className="text-xs text-gray-400 dark:text-zinc-500">{user?.username}</span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400">{user?.username}</span>
         <button
           onClick={() => void handleSignOut()}
           className="text-xs text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white"

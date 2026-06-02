@@ -26,7 +26,7 @@ export function ShelfBookCard({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex gap-3 group">
+      <div className="flex gap-3">
         <BookCover
           coverUrl={book?.coverUrl ?? null}
           title={title}
@@ -39,7 +39,7 @@ export function ShelfBookCard({
               {authors.join(", ")}
             </p>
           )}
-          <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex gap-3 mt-2">
             <button
               onClick={() => onMove(isbn, targetStatus)}
               disabled={isMoving || isRemoving}
@@ -57,7 +57,7 @@ export function ShelfBookCard({
           </div>
         </div>
       </div>
-      {error && <p className="text-xs text-red-500 dark:text-red-400 pl-15">{error}</p>}
+      {error && <p className="text-xs text-red-500 dark:text-red-400 pl-[60px]">{error}</p>}
     </div>
   );
 }

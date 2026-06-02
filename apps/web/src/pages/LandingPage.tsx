@@ -93,7 +93,7 @@ export function LandingPage() {
         </div>
 
         <div className="bg-gray-50 dark:bg-zinc-800 rounded-2xl p-8">
-          <p className="text-xs font-medium text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-6 text-center">
+          <p className="text-xs font-medium text-gray-500 dark:text-zinc-500 uppercase tracking-widest mb-6 text-center">
             Example shelf
           </p>
           <DemoShelf />
