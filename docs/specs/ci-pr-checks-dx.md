@@ -88,7 +88,7 @@ The **Unique Version** check fails because `package.json` version `v0.1.3` is al
 
 ### Future Considerations (P2)
 
-7. **Auto-trigger version bump post-merge**: `version-bump.yml` already exists as a `workflow_dispatch` that opens a bump PR on demand. The remaining step is wiring it to trigger automatically after a merge to `main`, so the next branch is always pre-bumped. Requires a PAT with workflow permissions.
+7. ~~**Auto-trigger version bump post-merge**~~: **Implemented.** `version-bump.yml` now also triggers via `workflow_run` on `Deploy to Sandbox` completion (success only). Opens a patch bump PR automatically after every successful deploy so the next feature branch is always pre-bumped.
 8. **Commitizen / semantic-release**: Replace manual version bumping with conventional commits driving automated versioning — separate ADR required.
 
 ---
