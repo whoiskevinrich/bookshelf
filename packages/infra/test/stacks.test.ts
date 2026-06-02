@@ -37,9 +37,9 @@ describe("AuthStack", () => {
     });
   });
 
-  it("allows self sign-up", () => {
+  it("disables self sign-up by default (invitation-only)", () => {
     template.hasResourceProperties("AWS::Cognito::UserPool", {
-      AdminCreateUserConfig: { AllowAdminCreateUserOnly: false },
+      AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
     });
   });
 

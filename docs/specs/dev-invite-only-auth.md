@@ -47,11 +47,11 @@ The dev Cognito User Pool has `selfSignUpEnabled: true`, meaning anyone who disc
 ### Must-Have (P0)
 
 - **Disable self-sign-up in dev**: `selfSignUpEnabled: false` on the dev User Pool. Attempting to register via the SPA or Cognito API returns an error.
-  - *Acceptance*: A new browser session visiting `/register` (or equivalent) cannot create an account; Cognito rejects the `signUp` API call.
+  - _Acceptance_: A new browser session visiting `/register` (or equivalent) cannot create an account; Cognito rejects the `signUp` API call.
 - **Environment-aware CDK**: The `AuthStack` reads a prop (e.g. `allowSelfSignUp: boolean`) that is `false` for dev and `true` for prod.
-  - *Acceptance*: `cdk synth` for dev outputs `selfSignUpEnabled: false`; for prod it outputs `true`.
+  - _Acceptance_: `cdk synth` for dev outputs `selfSignUpEnabled: false`; for prod it outputs `true`.
 - **Admin invite path documented**: A runbook entry explains how to invite a user via `aws cognito-idp admin-create-user`.
-  - *Acceptance*: Runbook exists at `docs/runbooks/invite-dev-user.md`.
+  - _Acceptance_: Runbook exists at `docs/runbooks/invite-dev-user.md`.
 
 ### Nice-to-Have (P1)
 
@@ -66,19 +66,19 @@ The dev Cognito User Pool has `selfSignUpEnabled: true`, meaning anyone who disc
 
 ## Success Metrics
 
-| Metric | Target |
-|--------|--------|
-| Unauthorized self-signup attempts succeed | 0 after deploy |
-| Admin can invite a user end-to-end | ≤ 5 min via CLI |
-| Prod self-signup regression | None (smoke tests pass) |
+| Metric                                    | Target                  |
+| ----------------------------------------- | ----------------------- |
+| Unauthorized self-signup attempts succeed | 0 after deploy          |
+| Admin can invite a user end-to-end        | ≤ 5 min via CLI         |
+| Prod self-signup regression               | None (smoke tests pass) |
 
 ---
 
 ## Open Questions
 
-| # | Question | Owner | Blocking? |
-|---|----------|-------|-----------|
-| 1 | ~~Should the SPA hide the "Create account" UI in dev, or just let Cognito reject it?~~ **Resolved:** Let Cognito reject it — the form stays visible, the error message explains the situation. | — | Closed |
+| #   | Question                                                                                                                                                                                       | Owner | Blocking? |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | --------- |
+| 1   | ~~Should the SPA hide the "Create account" UI in dev, or just let Cognito reject it?~~ **Resolved:** Let Cognito reject it — the form stays visible, the error message explains the situation. | —     | Closed    |
 
 ---
 
