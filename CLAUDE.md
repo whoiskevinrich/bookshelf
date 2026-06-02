@@ -96,6 +96,15 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 - Duplicate detection: ISBN/ASIN checked before adding a book
 - Cover images: broken-image fallback on all external CDN URLs
 
+### UI / Design System
+
+- Buttons: always use `<Button>` from `src/components/ui/Button.tsx` — never inline `bg-indigo-600` or `bg-gray-900` button classes on a raw `<button>`
+- Auth form inputs/labels: import `inputClass`/`labelClass` from `src/lib/form-styles.ts` — never redeclare locally
+- Muted/secondary text: minimum `text-gray-500 dark:text-zinc-400` for any visible text content on light backgrounds (`text-gray-400` fails WCAG AA contrast)
+- Interactive elements: no hover-only affordances (e.g. `opacity-0 group-hover:opacity-100`) — touch users can't hover
+- Loading spinners (`animate-spin`): must include `role="status"` and `aria-label`
+- State communicated by color alone (e.g. checklists, badges): must also use a shape/icon distinction for color-blind users
+
 ### Security
 
 - **[NON-NEGOTIABLE] Environment variables must NEVER be committed to source control** — not in `.env`, `launch.json`, config files, or anywhere else. Use `.env.local` (gitignored) for local values; load them at runtime via `--env-file`, SSM, or equivalent. If a secret is already committed, treat it as compromised and rotate it.
@@ -134,6 +143,13 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 | Web auth library     | `@aws-amplify/auth` (isolated behind `lib/auth.ts`)      | Lowest implementation effort to unblock E2E testing; 2-way door — swappable by rewriting one file — see `docs/adrs/004-web-auth-library.md`                | 2026-05-31 |
 | SSM secret retrieval | Lambda Powertools `SSMProvider` with 7-day TTL cache     | Fetches SecureString at invocation time; avoids CDK synth-time account constraints; built-in caching — see `docs/adrs/005-lambda-powertools-parameters.md` | 2026-06-01 |
 | Dev auth access      | Invitation-only (`selfSignUpEnabled: false` in dev)      | Prevents strangers from self-registering on dev infra; `allowSelfSignUp` CDK prop flips it on for prod; invite via `docs/runbooks/invite-dev-user.md`      | 2026-06-01 |
+| Button primitive     | `src/components/ui/Button.tsx` with `variant`/`size`/`loading` props | Single source of truth for all button styles; prevents silent style drift across pages | 2026-06-02 |
+| Button color split   | Auth pages → `variant="primary"` (indigo-600); app pages → `variant="app"` (gray-900/white) | Intentional: indigo is the brand entry point; gray-900 is the neutral in-app style. Both route through `Button` so the split is explicit and documented | 2026-06-02 |
+| Shared form styles   | `src/lib/form-styles.ts` exports `inputClass` / `labelClass` | All auth inputs share one definition; eliminates copy-paste drift across 5 auth pages | 2026-06-02 |
+| Muted text floor     | `text-gray-500 dark:text-zinc-400` minimum for all visible text content | `text-gray-400` on white = ~2.8:1, fails WCAG AA; gray-500 = ~4.6:1, passes. Placeholder text (exempt) may stay gray-400 | 2026-06-02 |
+| Shelf card actions   | Always visible (no hover-only reveal) | Hover-only `opacity-0 group-hover:opacity-100` is invisible on touch devices; always-visible text links are the correct mobile-first default | 2026-06-02 |
+| Loading spinners     | `role="status"` + `aria-label="Loading"` required on all `animate-spin` elements | Screen readers need to announce loading state; omitting these is a silent a11y failure | 2026-06-02 |
+| PasswordChecklist    | Unmet rules use `○` prefix (not `·`); met rules use `✓` | Shape must distinguish state, not color alone — color-blind users cannot distinguish gray `·` from green `✓` | 2026-06-02 |
 
 ## Memory and Documentation Files
 
