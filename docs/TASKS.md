@@ -4,6 +4,7 @@
 
 - [ ] Merge PR #13 — smoke test fixes (SSM API key injection, ISBN validation, infra tsconfig, Powertools caching)
 - [ ] After merge: verify CI deploy passes all 11 smoke tests in dev
+- [ ] Deploy invitation-only dev auth — `cdk deploy BookshelfAuth` (dev, no `-c allowSelfSignUp`); redeploy is non-breaking, existing accounts are preserved
 
 ## Backlog
 

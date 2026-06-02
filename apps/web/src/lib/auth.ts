@@ -50,6 +50,12 @@ export async function signUp(email: string, password: string): Promise<SignUpOut
   try {
     return await amplifySignUp({ username: email, password });
   } catch (err) {
+    if (err instanceof Error && err.name === "NotAuthorizedException") {
+      throw new Error(
+        "Sign-up is not available in this environment. Contact the app owner to request access.",
+        { cause: err },
+      );
+    }
     throw new Error(mapCognitoError(err), { cause: err });
   }
 }
