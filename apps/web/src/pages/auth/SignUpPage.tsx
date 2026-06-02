@@ -4,10 +4,8 @@ import { signUp } from "../../lib/auth";
 import { validatePassword } from "../../lib/passwordRules";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 import { PasswordChecklist } from "../../components/auth/PasswordChecklist";
-
-const inputClass =
-  "mt-1 block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500";
-const labelClass = "block text-sm font-medium text-gray-700 dark:text-zinc-300";
+import { Button } from "../../components/ui/Button";
+import { inputClass, labelClass } from "../../lib/form-styles";
 
 export function SignUpPage() {
   const navigate = useNavigate();
@@ -99,13 +97,9 @@ export function SignUpPage() {
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
+        <Button type="submit" loading={loading} className="w-full">
           {loading ? "Creating account…" : "Create account"}
-        </button>
+        </Button>
       </form>
 
       <p className="text-center text-sm text-gray-600 dark:text-zinc-400">

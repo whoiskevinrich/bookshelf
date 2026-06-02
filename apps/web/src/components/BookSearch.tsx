@@ -61,7 +61,7 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
         className="w-full border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-zinc-500"
       />
 
-      {loading && <p className="text-sm text-gray-400 dark:text-zinc-500">Searching…</p>}
+      {loading && <p className="text-sm text-gray-500 dark:text-zinc-400">Searching…</p>}
       {error && (
         <p className="text-sm text-red-500 dark:text-red-400">
           {error}{" "}
@@ -75,7 +75,7 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
       )}
 
       {results.length === 0 && !loading && !error && query.trim().length > 0 && (
-        <p className="text-sm text-gray-400 dark:text-zinc-500">No results found.</p>
+        <p className="text-sm text-gray-500 dark:text-zinc-400">No results found.</p>
       )}
 
       <div className="space-y-3">
@@ -97,7 +97,7 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
                 </p>
               )}
               {book.publishedYear && (
-                <p className="text-xs text-gray-400 dark:text-zinc-500">{book.publishedYear}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-400">{book.publishedYear}</p>
               )}
             </div>
             <div className="flex flex-col gap-1.5 flex-shrink-0">

@@ -8,9 +8,9 @@ export function PasswordChecklist({ password }: { password: string }) {
         return (
           <li
             key={r.label}
-            className={`text-xs ${met ? "text-green-600 dark:text-green-400" : "text-gray-400 dark:text-zinc-500"}`}
+            className={`text-xs ${met ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-zinc-400"}`}
           >
-            {met ? "✓" : "·"} {r.label}
+            {met ? "✓" : "○"} {r.label}
           </li>
         );
       })}
