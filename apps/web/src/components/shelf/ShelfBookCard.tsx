@@ -35,7 +35,7 @@ export function ShelfBookCard({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium leading-tight truncate dark:text-white">{title}</p>
           {authors.length > 0 && (
-            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
               {authors.join(", ")}
             </p>
           )}

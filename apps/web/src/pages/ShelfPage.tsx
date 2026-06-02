@@ -31,11 +31,11 @@ function ShelfSection({
 }: ShelfSectionProps) {
   return (
     <section>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
         {title} ({entries.length})
       </h2>
       {entries.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-zinc-400">{emptyMessage}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{emptyMessage}</p>
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
           {entries.map((entry) => (
@@ -99,7 +99,7 @@ export function ShelfPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-900 transition-colors">
+    <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
       <AppHeader activePage="shelf" />
 
       <main className="max-w-4xl mx-auto px-6 py-10">
@@ -107,14 +107,14 @@ export function ShelfPage() {
           <h1 className="text-2xl font-bold dark:text-white">My Shelf</h1>
           <button
             onClick={() => (showSearch ? setShowSearch(false) : handleOpenSearch())}
-            className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 transition-colors"
+            className="text-sm bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 transition-colors"
           >
             {showSearch ? "Cancel" : "Add a book"}
           </button>
         </div>
 
         {showSearch && (
-          <div className="mb-8 p-4 border border-gray-100 dark:border-zinc-700 rounded-xl">
+          <div className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
             <BookSearch onAdd={handleAdd} isAdding={addMutation.isPending} />
           </div>
         )}
@@ -157,7 +157,7 @@ export function ShelfPage() {
                   <button
                     onClick={() => void fetchNextPage()}
                     disabled={isFetchingNextPage}
-                    className="text-sm text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white disabled:opacity-40"
+                    className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white disabled:opacity-40"
                   >
                     {isFetchingNextPage ? "Loading more…" : "Load more"}
                   </button>

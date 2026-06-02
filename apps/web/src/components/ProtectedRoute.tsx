@@ -12,7 +12,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
         <div
           role="status"
           aria-label="Loading"
-          className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"
+          className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"
         />
       </div>
     );

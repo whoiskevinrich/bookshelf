@@ -99,7 +99,7 @@ export function LoginPage() {
           <div className="flex items-center justify-between">
             <Link
               to="/auth/forgot-password"
-              className="text-sm text-indigo-600 hover:text-indigo-500"
+              className="text-sm text-blue-600 hover:text-blue-500"
             >
               Forgot password?
             </Link>
@@ -110,9 +110,9 @@ export function LoginPage() {
           </Button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 dark:text-zinc-400">
+        <p className="text-center text-sm text-slate-600 dark:text-slate-400">
           Don&apos;t have an account?{" "}
-          <Link to="/auth/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <Link to="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500">
             Sign up
           </Link>
         </p>
