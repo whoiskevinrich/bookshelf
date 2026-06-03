@@ -68,6 +68,13 @@
             "shell": "powershell",
             "async": true,
             "statusMessage": "Starting productivity system..."
+          },
+          {
+            "type": "command",
+            "command": "case \"$PWD\" in *.claude/worktrees/*) bash scripts/worktree-setup.sh ;; esac",
+            "shell": "bash",
+            "async": false,
+            "statusMessage": "Copying .env.local files into worktree..."
           }
         ]
       }
