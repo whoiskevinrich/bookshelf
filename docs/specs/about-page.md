@@ -114,8 +114,11 @@ This page has no quantitative success target — it is a transparency and polish
 
 ## Open Questions
 
-- **[Kevin]** Is the GitHub repo public? If not, the "view source" P1 link and the GitHub credit link should be omitted or replaced with a personal site URL.
-- **[Kevin]** Should authenticated users see "About" in `AppHeader`? (P1 — not blocking.)
+~~- **[Kevin]** Is the GitHub repo public? If not, the "view source" P1 link and the GitHub credit link should be omitted or replaced with a personal site URL.~~
+**Resolved:** Repo is currently private but will be made public in the future. The "Source on GitHub" link is gated behind `VITE_SHOW_REPO_LINK=true`; set it once the repo is public.
+
+~~- **[Kevin]** Should authenticated users see "About" in `AppHeader`? (P1 — not blocking.)~~
+**Resolved:** Yes. Implemented — `AppHeader` includes an About `NavLink`.
 
 ---
 
