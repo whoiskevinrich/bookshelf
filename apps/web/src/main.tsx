@@ -21,14 +21,18 @@ const queryClient = new QueryClient({
 
 const MOCK_MODE = import.meta.env.VITE_MOCK_API === "true";
 
-Amplify.configure({
-  Auth: {
-    Cognito: {
-      userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID as string,
-      userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID as string,
+// In mock mode auth is also mocked (see lib/auth.ts), so we skip Amplify
+// configuration entirely to avoid errors from missing/placeholder env vars.
+if (!MOCK_MODE) {
+  Amplify.configure({
+    Auth: {
+      Cognito: {
+        userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID as string,
+        userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID as string,
+      },
     },
-  },
-});
+  });
+}
 
 if (MOCK_MODE) {
   const { worker } = await import("./mocks/browser");
