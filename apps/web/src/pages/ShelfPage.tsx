@@ -108,7 +108,7 @@ export function ShelfPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
-      <AppHeader activePage="shelf" />
+      <AppHeader />
 
       <main className="max-w-4xl mx-auto px-6 py-10">
         <div className="flex items-center justify-between mb-8">
