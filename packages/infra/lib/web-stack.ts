@@ -1,24 +1,32 @@
+import * as path from "path";
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as cloudfrontOrigins from "aws-cdk-lib/aws-cloudfront-origins";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 
 export interface WebStackProps extends cdk.StackProps {
   /** Semver version string from CI, e.g. "v1.2.3". Used as the active S3 prefix. */
   version: string;
+  /**
+   * Absolute path to the built web app dist directory.
+   * Defaults to `apps/web/dist` relative to the repo root.
+   * Override in tests to point at a fixture directory.
+   */
+  webDistPath?: string;
 }
 
 export class WebStack extends cdk.Stack {
   /** CloudFront distribution URL */
   readonly distributionUrl: string;
-  readonly distributionId: string;
-  readonly bucketName: string;
 
   constructor(scope: Construct, id: string, props: WebStackProps) {
     super(scope, id, props);
+
+    const webDistPath = props.webDistPath ?? path.join(__dirname, "../../../apps/web/dist");
 
     // ── S3 bucket (static SPA assets) ─────────────────────────────────────
     //
@@ -26,8 +34,8 @@ export class WebStack extends cdk.Stack {
     //   s3://bookshelf-web/builds/v1.2.3/   ← active
     //   s3://bookshelf-web/builds/v1.2.2/   ← previous (for rollback)
     //
-    // The active version prefix is stored in SSM at /bookshelf/web/active-version.
-    // The deploy pipeline syncs the new build then updates SSM + invalidates CF.
+    // BucketDeployment syncs the built dist/ into the active prefix and
+    // invalidates CloudFront. prune: false preserves previous prefixes.
     const bucket = new s3.Bucket(this, "WebBucket", {
       bucketName: `bookshelf-web-${this.account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL, // CloudFront OAC handles access
@@ -59,7 +67,7 @@ export class WebStack extends cdk.Stack {
       defaultBehavior: {
         origin: cloudfrontOrigins.S3BucketOrigin.withOriginAccessControl(bucket, {
           originAccessControl: oac,
-          // Route to the versioned prefix; updated in CI via SSM + CF invalidation
+          // Route to the versioned prefix; updated on each deploy via BucketDeployment
           originPath: `/builds/${props.version}`,
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -100,40 +108,39 @@ export class WebStack extends cdk.Stack {
       }),
     );
 
-    // ── SSM Parameters (read by rollback runbook + CI scripts) ────────────
+    // ── Web asset deployment ───────────────────────────────────────────────
+    //
+    // Uploads the built SPA to the versioned S3 prefix and invalidates
+    // CloudFront — replacing the manual `aws s3 sync` + `create-invalidation`
+    // CI steps. prune: false preserves previous prefixes for rollback.
+    new s3deploy.BucketDeployment(this, "DeployWeb", {
+      sources: [s3deploy.Source.asset(webDistPath)],
+      destinationBucket: bucket,
+      destinationKeyPrefix: `builds/${props.version}`,
+      distribution,
+      distributionPaths: ["/*"],
+      prune: false,
+      memoryLimit: 512,
+    });
+
+    // ── SSM Parameters ─────────────────────────────────────────────────────
+    //
+    // active-version: read by the rollback runbook to identify the live prefix
+    // distribution-id: kept for manual operational use (runbook, ad-hoc invalidation)
+    // bucket-name and distribution-id are no longer read by CI — BucketDeployment
+    // handles sync and invalidation, and CloudFormation outputs cover anything else.
     new ssm.StringParameter(this, "ActiveVersionParam", {
       parameterName: "/bookshelf/web/active-version",
       stringValue: props.version,
       description: "Currently active web build version — update to roll back",
     });
-    new ssm.StringParameter(this, "BucketNameParam", {
-      parameterName: "/bookshelf/web/bucket-name",
-      stringValue: bucket.bucketName,
-      description: "Bookshelf web S3 bucket name",
-    });
-    new ssm.StringParameter(this, "DistributionIdParam", {
-      parameterName: "/bookshelf/web/distribution-id",
-      stringValue: distribution.distributionId,
-      description: "Bookshelf CloudFront distribution ID",
-    });
 
     // ── Outputs ────────────────────────────────────────────────────────────
     this.distributionUrl = `https://${distribution.distributionDomainName}`;
-    this.distributionId = distribution.distributionId;
-    this.bucketName = bucket.bucketName;
 
     new cdk.CfnOutput(this, "DistributionUrlOutput", {
       exportName: "BookshelfDistributionUrl",
       value: this.distributionUrl,
-    });
-    new cdk.CfnOutput(this, "DistributionIdOutput", {
-      exportName: "BookshelfDistributionId",
-      value: distribution.distributionId,
-      description: "Required for CI invalidations and rollback runbook",
-    });
-    new cdk.CfnOutput(this, "BucketNameOutput", {
-      exportName: "BookshelfBucketName",
-      value: bucket.bucketName,
     });
   }
 }

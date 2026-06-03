@@ -55,12 +55,13 @@ If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainW
 
 ### Phase 4 — Pre-merge Review (REQUIRED before gh pr create)
 
-1. Document as appropriate (hook will remind you):
+1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm version:bump`, then `pnpm preflight`
+2. Document as appropriate (hook will remind you):
    - Technical decisions → `docs/adrs/<slug>.md` + row in `docs/decisions.md`
    - Spec changes → `docs/specs/<slug>.md`
    - System operations (scripts, infra, env setup) → `docs/runbooks/<slug>.md`
-2. `/pr-review-toolkit:review-pr all` — address all Critical issues first
-3. `/engineering:deploy-checklist`
+3. `/pr-review-toolkit:review-pr all` — address all Critical issues first
+4. `/engineering:deploy-checklist`
 
 ### Phase 5 — Merge and Deploy
 

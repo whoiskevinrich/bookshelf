@@ -19,6 +19,8 @@ jobs:
     environment: dev
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-tags: true # required for "Capture last good version tag"
 
       - uses: pnpm/action-setup@v6
         with:
@@ -54,62 +56,69 @@ jobs:
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
 
-      - name: CDK deploy all stacks
-        run: pnpm --filter @bookshelf/infra run cdk deploy --all --require-approval never -c version=${{ steps.version.outputs.tag }}
-
-      - name: Resolve SSM outputs
-        id: ssm
+      - name: Deploy Auth and API stacks
         run: |
-          API_URL=$(aws ssm get-parameter --name "/bookshelf/api/url" --query "Parameter.Value" --output text)
-          USER_POOL_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/user-pool-id" --query "Parameter.Value" --output text)
-          CLIENT_ID=$(aws ssm get-parameter --name "/bookshelf/cognito/client-id" --query "Parameter.Value" --output text)
-          BUCKET=$(aws ssm get-parameter --name "/bookshelf/web/bucket-name" --query "Parameter.Value" --output text)
-          DIST_ID=$(aws ssm get-parameter --name "/bookshelf/web/distribution-id" --query "Parameter.Value" --output text)
-          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
+            --require-approval never -c version=${{ steps.version.outputs.tag }}
+
+      - name: Resolve stack outputs
+        id: outputs
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfApi \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrlOutput'].OutputValue" \
+            --output text)
+          USER_POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfAuth \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolIdOutput'].OutputValue" \
+            --output text)
+          CLIENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfAuth \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientIdOutput'].OutputValue" \
+            --output text)
+          echo "api_url=$API_URL"           >> "$GITHUB_OUTPUT"
           echo "user_pool_id=$USER_POOL_ID" >> "$GITHUB_OUTPUT"
-          echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
-          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
-          echo "distribution_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+          echo "client_id=$CLIENT_ID"       >> "$GITHUB_OUTPUT"
 
       - name: Build web app
         env:
-          VITE_API_BASE_URL: ${{ steps.ssm.outputs.api_url }}
-          VITE_COGNITO_USER_POOL_ID: ${{ steps.ssm.outputs.user_pool_id }}
-          VITE_COGNITO_CLIENT_ID: ${{ steps.ssm.outputs.client_id }}
+          VITE_API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.outputs.outputs.client_id }}
           VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
         run: pnpm --filter @bookshelf/web run build
 
-      - name: Sync web assets to S3
+      - name: Deploy Web stack
+        # BucketDeployment inside WebStack syncs dist/ to S3 and invalidates
+        # CloudFront — no separate sync or invalidation steps needed.
         run: |
-          aws s3 sync apps/web/dist \
-            s3://${{ steps.ssm.outputs.bucket }}/builds/${{ steps.version.outputs.tag }}/ \
-            --delete
-
-      - name: Invalidate CloudFront cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ steps.ssm.outputs.distribution_id }} \
-            --paths "/*"
-
-      - name: Resolve API URL from SSM
-        id: api-url
-        run: echo "url=${{ steps.ssm.outputs.api_url }}" >> "$GITHUB_OUTPUT"
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
+            --require-approval never -c version=${{ steps.version.outputs.tag }}
 
       - name: Smoke tests
         id: smoke
         continue-on-error: true
         env:
-          API_BASE_URL: ${{ steps.api-url.outputs.url }}
+          API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
 
       - name: Rollback to last good version
         if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
+        env:
+          VITE_API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.outputs.outputs.client_id }}
+          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
         run: |
           echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.tag }}"
           git checkout ${{ steps.last-good.outputs.tag }}
           pnpm install --frozen-lockfile
           pnpm --filter @bookshelf/api run build
-          pnpm --filter @bookshelf/infra run cdk deploy --all --require-approval never -c version=${{ steps.last-good.outputs.tag }}
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
+            --require-approval never -c version=${{ steps.last-good.outputs.tag }}
+          pnpm --filter @bookshelf/web run build
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
+            --require-approval never -c version=${{ steps.last-good.outputs.tag }}
 
       - name: Fail job after rollback
         if: steps.smoke.outcome == 'failure'
@@ -118,9 +127,9 @@ jobs:
           exit 1
 
       - name: Tag deployed version
+        if: steps.smoke.outcome != 'failure'
         run: |
-          VERSION=$(jq -r .version package.json)
-          TAG="v$VERSION"
+          TAG="${{ steps.version.outputs.tag }}"
           echo "Tagging commit as $TAG"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

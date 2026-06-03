@@ -1,6 +1,7 @@
 name: Version Bump
 
 on:
+  # Manual trigger — supports patch / minor / major bumps from the GitHub UI.
   workflow_dispatch:
     inputs:
       bump-type:
@@ -9,13 +10,23 @@ on:
         type: choice
         options: [patch, minor, major]
 
+  # Automatic trigger — opens a patch bump PR after every successful deploy to
+  # dev so the next feature branch never hits the Unique Version gate.
+  # Fires only when the full Deploy to Sandbox workflow succeeds (smoke tests
+  # passed, git tag pushed), not on every push to main.
+  workflow_run:
+    workflows: ["Deploy to Sandbox"]
+    types: [completed]
+
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
   bump:
-    name: Bump ${{ inputs.bump-type }} version
+    name: Bump ${{ inputs.bump-type || 'patch' }} version
+    # When triggered by workflow_run, only proceed if the deploy succeeded.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -38,7 +49,8 @@ jobs:
 
       - name: Bump version (no git tag — tag is created post-deploy)
         run: |
-          npm version ${{ inputs.bump-type }} --no-git-tag-version
+          BUMP_TYPE="${{ inputs.bump-type || 'patch' }}"
+          npm version "$BUMP_TYPE" --no-git-tag-version
           NEW_VERSION=$(jq -r .version package.json)
           echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
 
@@ -48,6 +60,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
+          pnpm exec prettier --write package.json
           git add package.json
           git commit -m "chore: bump version to v${{ env.NEW_VERSION }}"
           git push origin "$BRANCH"
@@ -57,10 +70,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            TRIGGER="Auto-triggered after successful deploy of \`${{ github.event.workflow_run.head_sha }}\`."
+          else
+            TRIGGER="Manually triggered (${{ inputs.bump-type }} bump)."
+          fi
           gh pr create \
             --title "chore: bump version to v${{ env.NEW_VERSION }}" \
-            --body "Automated version bump (${{ inputs.bump-type }}) to \`v${{ env.NEW_VERSION }}\`.
+            --body "$TRIGGER
 
-          This PR was created by the **Version Bump** workflow. The unique-version gate in CI will verify the new version is not already tagged before allowing merge." \
+          Bumps version to \`v${{ env.NEW_VERSION }}\` so the next feature branch passes the Unique Version gate without a manual bump step.
+
+          The unique-version gate in CI will verify the new version is not already tagged before allowing merge." \
             --base main \
             --head "${{ env.BRANCH }}"

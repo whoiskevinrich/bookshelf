@@ -52,7 +52,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: pnpm prettier --check .
+        run: pnpm format:check
 
   test:
     name: Unit Tests
@@ -112,7 +112,7 @@ jobs:
           VERSION=$(jq -r .version package.json)
           echo "Package version: $VERSION"
           if git tag --list "v$VERSION" | grep -q "v$VERSION"; then
-            echo "::error::Tag v$VERSION already exists. Bump the version before merging."
+            echo "::error::Tag v$VERSION already exists. Run 'pnpm version:bump' and push again. See docs/runbooks/pr-workflow.md."
             exit 1
           fi
           echo "Version v$VERSION is unique."

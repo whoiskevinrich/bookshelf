@@ -22,10 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
-      - name: Validate version tag exists
+      - name: Log promotion target
         run: |
-          TAG="v${{ inputs.version }}"
-          echo "Promoting version: $TAG"
+          echo "Promoting version: v${{ inputs.version }}"
 
       - uses: actions/checkout@v6
         with:
@@ -61,7 +60,53 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: CDK deploy all stacks to prod
-        run: pnpm deploy:infra
+      - name: Build API bundle
+        run: pnpm --filter @bookshelf/api run build
+
+      - name: Deploy Auth and API stacks
+        run: |
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
+            --require-approval never -c version=v${{ inputs.version }}
         env:
           BOOKSHELF_ENV: prod
+
+      - name: Resolve stack outputs (prod)
+        id: outputs
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfApi \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrlOutput'].OutputValue" \
+            --output text)
+          USER_POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfAuth \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolIdOutput'].OutputValue" \
+            --output text)
+          CLIENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfAuth \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientIdOutput'].OutputValue" \
+            --output text)
+          echo "api_url=$API_URL"           >> "$GITHUB_OUTPUT"
+          echo "user_pool_id=$USER_POOL_ID" >> "$GITHUB_OUTPUT"
+          echo "client_id=$CLIENT_ID"       >> "$GITHUB_OUTPUT"
+
+      - name: Build web app
+        env:
+          VITE_API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.outputs.outputs.client_id }}
+          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
+        run: pnpm --filter @bookshelf/web run build
+
+      - name: Deploy Web stack
+        # BucketDeployment inside WebStack syncs dist/ to S3 and invalidates
+        # CloudFront — no separate sync or invalidation steps needed.
+        run: |
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
+            --require-approval never -c version=v${{ inputs.version }}
+        env:
+          BOOKSHELF_ENV: prod
+
+      - name: Smoke tests (prod)
+        env:
+          API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
+        run: pnpm --filter @bookshelf/api run test:smoke
