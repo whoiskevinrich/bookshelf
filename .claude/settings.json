@@ -71,7 +71,7 @@
           },
           {
             "type": "command",
-            "command": "case \"$PWD\" in *.claude/worktrees/*) bash scripts/worktree-setup.sh ;; esac",
+            "command": "case \"$PWD\" in *.claude/worktrees/*) MAIN=\"G:/source/bookshelf\"; for f in apps/api/.env.local apps/web/.env.local; do [ -f \"$MAIN/$f\" ] && [ ! -f \"$f\" ] && cp \"$MAIN/$f\" \"$f\" && echo \"Copied: $f\"; done ;; esac",
             "shell": "bash",
             "async": false,
             "statusMessage": "Copying .env.local files into worktree..."
