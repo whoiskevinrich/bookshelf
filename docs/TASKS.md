@@ -53,6 +53,7 @@
 ### Future (post-v1)
 
 - [ ] Configure SES as Cognito email sender — improves deliverability, eliminates spam-folder issues; see `docs/runbooks/auth-troubleshooting.md#ses-upgrade-path`
+- [ ] Visual polish P2 — Shelf carousel: horizontally scrollable cover carousel on desktop (≥ md), prev/next arrow controls, scroll-snap; requires a cover detail view and roving-tabindex a11y — write a separate spec before starting; see `docs/specs/visual-polish.md`
 
 ## Done
 

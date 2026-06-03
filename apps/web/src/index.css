@@ -1,3 +1,67 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Animations ─────────────────────────────────────────── */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.3s ease-out both;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-slate-200) 25%,
+    var(--color-slate-100) 50%,
+    var(--color-slate-200) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Note: :where() has zero specificity, so never add a bg-* Tailwind utility
+   to an element that also has .shimmer — it will win and break the gradient. */
+:where(.dark, .dark *) .shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-slate-700) 25%,
+    var(--color-slate-600) 50%,
+    var(--color-slate-700) 75%
+  );
+  /* background-size inherited from .shimmer */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up {
+    animation: none;
+  }
+
+  .shimmer {
+    animation: none;
+    background: var(--color-slate-200);
+  }
+
+  :where(.dark, .dark *) .shimmer {
+    background: var(--color-slate-700);
+  }
+}

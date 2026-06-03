@@ -12,6 +12,7 @@ import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
 import { BookSearch } from "../components/BookSearch";
+import { Button } from "../components/ui/Button";
 import type { ShelfEntry, ShelfStatus, BookSearchResult } from "../lib/api-client";
 
 interface ShelfSectionProps {
@@ -31,17 +32,24 @@ function ShelfSection({
 }: ShelfSectionProps) {
   return (
     <section>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
-        {title} ({entries.length})
-      </h2>
+      <div className="flex items-center gap-3 mb-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 shrink-0">
+          {title}
+        </h2>
+        <span className="flex-1 h-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+        <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 rounded-full px-2 py-0.5">
+          {entries.length}
+        </span>
+      </div>
       {entries.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">{emptyMessage}</p>
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
-          {entries.map((entry) => (
+          {entries.map((entry, index) => (
             <ShelfBookCard
               key={entry.isbn}
               entry={entry}
+              staggerIndex={index}
               onMove={(isbn, status) => moveMutation.mutate({ isbn, status })}
               onRemove={(isbn) => removeMutation.mutate(isbn)}
               isMoving={moveMutation.isPending && moveMutation.variables?.isbn === entry.isbn}
@@ -105,12 +113,9 @@ export function ShelfPage() {
       <main className="max-w-4xl mx-auto px-6 py-10">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold dark:text-white">My Shelf</h1>
-          <button
-            onClick={() => (showSearch ? setShowSearch(false) : handleOpenSearch())}
-            className="text-sm bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 transition-colors"
-          >
+          <Button variant="app" onClick={() => (showSearch ? setShowSearch(false) : handleOpenSearch())}>
             {showSearch ? "Cancel" : "Add a book"}
-          </button>
+          </Button>
         </div>
 
         {showSearch && (
@@ -154,13 +159,13 @@ export function ShelfPage() {
 
               {hasNextPage && (
                 <div className="text-center">
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={() => void fetchNextPage()}
                     disabled={isFetchingNextPage}
-                    className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white disabled:opacity-40"
                   >
                     {isFetchingNextPage ? "Loading more…" : "Load more"}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
