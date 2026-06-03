@@ -1,5 +1,7 @@
 import { PublicHeader } from "../components/PublicHeader";
 
+const isRepoPublic = import.meta.env.VITE_REPO_PUBLIC === "true";
+
 const sectionHeadingClass =
   "text-xl font-semibold tracking-tight text-slate-900 dark:text-white mb-4";
 
@@ -63,15 +65,19 @@ export function AboutPage() {
               >
                 Kevin Rich
               </a>
-              . Source on{" "}
-              <a
-                href="https://github.com/whoiskevinrich/bookshelf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-900 dark:text-white underline hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-              >
-                GitHub
-              </a>
+              {isRepoPublic && (
+                <>
+                  {". Source on "}
+                  <a
+                    href="https://github.com/whoiskevinrich/bookshelf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-slate-900 dark:text-white underline hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  >
+                    GitHub
+                  </a>
+                </>
+              )}
               .
             </p>
           </footer>
