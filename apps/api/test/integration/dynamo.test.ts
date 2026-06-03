@@ -1,8 +1,8 @@
 /**
- * Integration tests for dynamo.ts — run against DynamoDB Local.
+ * Integration tests for dynamo.ts — run against real AWS DynamoDB (dev table).
  *
  * Prerequisites:
- *   docker compose up -d dynamodb-local
+ *   AWS credentials in environment (via ~/.aws or env vars)
  *   pnpm --filter @bookshelf/api test:integration
  */
 
@@ -26,31 +26,22 @@ import {
   decodeCursor,
 } from "../../src/lib/dynamo.js";
 
-const ENDPOINT = process.env["DYNAMODB_ENDPOINT"] ?? "http://127.0.0.1:8000";
 const TABLE = process.env["DYNAMODB_TABLE_NAME"] ?? "bookshelf-integration-test";
 
-const rawClient = new DynamoDBClient({
-  endpoint: ENDPOINT,
-  region: "us-east-1",
-  credentials: {
-    accessKeyId: "DUMMYACCESSKEYID0001",
-    secretAccessKey: "dummysecretaccesskey0001",
-  },
-});
+const rawClient = new DynamoDBClient({});
 
-async function waitUntilActive(maxMs = 1000): Promise<void> {
+async function waitUntilActive(maxMs = 30000): Promise<void> {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     const { Table } = await rawClient.send(new DescribeTableCommand({ TableName: TABLE }));
     if (Table?.TableStatus === "ACTIVE") return;
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`Table did not become ACTIVE within ${maxMs}ms`);
 }
 
 beforeAll(async () => {
   // Drop any leftover table from a previous interrupted run so tests start fresh.
-  // DynamoDB Local deletes synchronously — no polling needed after delete.
   try {
     await rawClient.send(new DeleteTableCommand({ TableName: TABLE }));
   } catch (err) {

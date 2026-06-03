@@ -5,6 +5,7 @@
 - [ ] Merge PR #13 — smoke test fixes (SSM API key injection, ISBN validation, infra tsconfig, Powertools caching)
 - [ ] After merge: verify CI deploy passes all 11 smoke tests in dev
 - [ ] Deploy invitation-only dev auth — `cdk deploy BookshelfAuth` (dev, no `-c allowSelfSignUp`); redeploy is non-breaking, existing accounts are preserved
+- [ ] Merge PR #21 — visual polish (cover hover, stagger, shimmer skeleton, empty state, section headers, DemoShelf parity, worktree-setup hook)
 
 ## Backlog
 
@@ -30,6 +31,11 @@
 - [x] Audit and update all components to use semantic token classes (remove hard-coded light-only utilities)
 - [x] QA: verify all pages in both themes at mobile and desktop widths
 
+### UI Polish (backlog)
+
+- [ ] Book cover placeholder — books without a cover URL should show a styled placeholder (title initials or icon, slate palette, consistent with `BookCover` fallback) instead of a blank/broken image
+- [ ] Amplify login screen theme — auth pages (`/auth/login`, `/auth/signup`, `/auth/verify`, etc.) should visually match the app's slate color palette and dark mode; currently uses default Amplify UI styling
+
 ### Phase 4 — Web UI (remaining)
 
 - [ ] Implement `lib/api-client.ts` — typed client for `/v1/` endpoints
@@ -53,6 +59,7 @@
 ### Future (post-v1)
 
 - [ ] Configure SES as Cognito email sender — improves deliverability, eliminates spam-folder issues; see `docs/runbooks/auth-troubleshooting.md#ses-upgrade-path`
+- [ ] Visual polish P2 — Shelf carousel: horizontally scrollable cover carousel on desktop (≥ md), prev/next arrow controls, scroll-snap; requires a cover detail view and roving-tabindex a11y — write a separate spec before starting; see `docs/specs/visual-polish.md`
 
 ## Done
 

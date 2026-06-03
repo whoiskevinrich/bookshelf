@@ -1,13 +1,13 @@
 /**
- * Creates the local DynamoDB table and seeds it with demo shelf data.
+ * Seeds the dev DynamoDB table with demo shelf data.
  *
  * Usage:
  *   pnpm --filter @bookshelf/api db:seed
  *
  * Reads from .env.local:
- *   DYNAMODB_ENDPOINT   — defaults to http://localhost:8000
  *   DYNAMODB_TABLE_NAME — defaults to bookshelf
  *   LOCAL_DEV_USER_ID   — Cognito userId to seed the shelf under
+ *   AWS credentials     — via standard AWS SDK credential chain (env vars, ~/.aws, etc.)
  */
 import {
   DynamoDBClient,
@@ -17,7 +17,6 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
 
-const ENDPOINT = process.env["DYNAMODB_ENDPOINT"] ?? "http://127.0.0.1:8000";
 const TABLE = process.env["DYNAMODB_TABLE_NAME"] ?? "bookshelf";
 const USER_ID = process.env["LOCAL_DEV_USER_ID"];
 
@@ -30,11 +29,7 @@ if (!USER_ID) {
   process.exit(1);
 }
 
-const raw = new DynamoDBClient({
-  endpoint: ENDPOINT,
-  region: "us-east-1",
-  credentials: { accessKeyId: "DUMMYACCESSKEYID0001", secretAccessKey: "dummysecretaccesskey0001" },
-});
+const raw = new DynamoDBClient({});
 const db = DynamoDBDocumentClient.from(raw);
 
 // ── Table ──────────────────────────────────────────────────────────────────
@@ -228,4 +223,4 @@ async function seed(): Promise<void> {
 
 await ensureTable();
 await seed();
-console.log("\nDone. Start the API with DYNAMODB_ENDPOINT=http://localhost:8000");
+console.log("\nDone. Start the API with: pnpm --filter @bookshelf/api dev");

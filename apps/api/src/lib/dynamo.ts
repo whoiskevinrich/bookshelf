@@ -16,20 +16,7 @@ let _dynamo: DynamoDBDocumentClient | undefined;
 
 export function dynamo(): DynamoDBDocumentClient {
   if (!_dynamo) {
-    const endpoint = process.env["DYNAMODB_ENDPOINT"];
-    const client = new DynamoDBClient(
-      endpoint
-        ? {
-            endpoint,
-            region: "us-east-1",
-            credentials: {
-              accessKeyId: "DUMMYACCESSKEYID0001",
-              secretAccessKey: "dummysecretaccesskey0001",
-            },
-          }
-        : {},
-    );
-    _dynamo = DynamoDBDocumentClient.from(client);
+    _dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
   }
   return _dynamo;
 }

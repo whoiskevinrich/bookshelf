@@ -13,21 +13,36 @@ No implementation work begins before running this skill.
 
 ## Worktree Setup (new worktrees only)
 
-When opening a session inside a git worktree (path contains `.claude/worktrees/`), run the setup script before any dev work:
+When opening a session inside a git worktree (path contains `.claude/worktrees/`), run the setup script before any dev work.
+
+**From bash (Bash tool):**
+
+```bash
+bash scripts/worktree-setup.sh
+```
+
+**From PowerShell (PowerShell tool):**
 
 ```powershell
 .\scripts\worktree-setup.ps1
 ```
 
-This copies `apps/api/.env.local` and `apps/web/.env.local` from the main worktree (`G:\source\bookshelf`). Without these files neither the API nor the frontend can connect to Cognito or DynamoDB.
+Both forms do the same thing: copy `apps/api/.env.local` and `apps/web/.env.local` from the main worktree (`G:\source\bookshelf`). Without these files neither the API nor the frontend can connect to Cognito or DynamoDB.
 
 If the script reports nothing to copy (files already exist), proceed normally.
-If the main worktree path differs, pass it: `.\scripts\worktree-setup.ps1 -MainWorktree "C:\path\to\bookshelf"`.
+If the main worktree path differs, pass it:
 
-**After setup, choose a dev mode** — see `docs/runbooks/local-dev.md`:
+- Bash: `bash scripts/worktree-setup.sh -MainWorktree "C:\path\to\bookshelf"`
+- PowerShell: `.\scripts\worktree-setup.ps1 -MainWorktree "C:\path\to\bookshelf"`
 
-- **Frontend work only** → `pnpm --filter @bookshelf/web dev:mock` (no Docker needed)
-- **API or full-stack work** → `docker compose up -d` then start both servers normally
+**After setup, start the dev servers** — see `docs/runbooks/local-dev.md`:
+
+```bash
+pnpm --filter @bookshelf/api dev      # API on :3001
+pnpm --filter @bookshelf/web dev      # Web on :3000
+```
+
+**[NON-NEGOTIABLE] Never use `dev:mock` mode.** Auth always runs against the real dev Cognito pool. Mock mode bypasses authentication entirely and must not be used or suggested — it produces a dev environment that doesn't reflect real app behaviour.
 
 ## Workflow: Idea to Production
 
@@ -86,6 +101,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 - No console.log in production code
 - Error boundaries on all async operations
 - Environment variables for all external service credentials
+- **[NON-NEGOTIABLE] Never add mock/stub auth** — `VITE_MOCK_API`, fake `getCurrentUser()` returns, or any bypass of Cognito authentication. Auth always runs against the real dev Cognito pool. Flag any `MOCK_MODE` guard in `lib/auth.ts` or `main.tsx` as a blocker.
 
 ### Bookshelf Domain
 
