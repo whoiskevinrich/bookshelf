@@ -44,14 +44,6 @@ function mapCognitoError(err: unknown): string {
   }
 }
 
-// ── Mock mode ─────────────────────────────────────────────────────────────────
-// When VITE_MOCK_API=true, getCurrentUser/getSession return a fixed identity so
-// ProtectedRoute passes without a real Cognito session. Sign-up/in/out functions
-// are unused in mock mode and keep their real implementations.
-
-const MOCK_MODE = import.meta.env.VITE_MOCK_API === "true";
-const MOCK_USER: AuthUser = { userId: "mock-user-id", username: "demo@example.com" };
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function signUp(email: string, password: string): Promise<SignUpOutput> {
@@ -102,7 +94,6 @@ export async function signOut(): Promise<void> {
 
 /** Returns the current Cognito ID token, or null if not authenticated. */
 export async function getSession(): Promise<string | null> {
-  if (MOCK_MODE) return "mock-id-token";
   try {
     const session = await fetchAuthSession();
     return session.tokens?.idToken?.toString() ?? null;
@@ -112,7 +103,6 @@ export async function getSession(): Promise<string | null> {
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  if (MOCK_MODE) return MOCK_USER;
   try {
     const user = await amplifyGetCurrentUser();
     // signInDetails.loginId is the email; username is the Cognito sub UUID
