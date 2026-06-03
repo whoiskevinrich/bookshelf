@@ -8,7 +8,7 @@ The API connects directly to AWS DynamoDB and Cognito in the dev environment.
 This project uses [Granted](https://docs.commonfate.io/granted/introduction) for credential management:
 
 ```bash
-assume <your-dev-profile>
+assume Sandbox/AWSPowerUserAccess
 ```
 
 Credentials expire (typically after 1 hour). Re-run `assume` if the API starts returning
@@ -40,7 +40,7 @@ bash scripts/worktree-setup.sh -MainWorktree "C:\path\to\bookshelf"
 populate from SSM:
 
 ```bash
-assume <your-dev-profile>
+assume Sandbox/AWSPowerUserAccess
 aws ssm get-parameter --name /bookshelf/cognito/user-pool-id --query Parameter.Value --output text
 aws ssm get-parameter --name /bookshelf/cognito/client-id    --query Parameter.Value --output text
 aws ssm get-parameter --name /bookshelf/api/url              --query Parameter.Value --output text
@@ -50,10 +50,20 @@ aws ssm get-parameter --name /bookshelf/api/url              --query Parameter.V
 
 ## Starting the dev stack
 
-Auth and data both run against real AWS (dev environment). No Docker required.
+Use the `/dev` skill from Claude Code — it handles credential acquisition automatically:
+
+```
+/dev
+```
+
+The skill checks for active AWS credentials, runs
+`assume Sandbox/AWSPowerUserAccess --exec "pnpm --filter @bookshelf/api dev"`
+if credentials are missing or expired, then starts the web server alongside it.
+
+**To start manually** (outside Claude Code):
 
 ```bash
-assume <your-dev-profile>                 # ensure credentials are active first
+assume Sandbox/AWSPowerUserAccess
 pnpm --filter @bookshelf/api dev          # API on :3001 → real DynamoDB
 pnpm --filter @bookshelf/web dev          # Web on :3000 → real Cognito
 ```
@@ -78,7 +88,7 @@ Safe to re-run — existing items are overwritten, not duplicated.
 Your Cognito session has expired — sign out and sign back in at `/auth/login`.
 
 **API returns 5xx / DynamoDB CredentialsProviderError**
-AWS credentials are missing or expired — run `assume <your-dev-profile>` then restart the API.
+AWS credentials are missing or expired — run `assume Sandbox/AWSPowerUserAccess` then restart the API.
 
 **Shelf loads then shows error state in browser**
 Same as above — the API started but credentials expired mid-session. Re-run `assume` and
