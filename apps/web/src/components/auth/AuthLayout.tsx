@@ -13,7 +13,9 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Bookshelf</h1>
           <h2 className="mt-2 text-xl text-slate-600 dark:text-slate-300">{title}</h2>
-          {subtitle && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
+          {subtitle && (
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+          )}
         </div>
         {children}
       </div>

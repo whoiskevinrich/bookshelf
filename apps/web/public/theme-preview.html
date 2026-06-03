@@ -1,0 +1,1149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bookshelf — Color Theme Options</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      /* ─── Theme Variables ─────────────────────────────────────────────── */
+
+      /* Theme A: Current (Monochrome Noir) */
+      .theme-a {
+        --bg-base: #ffffff;
+        --bg-subtle: #f9fafb;
+        --bg-card: #ffffff;
+        --border: #e5e7eb;
+        --border-subtle: #f3f4f6;
+        --text-primary: #111827;
+        --text-secondary: #4b5563;
+        --text-muted: #6b7280;
+        --accent: #4f46e5;
+        --accent-hover: #4338ca;
+        --accent-text: #ffffff;
+        --btn-primary: #111827;
+        --btn-primary-hover: #374151;
+        --btn-primary-text: #ffffff;
+        --success: #16a34a;
+        --error: #dc2626;
+        --tag-bg: #f3f4f6;
+        --tag-text: #374151;
+      }
+      .theme-a.dark-mode {
+        --bg-base: #18181b;
+        --bg-subtle: #27272a;
+        --bg-card: #27272a;
+        --border: #3f3f46;
+        --border-subtle: #3f3f46;
+        --text-primary: #ffffff;
+        --text-secondary: #d4d4d8;
+        --text-muted: #a1a1aa;
+        --accent: #818cf8;
+        --accent-hover: #6366f1;
+        --accent-text: #ffffff;
+        --btn-primary: #ffffff;
+        --btn-primary-hover: #e4e4e7;
+        --btn-primary-text: #18181b;
+        --success: #4ade80;
+        --error: #f87171;
+        --tag-bg: #3f3f46;
+        --tag-text: #d4d4d8;
+      }
+
+      /* Theme B: Forest (Earthy Greens + Warm Neutrals) */
+      .theme-b {
+        --bg-base: #fafaf7;
+        --bg-subtle: #f5f3ee;
+        --bg-card: #ffffff;
+        --border: #d6d3c8;
+        --border-subtle: #e8e5de;
+        --text-primary: #1c1917;
+        --text-secondary: #44403c;
+        --text-muted: #78716c;
+        --accent: #15803d;
+        --accent-hover: #166534;
+        --accent-text: #ffffff;
+        --btn-primary: #1c1917;
+        --btn-primary-hover: #44403c;
+        --btn-primary-text: #ffffff;
+        --success: #16a34a;
+        --error: #dc2626;
+        --tag-bg: #dcfce7;
+        --tag-text: #166534;
+      }
+      .theme-b.dark-mode {
+        --bg-base: #1c1917;
+        --bg-subtle: #292524;
+        --bg-card: #292524;
+        --border: #44403c;
+        --border-subtle: #44403c;
+        --text-primary: #fafaf9;
+        --text-secondary: #d6d3d1;
+        --text-muted: #a8a29e;
+        --accent: #4ade80;
+        --accent-hover: #22c55e;
+        --accent-text: #1c1917;
+        --btn-primary: #fafaf9;
+        --btn-primary-hover: #e7e5e4;
+        --btn-primary-text: #1c1917;
+        --success: #4ade80;
+        --error: #f87171;
+        --tag-bg: #14532d;
+        --tag-text: #86efac;
+      }
+
+      /* Theme C: Amber (Warm Library) */
+      .theme-c {
+        --bg-base: #fffbf0;
+        --bg-subtle: #fef9e6;
+        --bg-card: #ffffff;
+        --border: #e2d9b8;
+        --border-subtle: #f0e8cc;
+        --text-primary: #1c1409;
+        --text-secondary: #4a3f2c;
+        --text-muted: #7c6e54;
+        --accent: #b45309;
+        --accent-hover: #92400e;
+        --accent-text: #ffffff;
+        --btn-primary: #1c1409;
+        --btn-primary-hover: #4a3f2c;
+        --btn-primary-text: #fffbf0;
+        --success: #16a34a;
+        --error: #dc2626;
+        --tag-bg: #fef3c7;
+        --tag-text: #92400e;
+      }
+      .theme-c.dark-mode {
+        --bg-base: #1c1409;
+        --bg-subtle: #28200f;
+        --bg-card: #28200f;
+        --border: #4a3f2c;
+        --border-subtle: #4a3f2c;
+        --text-primary: #fef9e6;
+        --text-secondary: #d6c9a8;
+        --text-muted: #a89268;
+        --accent: #fbbf24;
+        --accent-hover: #f59e0b;
+        --accent-text: #1c1409;
+        --btn-primary: #fef9e6;
+        --btn-primary-hover: #fde68a;
+        --btn-primary-text: #1c1409;
+        --success: #4ade80;
+        --error: #f87171;
+        --tag-bg: #451a03;
+        --tag-text: #fbbf24;
+      }
+
+      /* Theme D: Slate Blue (Modern / Cool) */
+      .theme-d {
+        --bg-base: #f8fafc;
+        --bg-subtle: #f1f5f9;
+        --bg-card: #ffffff;
+        --border: #cbd5e1;
+        --border-subtle: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #334155;
+        --text-muted: #64748b;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --accent-text: #ffffff;
+        --btn-primary: #0f172a;
+        --btn-primary-hover: #1e293b;
+        --btn-primary-text: #ffffff;
+        --success: #16a34a;
+        --error: #dc2626;
+        --tag-bg: #dbeafe;
+        --tag-text: #1e40af;
+      }
+      .theme-d.dark-mode {
+        --bg-base: #0f172a;
+        --bg-subtle: #1e293b;
+        --bg-card: #1e293b;
+        --border: #334155;
+        --border-subtle: #334155;
+        --text-primary: #f8fafc;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --accent: #60a5fa;
+        --accent-hover: #3b82f6;
+        --accent-text: #0f172a;
+        --btn-primary: #f8fafc;
+        --btn-primary-hover: #e2e8f0;
+        --btn-primary-text: #0f172a;
+        --success: #4ade80;
+        --error: #f87171;
+        --tag-bg: #1e3a5f;
+        --tag-text: #93c5fd;
+      }
+
+      /* ─── Shared component styles ─────────────────────────────────────── */
+      .t-bg {
+        background: var(--bg-base);
+        color: var(--text-primary);
+      }
+      .t-subtle {
+        background: var(--bg-subtle);
+      }
+      .t-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .t-text {
+        color: var(--text-primary);
+      }
+      .t-text-2 {
+        color: var(--text-secondary);
+      }
+      .t-muted {
+        color: var(--text-muted);
+      }
+      .t-border {
+        border-color: var(--border);
+      }
+      .t-accent {
+        color: var(--accent);
+      }
+      .t-btn-primary {
+        background: var(--btn-primary);
+        color: var(--btn-primary-text);
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .t-btn-primary:hover {
+        background: var(--btn-primary-hover);
+      }
+      .t-btn-secondary {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .t-btn-ghost {
+        background: transparent;
+        color: var(--text-muted);
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .t-input {
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 14px;
+        width: 100%;
+        outline: none;
+        box-sizing: border-box;
+      }
+      .t-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+      }
+      .t-tag {
+        background: var(--tag-bg);
+        color: var(--tag-text);
+        border-radius: 4px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .t-link {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 14px;
+      }
+      .t-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 12px 0;
+      }
+      .t-header {
+        background: var(--bg-base);
+        border-bottom: 1px solid var(--border);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body style="background: #e5e7eb; padding: 24px; min-height: 100vh">
+    <h1 style="text-align: center; font-size: 22px; font-weight: 700; color: #111; margin: 0 0 6px">
+      Bookshelf — Color Theme Options
+    </h1>
+    <p style="text-align: center; color: #6b7280; font-size: 14px; margin: 0 0 28px">
+      Toggle dark mode per card · pick a theme to commit
+    </p>
+
+    <!-- Controls -->
+    <div
+      style="display: flex; gap: 8px; justify-content: center; margin-bottom: 28px; flex-wrap: wrap"
+    >
+      <button
+        onclick="toggleAll()"
+        style="
+          background: #111;
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 18px;
+          font-size: 13px;
+          cursor: pointer;
+        "
+      >
+        Toggle All Dark
+      </button>
+    </div>
+
+    <div
+      style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+      "
+    >
+      <!-- ── THEME A ── -->
+      <div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+          "
+        >
+          <div>
+            <span style="font-size: 15px; font-weight: 700; color: #111">A — Monochrome Noir</span>
+            <span style="font-size: 12px; color: #6b7280; margin-left: 6px">Current direction</span>
+          </div>
+          <button
+            onclick="toggleDark('a')"
+            style="
+              font-size: 12px;
+              background: #fff;
+              border: 1px solid #d1d5db;
+              border-radius: 4px;
+              padding: 3px 10px;
+              cursor: pointer;
+            "
+          >
+            🌙 Dark
+          </button>
+        </div>
+        <div
+          id="card-a"
+          class="theme-a t-bg"
+          style="border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12)"
+        >
+          <div class="t-header">
+            <span class="t-text" style="font-weight: 600; font-size: 15px">📚 Bookshelf</span>
+            <nav style="display: flex; gap: 16px">
+              <a
+                class="t-accent"
+                href="#"
+                style="font-size: 13px; font-weight: 500; text-decoration: none"
+                >My Books</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none"
+                >Wishlist</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none">Add</a>
+            </nav>
+          </div>
+          <div style="padding: 16px" class="t-subtle">
+            <div style="display: flex; gap: 8px; margin-bottom: 12px">
+              <input class="t-input" type="text" placeholder="Search by title, author, ISBN…" />
+              <button class="t-btn-primary" style="white-space: nowrap">Search</button>
+            </div>
+            <div
+              class="t-card"
+              style="
+                padding: 12px;
+                margin-bottom: 10px;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >The Name of the Wind</span
+                  >
+                  <span class="t-tag">Owned</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Patrick Rothfuss</div>
+                <div class="t-muted" style="font-size: 12px; margin: 4px 0">ISBN 9780756404741</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-secondary" style="padding: 4px 10px; font-size: 12px">
+                    Edit
+                  </button>
+                  <button
+                    class="t-btn-ghost"
+                    style="padding: 4px 10px; font-size: 12px; color: var(--error)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              class="t-card"
+              style="padding: 12px; display: flex; gap: 12px; align-items: flex-start"
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >Project Hail Mary</span
+                  >
+                  <span class="t-tag">Wishlist</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Andy Weir</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-primary" style="padding: 4px 10px; font-size: 12px">
+                    Add to shelf
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 10px 16px; border-top: 1px solid var(--border)" class="t-bg">
+            <span class="t-muted" style="font-size: 12px"
+              >Accent: <strong class="t-accent" style="color: var(--accent)">indigo</strong> ·
+              Neutral grays + zinc dark</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- ── THEME B ── -->
+      <div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+          "
+        >
+          <div>
+            <span style="font-size: 15px; font-weight: 700; color: #111">B — Forest</span>
+            <span style="font-size: 12px; color: #6b7280; margin-left: 6px"
+              >Earthy greens · warm off-white</span
+            >
+          </div>
+          <button
+            onclick="toggleDark('b')"
+            style="
+              font-size: 12px;
+              background: #fff;
+              border: 1px solid #d1d5db;
+              border-radius: 4px;
+              padding: 3px 10px;
+              cursor: pointer;
+            "
+          >
+            🌙 Dark
+          </button>
+        </div>
+        <div
+          id="card-b"
+          class="theme-b t-bg"
+          style="border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12)"
+        >
+          <div class="t-header">
+            <span class="t-text" style="font-weight: 600; font-size: 15px">📚 Bookshelf</span>
+            <nav style="display: flex; gap: 16px">
+              <a
+                class="t-accent"
+                href="#"
+                style="font-size: 13px; font-weight: 500; text-decoration: none"
+                >My Books</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none"
+                >Wishlist</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none">Add</a>
+            </nav>
+          </div>
+          <div style="padding: 16px" class="t-subtle">
+            <div style="display: flex; gap: 8px; margin-bottom: 12px">
+              <input class="t-input" type="text" placeholder="Search by title, author, ISBN…" />
+              <button class="t-btn-primary" style="white-space: nowrap">Search</button>
+            </div>
+            <div
+              class="t-card"
+              style="
+                padding: 12px;
+                margin-bottom: 10px;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >The Name of the Wind</span
+                  >
+                  <span class="t-tag">Owned</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Patrick Rothfuss</div>
+                <div class="t-muted" style="font-size: 12px; margin: 4px 0">ISBN 9780756404741</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-secondary" style="padding: 4px 10px; font-size: 12px">
+                    Edit
+                  </button>
+                  <button
+                    class="t-btn-ghost"
+                    style="padding: 4px 10px; font-size: 12px; color: var(--error)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              class="t-card"
+              style="padding: 12px; display: flex; gap: 12px; align-items: flex-start"
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >Project Hail Mary</span
+                  >
+                  <span class="t-tag">Wishlist</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Andy Weir</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-primary" style="padding: 4px 10px; font-size: 12px">
+                    Add to shelf
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 10px 16px; border-top: 1px solid var(--border)" class="t-bg">
+            <span class="t-muted" style="font-size: 12px"
+              >Accent: <strong style="color: var(--accent)">forest green</strong> · Stone/warm-gray
+              neutrals</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- ── THEME C ── -->
+      <div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+          "
+        >
+          <div>
+            <span style="font-size: 15px; font-weight: 700; color: #111">C — Amber Library</span>
+            <span style="font-size: 12px; color: #6b7280; margin-left: 6px"
+              >Warm paper · amber/burnt orange</span
+            >
+          </div>
+          <button
+            onclick="toggleDark('c')"
+            style="
+              font-size: 12px;
+              background: #fff;
+              border: 1px solid #d1d5db;
+              border-radius: 4px;
+              padding: 3px 10px;
+              cursor: pointer;
+            "
+          >
+            🌙 Dark
+          </button>
+        </div>
+        <div
+          id="card-c"
+          class="theme-c t-bg"
+          style="border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12)"
+        >
+          <div class="t-header">
+            <span class="t-text" style="font-weight: 600; font-size: 15px">📚 Bookshelf</span>
+            <nav style="display: flex; gap: 16px">
+              <a
+                class="t-accent"
+                href="#"
+                style="font-size: 13px; font-weight: 500; text-decoration: none"
+                >My Books</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none"
+                >Wishlist</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none">Add</a>
+            </nav>
+          </div>
+          <div style="padding: 16px" class="t-subtle">
+            <div style="display: flex; gap: 8px; margin-bottom: 12px">
+              <input class="t-input" type="text" placeholder="Search by title, author, ISBN…" />
+              <button class="t-btn-primary" style="white-space: nowrap">Search</button>
+            </div>
+            <div
+              class="t-card"
+              style="
+                padding: 12px;
+                margin-bottom: 10px;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >The Name of the Wind</span
+                  >
+                  <span class="t-tag">Owned</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Patrick Rothfuss</div>
+                <div class="t-muted" style="font-size: 12px; margin: 4px 0">ISBN 9780756404741</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-secondary" style="padding: 4px 10px; font-size: 12px">
+                    Edit
+                  </button>
+                  <button
+                    class="t-btn-ghost"
+                    style="padding: 4px 10px; font-size: 12px; color: var(--error)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              class="t-card"
+              style="padding: 12px; display: flex; gap: 12px; align-items: flex-start"
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >Project Hail Mary</span
+                  >
+                  <span class="t-tag">Wishlist</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Andy Weir</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-primary" style="padding: 4px 10px; font-size: 12px">
+                    Add to shelf
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 10px 16px; border-top: 1px solid var(--border)" class="t-bg">
+            <span class="t-muted" style="font-size: 12px"
+              >Accent: <strong style="color: var(--accent)">amber/burnt orange</strong> · Warm
+              parchment neutrals</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- ── THEME D ── -->
+      <div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+          "
+        >
+          <div>
+            <span style="font-size: 15px; font-weight: 700; color: #111">D — Slate Blue</span>
+            <span style="font-size: 12px; color: #6b7280; margin-left: 6px"
+              >Cool, modern, crisp</span
+            >
+          </div>
+          <button
+            onclick="toggleDark('d')"
+            style="
+              font-size: 12px;
+              background: #fff;
+              border: 1px solid #d1d5db;
+              border-radius: 4px;
+              padding: 3px 10px;
+              cursor: pointer;
+            "
+          >
+            🌙 Dark
+          </button>
+        </div>
+        <div
+          id="card-d"
+          class="theme-d t-bg"
+          style="border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12)"
+        >
+          <div class="t-header">
+            <span class="t-text" style="font-weight: 600; font-size: 15px">📚 Bookshelf</span>
+            <nav style="display: flex; gap: 16px">
+              <a
+                class="t-accent"
+                href="#"
+                style="font-size: 13px; font-weight: 500; text-decoration: none"
+                >My Books</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none"
+                >Wishlist</a
+              >
+              <a class="t-muted" href="#" style="font-size: 13px; text-decoration: none">Add</a>
+            </nav>
+          </div>
+          <div style="padding: 16px" class="t-subtle">
+            <div style="display: flex; gap: 8px; margin-bottom: 12px">
+              <input class="t-input" type="text" placeholder="Search by title, author, ISBN…" />
+              <button class="t-btn-primary" style="white-space: nowrap">Search</button>
+            </div>
+            <div
+              class="t-card"
+              style="
+                padding: 12px;
+                margin-bottom: 10px;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >The Name of the Wind</span
+                  >
+                  <span class="t-tag">Owned</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Patrick Rothfuss</div>
+                <div class="t-muted" style="font-size: 12px; margin: 4px 0">ISBN 9780756404741</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-secondary" style="padding: 4px 10px; font-size: 12px">
+                    Edit
+                  </button>
+                  <button
+                    class="t-btn-ghost"
+                    style="padding: 4px 10px; font-size: 12px; color: var(--error)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              class="t-card"
+              style="padding: 12px; display: flex; gap: 12px; align-items: flex-start"
+            >
+              <div
+                style="
+                  width: 44px;
+                  height: 62px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  flex-shrink: 0;
+                "
+              ></div>
+              <div style="flex: 1">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start">
+                  <span class="t-text" style="font-weight: 600; font-size: 14px"
+                    >Project Hail Mary</span
+                  >
+                  <span class="t-tag">Wishlist</span>
+                </div>
+                <div class="t-text-2" style="font-size: 13px; margin: 2px 0">Andy Weir</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px">
+                  <button class="t-btn-primary" style="padding: 4px 10px; font-size: 12px">
+                    Add to shelf
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 10px 16px; border-top: 1px solid var(--border)" class="t-bg">
+            <span class="t-muted" style="font-size: 12px"
+              >Accent: <strong style="color: var(--accent)">blue-600</strong> · Slate/cool
+              neutrals</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Color Swatches Row -->
+    <div style="max-width: 1400px; margin: 32px auto 0">
+      <h2 style="font-size: 15px; font-weight: 700; color: #111; margin: 0 0 12px">
+        Token comparison
+      </h2>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size: 12px">
+        <!-- A -->
+        <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px">
+          <div style="font-weight: 600; margin-bottom: 8px">A — Noir</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px">
+            <span
+              style="
+                background: #ffffff;
+                border: 1px solid #e5e7eb;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+              title="bg-base"
+            ></span>
+            <span
+              style="
+                background: #f9fafb;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+              title="bg-subtle"
+            ></span>
+            <span
+              style="
+                background: #e5e7eb;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+              title="border"
+            ></span>
+            <span
+              style="
+                background: #111827;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+              title="text-primary"
+            ></span>
+            <span
+              style="
+                background: #4b5563;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+              title="text-secondary"
+            ></span>
+            <span
+              style="
+                background: #4f46e5;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+              title="accent"
+            ></span>
+          </div>
+          <div style="margin-top: 6px; color: #6b7280">Neutral + indigo accent</div>
+        </div>
+        <!-- B -->
+        <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px">
+          <div style="font-weight: 600; margin-bottom: 8px">B — Forest</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px">
+            <span
+              style="
+                background: #fafaf7;
+                border: 1px solid #e5e7eb;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #f5f3ee;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #d6d3c8;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #1c1917;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #44403c;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #15803d;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+          </div>
+          <div style="margin-top: 6px; color: #6b7280">Stone warm + forest green</div>
+        </div>
+        <!-- C -->
+        <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px">
+          <div style="font-weight: 600; margin-bottom: 8px">C — Amber</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px">
+            <span
+              style="
+                background: #fffbf0;
+                border: 1px solid #e2d9b8;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #fef9e6;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #e2d9b8;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #1c1409;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #4a3f2c;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #b45309;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+          </div>
+          <div style="margin-top: 6px; color: #6b7280">Parchment + burnt amber</div>
+        </div>
+        <!-- D -->
+        <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px">
+          <div style="font-weight: 600; margin-bottom: 8px">D — Slate</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px">
+            <span
+              style="
+                background: #f8fafc;
+                border: 1px solid #e2e8f0;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #f1f5f9;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #cbd5e1;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #0f172a;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #334155;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+            <span
+              style="
+                background: #2563eb;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                display: inline-block;
+              "
+            ></span>
+          </div>
+          <div style="margin-top: 6px; color: #6b7280">Slate cool + blue accent</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const darkState = { a: false, b: false, c: false, d: false };
+
+      function toggleDark(id) {
+        darkState[id] = !darkState[id];
+        const card = document.getElementById("card-" + id);
+        card.classList.toggle("dark-mode", darkState[id]);
+        // update button text
+        const btn = card.previousElementSibling.querySelector("button");
+        btn.textContent = darkState[id] ? "☀️ Light" : "🌙 Dark";
+      }
+
+      function toggleAll() {
+        ["a", "b", "c", "d"].forEach((id) => {
+          const card = document.getElementById("card-" + id);
+          const allDark = Object.values(darkState).every((v) => v);
+          if (allDark) {
+            darkState[id] = false;
+            card.classList.remove("dark-mode");
+          } else {
+            darkState[id] = true;
+            card.classList.add("dark-mode");
+          }
+          const btn = card.previousElementSibling.querySelector("button");
+          btn.textContent = darkState[id] ? "☀️ Light" : "🌙 Dark";
+        });
+      }
+    </script>
+  </body>
+</html>
