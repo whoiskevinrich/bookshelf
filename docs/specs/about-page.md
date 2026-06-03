@@ -77,12 +77,15 @@ Bookshelf is a real, usable app — but its origin story is unusual: it was buil
 ## Content Draft
 
 ### Page title
+
 > About Bookshelf
 
 ### Lede
+
 > Bookshelf is two things at once: a real, usable app for tracking the books you own and want to read — and a live experiment in how far you can get building a web app almost entirely through conversation with Claude Code.
 
 ### The experiment
+
 > The goal was simple: start from nothing and build as much of a production-quality web app as possible using Claude Code as the primary development tool. That means the architecture decisions, the CDK infrastructure, the API, the authentication flow, and the React frontend were all shaped through back-and-forth with an AI — not by writing code from scratch in an editor.
 >
 > Some things still required human judgment: deciding what to build, reviewing what the AI produced, catching mistakes, and steering when it went off course. But the heavy lifting — scaffolding, implementation, debugging — was largely delegated.
@@ -90,9 +93,11 @@ Bookshelf is a real, usable app — but its origin story is unusual: it was buil
 > This page exists because it seemed dishonest not to say so.
 
 ### What it does
+
 > The app itself is straightforward: sign up, add books to your shelf (ones you own) or your wishlist (ones you want to read), and keep track of both. Nothing more.
 
 ### Credit
+
 > Built by [Kevin Rich](https://github.com/whoiskevinrich). Source on [GitHub](https://github.com/whoiskevinrich/bookshelf).
 
 ---
@@ -100,6 +105,7 @@ Bookshelf is a real, usable app — but its origin story is unusual: it was buil
 ## Success Metrics
 
 This page has no quantitative success target — it is a transparency and polish feature. Success is qualitative:
+
 - The page exists and is reachable.
 - It reads honestly and does not overstate the AI's role.
 - It is visually indistinguishable in quality from the rest of the app.
