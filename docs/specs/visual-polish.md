@@ -41,6 +41,7 @@ The Bookshelf app is functional but visually flat. Covers are static, interactiv
 **Why it works:** Immediate tactile feedback. Signals interactivity. Standard pattern for content grids (Spotify, Letterboxd). Zero risk of feeling garish at `scale-105`.
 
 **Acceptance criteria:**
+
 - [ ] `transition-transform duration-200 ease-out hover:scale-105` applied to cover wrapper in the shelf grid.
 - [ ] Shadow deepens on hover: `shadow-sm` → `shadow-md`.
 - [ ] Focus-visible also triggers the scale (keyboard accessible).
@@ -56,6 +57,7 @@ The Bookshelf app is functional but visually flat. Covers are static, interactiv
 **Why it works:** Replaces the jarring "everything appears at once" pop with a gentle cascade. Used on every quality content app (Airbnb, Apple Music). The stagger covers only the first 8–10 cards; beyond that all cards share the last delay value.
 
 **Acceptance criteria:**
+
 - [ ] `@keyframes fadeUp` defined in `index.css` (or via Tailwind `animate-*`).
 - [ ] Each card applies `animation-delay: calc(index * 50ms)` inline.
 - [ ] Animation plays only on initial shelf mount, not on subsequent re-renders.
@@ -71,6 +73,7 @@ The Bookshelf app is functional but visually flat. Covers are static, interactiv
 **Why it works:** Empty states are the highest-leverage UX moment — it's when new users decide if the app is worth continuing. A polished empty state signals craft and reduces abandonment. It also satisfies the code-review checklist requirement for zero-books handling.
 
 **Acceptance criteria:**
+
 - [ ] Inline SVG (no external assets) of an open book or stacked books in slate color palette.
 - [ ] Heading: `"Your shelf is empty"` (h2, text-xl).
 - [ ] Subline: `"Search for a book above to add your first one."` (text-sm, muted).
@@ -87,6 +90,7 @@ The Bookshelf app is functional but visually flat. Covers are static, interactiv
 **Why it works:** Shimmer is a more polished loading convention (used by Facebook, LinkedIn, GitHub). It communicates directionality and feels faster than a static pulse blink. Purely CSS — no JS.
 
 **Acceptance criteria:**
+
 - [ ] `@keyframes shimmer` defined in `index.css`.
 - [ ] `ShelfSkeleton` cards use shimmer instead of `animate-pulse`.
 - [ ] Dark mode shimmer uses dark slate tones (no harsh contrast).
@@ -101,6 +105,7 @@ The Bookshelf app is functional but visually flat. Covers are static, interactiv
 **Why it works:** Currently headers are plain text with no visual separation. The divider adds breathing room and hierarchy without adding clutter. The count pill makes quantities scannable at a glance.
 
 **Acceptance criteria:**
+
 - [ ] Header row: `flex items-center gap-3` — label + horizontal rule (flex-grow) + count pill.
 - [ ] Count pill: `text-xs bg-slate-100 dark:bg-slate-800 rounded-full px-2 py-0.5`.
 - [ ] No change to font weight or text size (preserve existing `text-sm font-semibold uppercase tracking-wide`).
@@ -130,10 +135,12 @@ The Bookshelf app is functional but visually flat. Covers are static, interactiv
 ## Success Metrics
 
 **Leading (measurable within 2 weeks of deploy):**
+
 - Zero new accessibility issues reported (WCAG AA).
 - No regression in Lighthouse performance score (remain ≥ 90).
 
 **Lagging:**
+
 - Qualitative: the app "feels like a real product" in user feedback.
 - Return session rate (anecdotal, solo product).
 
@@ -141,11 +148,11 @@ The Bookshelf app is functional but visually flat. Covers are static, interactiv
 
 ## Open Questions
 
-| Question | Owner | Blocking? |
-|---|---|---|
-| Should the empty state use an SVG illustration or a Lucide icon composition? | Design | No — default to Lucide `BookOpen` icon stack |
-| Should stagger animation cap at 8 cards or 12? | Engineering | No — cap at 10 |
-| Should the shimmer skeleton be a global CSS utility or scoped to `ShelfSkeleton`? | Engineering | No — scoped |
+| Question                                                                          | Owner       | Blocking?                                    |
+| --------------------------------------------------------------------------------- | ----------- | -------------------------------------------- |
+| Should the empty state use an SVG illustration or a Lucide icon composition?      | Design      | No — default to Lucide `BookOpen` icon stack |
+| Should stagger animation cap at 8 cards or 12?                                    | Engineering | No — cap at 10                               |
+| Should the shimmer skeleton be a global CSS utility or scoped to `ShelfSkeleton`? | Engineering | No — scoped                                  |
 
 ---
 
