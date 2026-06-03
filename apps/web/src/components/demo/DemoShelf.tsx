@@ -85,7 +85,7 @@ function BookGrid({ books }: { books: DemoBook[] }) {
           />
           <div>
             <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>
-            <p className="text-xs text-gray-500 dark:text-zinc-400">{book.authors.join(", ")}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{book.authors.join(", ")}</p>
           </div>
         </div>
       ))}
@@ -97,13 +97,13 @@ export function DemoShelf() {
   return (
     <div className="space-y-8">
       <section>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
           Owned
         </h3>
         <BookGrid books={OWNED} />
       </section>
       <section>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
           Want to Read
         </h3>
         <BookGrid books={WANT} />

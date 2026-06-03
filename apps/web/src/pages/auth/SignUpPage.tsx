@@ -102,9 +102,9 @@ export function SignUpPage() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-gray-600 dark:text-zinc-400">
+      <p className="text-center text-sm text-slate-600 dark:text-slate-400">
         Already have an account?{" "}
-        <Link to="/auth/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+        <Link to="/auth/login" className="font-medium text-blue-600 hover:text-blue-500">
           Sign in
         </Link>
       </p>

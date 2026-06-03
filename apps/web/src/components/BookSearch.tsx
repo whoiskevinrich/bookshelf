@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { searchBooks, getBookByIsbn, type BookSearchResult } from "../lib/api-client";
 import { isValidIsbn } from "../lib/isbn";
 import { BookCover } from "./BookCover";
+import { Button } from "./ui/Button";
 import type { ShelfStatus } from "../lib/api-client";
 
 interface BookSearchProps {
@@ -58,10 +59,10 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search by title, author, or paste an ISBN…"
-        className="w-full border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-zinc-500"
+        className="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500"
       />
 
-      {loading && <p className="text-sm text-gray-500 dark:text-zinc-400">Searching…</p>}
+      {loading && <p className="text-sm text-slate-500 dark:text-slate-400">Searching…</p>}
       {error && (
         <p className="text-sm text-red-500 dark:text-red-400">
           {error}{" "}
@@ -75,14 +76,14 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
       )}
 
       {results.length === 0 && !loading && !error && query.trim().length > 0 && (
-        <p className="text-sm text-gray-500 dark:text-zinc-400">No results found.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">No results found.</p>
       )}
 
       <div className="space-y-3">
         {results.map((book) => (
           <div
             key={book.isbn}
-            className="flex gap-3 items-start border border-gray-100 dark:border-zinc-700 rounded-lg p-3"
+            className="flex gap-3 items-start border border-slate-100 dark:border-slate-700 rounded-lg p-3"
           >
             <BookCover
               coverUrl={book.coverUrl}
@@ -92,29 +93,31 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>
               {book.authors.length > 0 && (
-                <p className="text-xs text-gray-500 dark:text-zinc-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {book.authors.join(", ")}
                 </p>
               )}
               {book.publishedYear && (
-                <p className="text-xs text-gray-500 dark:text-zinc-400">{book.publishedYear}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{book.publishedYear}</p>
               )}
             </div>
             <div className="flex flex-col gap-1.5 flex-shrink-0">
-              <button
+              <Button
+                variant="app"
+                size="sm"
                 onClick={() => onAdd(book.isbn, "owned", book)}
                 disabled={isAdding}
-                className="text-xs bg-gray-900 text-white px-2.5 py-1 rounded hover:bg-gray-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 disabled:opacity-40 transition-colors whitespace-nowrap"
               >
                 Add Owned
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => onAdd(book.isbn, "want", book)}
                 disabled={isAdding}
-                className="text-xs border border-gray-300 dark:border-zinc-600 text-gray-700 dark:text-zinc-300 px-2.5 py-1 rounded hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 transition-colors whitespace-nowrap"
               >
                 Add to Wishlist
-              </button>
+              </Button>
             </div>
           </div>
         ))}
