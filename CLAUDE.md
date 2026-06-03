@@ -38,6 +38,7 @@ If the main worktree path differs, pass it:
 **After setup, start the dev servers** — see `docs/runbooks/local-dev.md`:
 
 ```bash
+assume <your-dev-profile>             # AWS credentials required for DynamoDB
 pnpm --filter @bookshelf/api dev      # API on :3001
 pnpm --filter @bookshelf/web dev      # Web on :3000
 ```
