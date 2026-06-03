@@ -1,6 +1,6 @@
 import { PublicHeader } from "../components/PublicHeader";
 
-const isRepoPublic = import.meta.env.VITE_REPO_PUBLIC === "true";
+const isRepoPublic = import.meta.env.VITE_SHOW_REPO_LINK === "true";
 
 const sectionHeadingClass =
   "text-xl font-semibold tracking-tight text-slate-900 dark:text-white mb-4";
