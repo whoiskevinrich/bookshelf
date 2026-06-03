@@ -75,6 +75,13 @@
             "shell": "bash",
             "async": false,
             "statusMessage": "Copying .env.local files into worktree..."
+          },
+          {
+            "type": "command",
+            "command": "pnpm install --frozen-lockfile",
+            "shell": "bash",
+            "async": false,
+            "statusMessage": "Installing dependencies..."
           }
         ]
       }
