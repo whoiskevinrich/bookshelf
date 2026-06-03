@@ -7,9 +7,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
+export const appButtonVariantClass =
+  "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 disabled:opacity-40";
+
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary: "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50",
-  app: "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 disabled:opacity-40",
+  app: appButtonVariantClass,
   secondary:
     "border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40",
   ghost:
