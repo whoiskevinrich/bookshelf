@@ -20,10 +20,7 @@ export function AboutPage() {
           </p>
 
           <section aria-labelledby="experiment-heading">
-            <h2
-              id="experiment-heading"
-              className={sectionHeadingClass}
-            >
+            <h2 id="experiment-heading" className={sectionHeadingClass}>
               The experiment
             </h2>
             <div className="space-y-4">
@@ -31,8 +28,8 @@ export function AboutPage() {
                 The goal was simple: start from nothing and build as much of a production-quality
                 web app as possible using Claude Code as the primary development tool. That means
                 the architecture decisions, the CDK infrastructure, the API, the authentication
-                flow, and the React frontend were all shaped through back-and-forth with an AI —
-                not by writing code from scratch in an editor.
+                flow, and the React frontend were all shaped through back-and-forth with an AI — not
+                by writing code from scratch in an editor.
               </p>
               <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                 Some things still required human judgment: deciding what to build, reviewing what
@@ -46,10 +43,7 @@ export function AboutPage() {
           </section>
 
           <section aria-labelledby="app-heading" className="mt-12">
-            <h2
-              id="app-heading"
-              className={sectionHeadingClass}
-            >
+            <h2 id="app-heading" className={sectionHeadingClass}>
               What it does
             </h2>
             <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
