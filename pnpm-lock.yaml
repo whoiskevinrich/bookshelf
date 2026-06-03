@@ -158,6 +158,12 @@ importers:
         specifier: ^0.5.21
         version: 0.5.21
     devDependencies:
+      '@bookshelf/api':
+        specifier: workspace:*
+        version: link:../../apps/api
+      '@bookshelf/web':
+        specifier: workspace:*
+        version: link:../../apps/web
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
