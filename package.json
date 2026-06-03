@@ -15,7 +15,6 @@
     "test:coverage": "pnpm -r test:coverage",
     "deploy:infra": "pnpm --filter @bookshelf/infra run deploy",
     "synth": "pnpm --filter ./packages/infra/** run synth",
-    "dev:api:local": "docker compose up -d --wait && pnpm --filter @bookshelf/api db:seed && pnpm --filter @bookshelf/api dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "version:bump": "npm version patch --no-git-tag-version",

@@ -38,7 +38,6 @@ If the main worktree path differs, pass it:
 **After setup, start the dev servers** — see `docs/runbooks/local-dev.md`:
 
 ```bash
-docker compose up -d                  # DynamoDB Local
 pnpm --filter @bookshelf/api dev      # API on :3001
 pnpm --filter @bookshelf/web dev      # Web on :3000
 ```

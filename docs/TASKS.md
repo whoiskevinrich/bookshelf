@@ -31,6 +31,11 @@
 - [x] Audit and update all components to use semantic token classes (remove hard-coded light-only utilities)
 - [x] QA: verify all pages in both themes at mobile and desktop widths
 
+### UI Polish (backlog)
+
+- [ ] Book cover placeholder — books without a cover URL should show a styled placeholder (title initials or icon, slate palette, consistent with `BookCover` fallback) instead of a blank/broken image
+- [ ] Amplify login screen theme — auth pages (`/auth/login`, `/auth/signup`, `/auth/verify`, etc.) should visually match the app's slate color palette and dark mode; currently uses default Amplify UI styling
+
 ### Phase 4 — Web UI (remaining)
 
 - [ ] Implement `lib/api-client.ts` — typed client for `/v1/` endpoints
