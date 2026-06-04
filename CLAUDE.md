@@ -37,10 +37,12 @@ If the main worktree path differs, pass it:
 
 **After setup, start the dev servers** — see `docs/runbooks/local-dev.md`:
 
-```bash
-pnpm --filter @bookshelf/api dev      # API on :3001
-pnpm --filter @bookshelf/web dev      # Web on :3000
 ```
+/dev
+```
+
+This skill checks for active AWS credentials, acquires them via
+`assume Sandbox/AWSPowerUserAccess` if needed, then starts the API and web servers.
 
 **[NON-NEGOTIABLE] Never use `dev:mock` mode.** Auth always runs against the real dev Cognito pool. Mock mode bypasses authentication entirely and must not be used or suggested — it produces a dev environment that doesn't reflect real app behaviour.
 

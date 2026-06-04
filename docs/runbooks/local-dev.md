@@ -1,5 +1,25 @@
 # Runbook: Local Development
 
+## Prerequisites — AWS credentials
+
+The API connects directly to AWS DynamoDB and Cognito in the dev environment.
+**You must have active AWS credentials before starting the API dev server.**
+
+This project uses [Granted](https://docs.commonfate.io/granted/introduction) for credential management:
+
+```bash
+assume Sandbox/AWSPowerUserAccess
+```
+
+Credentials expire (typically after 1 hour). Re-run `assume` if the API starts returning
+DynamoDB errors. Verify credentials are active at any time with:
+
+```bash
+aws sts get-caller-identity
+```
+
+---
+
 ## New worktree setup
 
 Git worktrees don't inherit `.env.local` files (they're gitignored). The SessionStart hook
@@ -16,10 +36,11 @@ If your main worktree is elsewhere:
 bash scripts/worktree-setup.sh -MainWorktree "C:\path\to\bookshelf"
 ```
 
-**If the main worktree has no `.env.local` files yet**, create them from `.env.example` and
+**If the main worktree has no `.env.local` files yet**, first assume credentials, then
 populate from SSM:
 
 ```bash
+assume Sandbox/AWSPowerUserAccess
 aws ssm get-parameter --name /bookshelf/cognito/user-pool-id --query Parameter.Value --output text
 aws ssm get-parameter --name /bookshelf/cognito/client-id    --query Parameter.Value --output text
 aws ssm get-parameter --name /bookshelf/api/url              --query Parameter.Value --output text
@@ -29,11 +50,22 @@ aws ssm get-parameter --name /bookshelf/api/url              --query Parameter.V
 
 ## Starting the dev stack
 
-Auth and data both run against real AWS (dev environment). No Docker required.
+Use the `/dev` skill from Claude Code — it handles credential acquisition automatically:
+
+```
+/dev
+```
+
+The skill checks for active AWS credentials, runs
+`assume Sandbox/AWSPowerUserAccess --exec "pnpm --filter @bookshelf/api dev"`
+if credentials are missing or expired, then starts the web server alongside it.
+
+**To start manually** (outside Claude Code):
 
 ```bash
-pnpm --filter @bookshelf/api dev      # API on :3001 → real DynamoDB
-pnpm --filter @bookshelf/web dev      # Web on :3000 → real Cognito
+assume Sandbox/AWSPowerUserAccess
+pnpm --filter @bookshelf/api dev          # API on :3001 → real DynamoDB
+pnpm --filter @bookshelf/web dev          # Web on :3000 → real Cognito
 ```
 
 First time on a new machine or fresh table, seed your shelf:
@@ -55,13 +87,18 @@ Safe to re-run — existing items are overwritten, not duplicated.
 **API returns 401**
 Your Cognito session has expired — sign out and sign back in at `/auth/login`.
 
-**API returns 5xx / DynamoDB error**
-AWS credentials may be expired or the dev table doesn't exist yet. Check:
+**API returns 5xx / DynamoDB CredentialsProviderError**
+AWS credentials are missing or expired — run `assume Sandbox/AWSPowerUserAccess` then restart the API.
+
+**Shelf loads then shows error state in browser**
+Same as above — the API started but credentials expired mid-session. Re-run `assume` and
+restart `pnpm --filter @bookshelf/api dev`.
+
+**Table not found**
+The dev DynamoDB table doesn't exist yet. Deploy it first:
 
 ```bash
-aws sts get-caller-identity            # confirm credentials are valid
-aws dynamodb describe-table --table-name bookshelf  # confirm table exists
+pnpm --filter @bookshelf/infra run cdk deploy BookshelfApi
 ```
 
-If the table is missing, it was likely never deployed: `cdk deploy BookshelfApi` in
-`packages/infra`.
+Then seed: `pnpm --filter @bookshelf/api db:seed`.
