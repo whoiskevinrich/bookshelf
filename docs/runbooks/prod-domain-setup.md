@@ -64,12 +64,12 @@ You'll get a `Name` (e.g. `_a1b2c3.bookshelf.whoiskevinrich.com.`) and a `Value`
 
 **3. Add it at Hover** → DNS records → Create DNS Record:
 
-| Field       | Value                                                                 |
-| ----------- | --------------------------------------------------------------------- |
-| TYPE        | `CNAME`                                                               |
+| Field       | Value                                                                                          |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| TYPE        | `CNAME`                                                                                        |
 | HOSTNAME    | the Name **minus the domain** — e.g. `_a1b2c3.bookshelf` (Hover appends `.whoiskevinrich.com`) |
-| TARGET NAME | the full ACM Value — e.g. `_x9y8z7.acm-validations.aws.`              |
-| TTL         | Default                                                              |
+| TARGET NAME | the full ACM Value — e.g. `_x9y8z7.acm-validations.aws.`                                       |
+| TTL         | Default                                                                                        |
 
 > The single most common mistake: pasting the **full** `_a1b2c3.bookshelf.whoiskevinrich.com`
 > into HOSTNAME. Hover appends the apex, so that becomes
@@ -88,7 +88,7 @@ mapping are created here:
 npx cdk deploy BookshelfAuth BookshelfApi -c env=prod -c version=vX.Y.Z
 ```
 
-> If the API cert happens to request a *different* validation record (rare with the
+> If the API cert happens to request a _different_ validation record (rare with the
 > shared wildcard), read it from the **`us-west-2`** ACM console and add that CNAME
 > at Hover too, the same way.
 
@@ -120,10 +120,10 @@ aws cloudformation describe-stacks --stack-name BookshelfApi --region us-west-2 
 **3. Add the two host CNAMEs at Hover** (leave apex/`www`/`presentation`/`home`
 forwards untouched):
 
-| HOSTNAME        | TYPE  | TARGET NAME                                         |
-| --------------- | ----- | --------------------------------------------------- |
-| `bookshelf`     | CNAME | the CloudFront domain (`d…​.cloudfront.net`)        |
-| `api.bookshelf` | CNAME | the API regional domain (`d-…​.execute-api.…​`)     |
+| HOSTNAME        | TYPE  | TARGET NAME                                     |
+| --------------- | ----- | ----------------------------------------------- |
+| `bookshelf`     | CNAME | the CloudFront domain (`d…​.cloudfront.net`)    |
+| `api.bookshelf` | CNAME | the API regional domain (`d-…​.execute-api.…​`) |
 
 ---
 
@@ -171,12 +171,12 @@ After this one-time bootstrap, `promote.yml` runs hands-off: the certs are issue
 
 ## Troubleshooting
 
-| Symptom | Likely cause |
-| --- | --- |
+| Symptom                                                            | Likely cause                                                                                                                                                                                                                |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cdk deploy BookshelfCdnCert` / `BookshelfApi` blocks indefinitely | The ACM validation CNAME isn't resolving — verify the Hover record. Host must be `_<hash>.bookshelf` (not the full FQDN), value must match ACM exactly. Check with `dig +short _<hash>.bookshelf.whoiskevinrich.com CNAME`. |
-| `cdk deploy` errors `…no credentials configured` for `us-east-1` | `us-east-1` not bootstrapped — run `cdk bootstrap aws://PROD_ACCOUNT_ID/us-east-1`. |
-| `https://bookshelf.whoiskevinrich.com` doesn't resolve | The `bookshelf` CNAME isn't added/propagated yet, or points at the wrong target — re-check `WebCnameTargetOutput`. |
-| Browser shows a CORS error calling `/api/...` | Web was built with an absolute API URL — rebuild with `VITE_API_BASE_URL=/api`. |
-| `api.bookshelf...` returns 404 for `/v1/...` | API custom domain mapping missing, or the `api.bookshelf` CNAME points at the execute-api URL instead of the **custom domain** regional name (`ApiCnameTargetOutput`). |
-| `bookshelf.../api/v1/...` 404 but `api.bookshelf.../v1/...` works | CloudFront path-strip Function not associated / not stripping `/api`. |
-| TLS warning on the custom domain | Cert not issued yet (still validating), or CloudFront/API still deploying. |
+| `cdk deploy` errors `…no credentials configured` for `us-east-1`   | `us-east-1` not bootstrapped — run `cdk bootstrap aws://PROD_ACCOUNT_ID/us-east-1`.                                                                                                                                         |
+| `https://bookshelf.whoiskevinrich.com` doesn't resolve             | The `bookshelf` CNAME isn't added/propagated yet, or points at the wrong target — re-check `WebCnameTargetOutput`.                                                                                                          |
+| Browser shows a CORS error calling `/api/...`                      | Web was built with an absolute API URL — rebuild with `VITE_API_BASE_URL=/api`.                                                                                                                                             |
+| `api.bookshelf...` returns 404 for `/v1/...`                       | API custom domain mapping missing, or the `api.bookshelf` CNAME points at the execute-api URL instead of the **custom domain** regional name (`ApiCnameTargetOutput`).                                                      |
+| `bookshelf.../api/v1/...` 404 but `api.bookshelf.../v1/...` works  | CloudFront path-strip Function not associated / not stripping `/api`.                                                                                                                                                       |
+| TLS warning on the custom domain                                   | Cert not issued yet (still validating), or CloudFront/API still deploying.                                                                                                                                                  |

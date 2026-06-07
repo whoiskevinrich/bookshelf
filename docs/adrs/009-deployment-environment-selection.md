@@ -15,7 +15,7 @@ That has two weaknesses:
 
 1. **Stringly-typed and unchecked.** `tryGetContext("domain")` is `any`; a typo or
    omission is silent.
-2. **A dangerous footgun.** Prod requires *several* flags. If `promote.yml` (or a
+2. **A dangerous footgun.** Prod requires _several_ flags. If `promote.yml` (or a
    manual run) omits one, prod silently deploys part of the **dev** topology — no
    custom domain, CORS wide open, self-signup off — with no error.
 
@@ -30,11 +30,11 @@ ambiently from the assumed role).
 
 ### Options
 
-| Option | Mechanics | Fit for this project |
-| --- | --- | --- |
-| **Independent context flags (original)** | `-c domain=… -c allowSelfSignUp=…` | Works, but stringly-typed and forgettable — the footgun above. |
-| **Literal `cdk.Stage` per environment** | `class BookshelfStage extends cdk.Stage`; instantiate Dev + Prod | Idiomatic *for CDK Pipelines*, which is the unit Stages feed. Renames stacks (path-prefixed), changes every `cdk deploy` selector to `Prod/…`, and pushes toward committing account IDs. High churn against live `RETAIN` resources, near-zero benefit without Pipelines. |
-| **Typed `EnvConfig` selected by one flag (chosen)** | `-c env=dev\|prod` indexes a typed config map; stacks stay top-level | Atomic environment selection, type-safe, no stack renames, account stays ambient. Minimal CI change. |
+| Option                                              | Mechanics                                                            | Fit for this project                                                                                                                                                                                                                                                      |
+| --------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Independent context flags (original)**            | `-c domain=… -c allowSelfSignUp=…`                                   | Works, but stringly-typed and forgettable — the footgun above.                                                                                                                                                                                                            |
+| **Literal `cdk.Stage` per environment**             | `class BookshelfStage extends cdk.Stage`; instantiate Dev + Prod     | Idiomatic _for CDK Pipelines_, which is the unit Stages feed. Renames stacks (path-prefixed), changes every `cdk deploy` selector to `Prod/…`, and pushes toward committing account IDs. High churn against live `RETAIN` resources, near-zero benefit without Pipelines. |
+| **Typed `EnvConfig` selected by one flag (chosen)** | `-c env=dev\|prod` indexes a typed config map; stacks stay top-level | Atomic environment selection, type-safe, no stack renames, account stays ambient. Minimal CI change.                                                                                                                                                                      |
 
 ## Decision
 

@@ -43,11 +43,11 @@ To make this possible, the stack props were **decoupled**: `ApiStack.sameOrigin`
 `WebStack.apiOrigin` (the `/api/*` routing) is independent of
 `WebStack.customDomain` (cert + alias). The three environments compose these:
 
-| env | self-signup | API via CloudFront / CORS | custom domain + certs |
-| --- | --- | --- | --- |
-| `dev` | off | yes — same-origin, no CORS | none |
-| `prod-interim` | off | yes — same-origin, **no CORS** | none |
-| `prod` | on | yes — same-origin, no CORS | `bookshelf.whoiskevinrich.com` |
+| env            | self-signup | API via CloudFront / CORS      | custom domain + certs          |
+| -------------- | ----------- | ------------------------------ | ------------------------------ |
+| `dev`          | off         | yes — same-origin, no CORS     | none                           |
+| `prod-interim` | off         | yes — same-origin, **no CORS** | none                           |
+| `prod`         | on          | yes — same-origin, no CORS     | `bookshelf.whoiskevinrich.com` |
 
 Security delta vs final prod: **only the hostname** (`*.cloudfront.net` vs
 `bookshelf.whoiskevinrich.com`). TLS is valid (AWS-managed cert), authn/authz, IAM,

@@ -41,19 +41,19 @@ Three facts constrain the design:
 
 ### Options — DNS
 
-| Option | Mechanics | Trade-off |
-| --- | --- | --- |
-| Subdomain delegation *(initial choice — not possible)* | Route53 zone for *only* `bookshelf.whoiskevinrich.com`; NS records at Hover delegate it. | Would give full CDK automation — **but Hover's DNS editor has no `NS` type, so it can't be created.** |
-| Full apex delegation | Move all of `whoiskevinrich.com` DNS to Route53; change nameservers at Hover. | Most automatable, but AWS owns apex + MX, and **breaks Hover's existing apex/`www`/`presentation`/`home` forwards** (Route53 has no HTTP forwarding). |
-| **Keep DNS at Hover, CNAME (chosen)** | No Route53. Manual ACM-validation CNAME + `bookshelf` / `api.bookshelf` CNAMEs at Hover. | Apex, email, and existing forwards untouched; ~$0 (no hosted zone). Cost: more manual DNS, and cert deploys block until the validation CNAME is added. |
+| Option                                                 | Mechanics                                                                                | Trade-off                                                                                                                                              |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Subdomain delegation _(initial choice — not possible)_ | Route53 zone for _only_ `bookshelf.whoiskevinrich.com`; NS records at Hover delegate it. | Would give full CDK automation — **but Hover's DNS editor has no `NS` type, so it can't be created.**                                                  |
+| Full apex delegation                                   | Move all of `whoiskevinrich.com` DNS to Route53; change nameservers at Hover.            | Most automatable, but AWS owns apex + MX, and **breaks Hover's existing apex/`www`/`presentation`/`home` forwards** (Route53 has no HTTP forwarding).  |
+| **Keep DNS at Hover, CNAME (chosen)**                  | No Route53. Manual ACM-validation CNAME + `bookshelf` / `api.bookshelf` CNAMEs at Hover. | Apex, email, and existing forwards untouched; ~$0 (no hosted zone). Cost: more manual DNS, and cert deploys block until the validation CNAME is added. |
 
 ### Options — API exposure
 
-| Option | Browser path | MCP / programmatic path | Notes |
-| --- | --- | --- | --- |
-| A — CloudFront `/api` only | same-origin, no CORS | no clean URL: `/api` prefix + path-rewrite, or raw execute-api URL | CORS benefit is browser-only; leaves the API without a canonical hostname. |
-| B — `api.` subdomain only | CORS to a known origin | clean `/v1/...` | Single hostname; browser keeps CORS. |
-| **Hybrid (chosen)** | CloudFront `/api/*`, same-origin, no CORS | `api.bookshelf.whoiskevinrich.com`, clean `/v1/...` | Two doors to one Lambda. Best of both; ≈ $0 extra. |
+| Option                     | Browser path                              | MCP / programmatic path                                            | Notes                                                                      |
+| -------------------------- | ----------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| A — CloudFront `/api` only | same-origin, no CORS                      | no clean URL: `/api` prefix + path-rewrite, or raw execute-api URL | CORS benefit is browser-only; leaves the API without a canonical hostname. |
+| B — `api.` subdomain only  | CORS to a known origin                    | clean `/v1/...`                                                    | Single hostname; browser keeps CORS.                                       |
+| **Hybrid (chosen)**        | CloudFront `/api/*`, same-origin, no CORS | `api.bookshelf.whoiskevinrich.com`, clean `/v1/...`                | Two doors to one Lambda. Best of both; ≈ $0 extra.                         |
 
 Cost is negligible either way. With DNS at Hover there is **no Route53 hosted zone**
 (not even the $0.50/month it would cost); both ACM certs are free, and API traffic

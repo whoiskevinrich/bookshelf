@@ -11,7 +11,7 @@ the API base URL (`/api` same-origin, or the execute-api URL for dev).
 
 Originally these were injected at **build time** as Vite `VITE_*` env vars. That
 forced an awkward dance: deploy `BookshelfAuth`/`BookshelfApi`, resolve their
-CloudFormation outputs, set `VITE_*` env vars, *then* build the web bundle — in CI
+CloudFormation outputs, set `VITE_*` env vars, _then_ build the web bundle — in CI
 and, painfully, by hand for local deploys (setting `$env:VITE_*` on the machine).
 
 The constraint that makes "just pass the stacks' readonly properties into the
@@ -39,8 +39,10 @@ config**:
 `config.json` shape:
 
 ```json
-{ "cognito": { "userPoolId": "...", "userPoolClientId": "...", "region": "us-west-2" },
-  "apiBaseUrl": "/api" }
+{
+  "cognito": { "userPoolId": "...", "userPoolClientId": "...", "region": "us-west-2" },
+  "apiBaseUrl": "/api"
+}
 ```
 
 ## Consequences

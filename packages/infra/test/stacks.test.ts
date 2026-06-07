@@ -284,9 +284,7 @@ describe("Custom-domain topology", () => {
     it("routes /api/* as an additional cache behavior", () => {
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
-          CacheBehaviors: Match.arrayWith([
-            Match.objectLike({ PathPattern: "/api/*" }),
-          ]),
+          CacheBehaviors: Match.arrayWith([Match.objectLike({ PathPattern: "/api/*" })]),
         }),
       });
     });

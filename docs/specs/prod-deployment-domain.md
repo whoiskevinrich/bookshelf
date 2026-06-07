@@ -104,12 +104,12 @@ strips `/api` so Hono's existing `/v1/...` routes match unchanged. MCP hits
 
 Four stacks. No Route53 — DNS lives at Hover.
 
-| Stack | Region | Responsibility |
-| --- | --- | --- |
-| `BookshelfCdnCert` | `us-east-1` | ACM cert for `bookshelf.whoiskevinrich.com` + `*.bookshelf.whoiskevinrich.com` (CloudFront). **Manual DNS validation** (`fromDns()` with no zone). `crossRegionReferences: true`. |
-| `BookshelfAuth` | `us-west-2` | Cognito (unchanged); self-signup enabled when `env=prod`. |
-| `BookshelfApi` | `us-west-2` | Existing API + **regional** ACM cert (`*.bookshelf.whoiskevinrich.com`, manual validation), `apigatewayv2.DomainName` + `ApiMapping`, and a `ApiCnameTargetOutput` for the `api.bookshelf` CNAME. CORS dropped. |
-| `BookshelfWeb` | `us-west-2` | CloudFront `domainNames`/`certificate` (from `BookshelfCdnCert`), the `/api/*` behavior + path-strip Function, and a `WebCnameTargetOutput` for the `bookshelf` CNAME. `crossRegionReferences: true`. |
+| Stack              | Region      | Responsibility                                                                                                                                                                                                  |
+| ------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BookshelfCdnCert` | `us-east-1` | ACM cert for `bookshelf.whoiskevinrich.com` + `*.bookshelf.whoiskevinrich.com` (CloudFront). **Manual DNS validation** (`fromDns()` with no zone). `crossRegionReferences: true`.                               |
+| `BookshelfAuth`    | `us-west-2` | Cognito (unchanged); self-signup enabled when `env=prod`.                                                                                                                                                       |
+| `BookshelfApi`     | `us-west-2` | Existing API + **regional** ACM cert (`*.bookshelf.whoiskevinrich.com`, manual validation), `apigatewayv2.DomainName` + `ApiMapping`, and a `ApiCnameTargetOutput` for the `api.bookshelf` CNAME. CORS dropped. |
+| `BookshelfWeb`     | `us-west-2` | CloudFront `domainNames`/`certificate` (from `BookshelfCdnCert`), the `/api/*` behavior + path-strip Function, and a `WebCnameTargetOutput` for the `bookshelf` CNAME. `crossRegionReferences: true`.           |
 
 ## Key construct changes
 
@@ -220,7 +220,7 @@ DNS validation is manual, so the first prod deploy is hands-on (steady-state
 ## MCP implications (why hybrid)
 
 `apps/mcp` (TASKS.md Phase 3) is a non-browser consumer with a typed
-`lib/api-client.ts`. Routing the API *only* through CloudFront would leave it with
+`lib/api-client.ts`. Routing the API _only_ through CloudFront would leave it with
 no clean base URL — it would have to either eat the `/api` prefix + path-rewrite
 Function or hardcode the volatile execute-api URL. The dedicated
 `api.bookshelf.whoiskevinrich.com` door gives MCP a stable canonical base
@@ -235,25 +235,25 @@ the Lambda is unaffected by domain routing. Track as its own ADR alongside
 
 ## Cost
 
-| Item | Monthly |
-| --- | --- |
-| Route53 | $0 — not used (DNS at Hover) |
-| ACM certs (both) | $0 |
-| CloudFront | within always-free 1 TB + 10M req tier → ~$0 |
-| CloudFront Function | 2M free/mo, then $0.10/M → ~$0 |
-| API Gateway custom domain | no per-domain charge |
+| Item                      | Monthly                                      |
+| ------------------------- | -------------------------------------------- |
+| Route53                   | $0 — not used (DNS at Hover)                 |
+| ACM certs (both)          | $0                                           |
+| CloudFront                | within always-free 1 TB + 10M req tier → ~$0 |
+| CloudFront Function       | 2M free/mo, then $0.10/M → ~$0               |
+| API Gateway custom domain | no per-domain charge                         |
 
 Total ≈ **$0/month** above existing usage. The cost is operational, not financial:
 manual DNS records + manual cert validation.
 
 ## Trade-offs
 
-| Decision | Chosen | Trade-off accepted |
-| --- | --- | --- |
-| DNS | CNAME at Hover (no Route53) | Manual records + manual cert validation (deploy blocks); apex + forwards + email stay at Hover untouched. |
-| API exposure | Hybrid (CloudFront `/api` + `api.` subdomain) | Two doors / two certs to reason about; in exchange, no CORS for the browser and a clean canonical URL for MCP. |
-| Cert region | Separate `us-east-1` cert stack + cross-region ref | Extra stack + one cross-region reference — unavoidable given CloudFront's `us-east-1` requirement vs. `us-west-2` app stacks. |
-| Deploy | Manual first-time bootstrap | First prod deploy is hands-on (cert validation + CNAMEs); documented in the runbook. Subsequent deploys are `cdk deploy --all -c env=prod`. |
+| Decision     | Chosen                                             | Trade-off accepted                                                                                                                          |
+| ------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| DNS          | CNAME at Hover (no Route53)                        | Manual records + manual cert validation (deploy blocks); apex + forwards + email stay at Hover untouched.                                   |
+| API exposure | Hybrid (CloudFront `/api` + `api.` subdomain)      | Two doors / two certs to reason about; in exchange, no CORS for the browser and a clean canonical URL for MCP.                              |
+| Cert region  | Separate `us-east-1` cert stack + cross-region ref | Extra stack + one cross-region reference — unavoidable given CloudFront's `us-east-1` requirement vs. `us-west-2` app stacks.               |
+| Deploy       | Manual first-time bootstrap                        | First prod deploy is hands-on (cert validation + CNAMEs); documented in the runbook. Subsequent deploys are `cdk deploy --all -c env=prod`. |
 
 ## Namespace convention (personal multi-app domain)
 
@@ -286,4 +286,7 @@ the namespace follows a fixed convention (ADR-008):
   Books calls (currently `CACHING_DISABLED` for all of `/api/*`).
 - Revisiting Route53 (subdomain delegation) if DNS ever moves off Hover — it would
   restore automated cert validation and alias records.
+
+```
+
 ```
