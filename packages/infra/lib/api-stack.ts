@@ -4,19 +4,45 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as apigatewayv2Integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
+
+/**
+ * Custom API hostname config (full prod only) — the canonical `api.<app>...`
+ * door for MCP / programmatic clients. Independent of `sameOrigin`: the interim
+ * topology runs same-origin (no CORS) without a custom hostname. See ADR-008.
+ */
+export interface ApiCustomDomainConfig {
+  /** Canonical API hostname, e.g. "api.bookshelf.whoiskevinrich.com". */
+  apiHostname: string;
+  /** Regional cert domain covering apiHostname, e.g. "*.bookshelf.whoiskevinrich.com". */
+  certificateDomainName: string;
+  /** Optional extra SANs for the regional cert. */
+  certificateSans?: string[];
+}
 
 export interface ApiStackProps extends cdk.StackProps {
   userPoolId: string;
   userPoolIssuer: string;
   userPoolClientId: string;
+  /**
+   * When true, the browser reaches the API same-origin via CloudFront `/api/*`
+   * (and MCP is non-browser), so **no CORS** is configured. When false/omitted
+   * (dev), the SPA calls the execute-api URL cross-origin and permissive CORS is
+   * kept. True for both the domainless `prod-interim` and full `prod`.
+   */
+  sameOrigin?: boolean;
+  /** Custom API hostname (full prod). Omit for dev and the domainless interim. */
+  customDomain?: ApiCustomDomainConfig;
 }
 
 export class ApiStack extends cdk.Stack {
-  /** HTTPS URL of the API Gateway — consumed by WebStack */
+  /** HTTPS URL of the API Gateway (raw execute-api endpoint) — consumed by WebStack */
   readonly apiUrl: string;
+  /** Bare execute-api hostname (no scheme/path) — used as the CloudFront `/api` origin */
+  readonly executeApiDomain: string;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -81,15 +107,25 @@ export class ApiStack extends cdk.Stack {
     );
 
     // ── API Gateway HTTP API ───────────────────────────────────────────────
+    //
+    // CORS: when `sameOrigin` (all deployed envs — dev, prod-interim, prod) the
+    // browser reaches the API same-origin via CloudFront `/api/*` and MCP is
+    // non-browser, so no CORS is configured. The fallback (sameOrigin false) keeps
+    // permissive CORS for a cross-origin SPA. Resolves the historical
+    // "tighten to CloudFront domain" TODO — see ADR-008.
     const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {
       apiName: "bookshelf-api",
       description: "Bookshelf REST API",
-      corsPreflight: {
-        allowOrigins: ["*"], // tightened to CloudFront domain after web deploy
-        allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
-        allowHeaders: ["Authorization", "Content-Type"],
-        maxAge: cdk.Duration.days(1),
-      },
+      ...(props.sameOrigin
+        ? {}
+        : {
+            corsPreflight: {
+              allowOrigins: ["*"],
+              allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
+              allowHeaders: ["Authorization", "Content-Type"],
+              maxAge: cdk.Duration.days(1),
+            },
+          }),
     });
 
     const lambdaIntegration = new apigatewayv2Integrations.HttpLambdaIntegration(
@@ -103,6 +139,50 @@ export class ApiStack extends cdk.Stack {
       methods: [apigatewayv2.HttpMethod.ANY],
       integration: lambdaIntegration,
     });
+
+    // Bare execute-api host (no scheme/path) for use as the CloudFront `/api` origin.
+    this.executeApiDomain = `${httpApi.apiId}.execute-api.${this.region}.amazonaws.com`;
+
+    // ── Custom domain (prod) — canonical API door for MCP / programmatic clients ─
+    //
+    // api.<app>.<root> → API Gateway, serving the same Hono /v1 routes with no
+    // path rewrite (unlike the browser's CloudFront /api/* door). DNS lives at the
+    // registrar (Hover): the regional cert is DNS-validated by a CNAME added there
+    // by hand (the deploy blocks until it is), and the public hostname is a CNAME
+    // → this custom domain's regional name. See ADR-008 /
+    // docs/runbooks/prod-domain-setup.md.
+    if (props.customDomain) {
+      const apiCert = new acm.Certificate(this, "ApiCertificate", {
+        domainName: props.customDomain.certificateDomainName,
+        ...(props.customDomain.certificateSans
+          ? { subjectAlternativeNames: props.customDomain.certificateSans }
+          : {}),
+        // No Route53 zone — add the validation CNAME manually at the registrar.
+        validation: acm.CertificateValidation.fromDns(),
+      });
+
+      const apiDomainName = new apigatewayv2.DomainName(this, "ApiDomainName", {
+        domainName: props.customDomain.apiHostname,
+        certificate: apiCert,
+      });
+
+      new apigatewayv2.ApiMapping(this, "ApiMapping", {
+        api: httpApi,
+        domainName: apiDomainName,
+        stage: httpApi.defaultStage,
+      });
+
+      // CNAME target to create at the registrar: api.<zone> → this value.
+      new cdk.CfnOutput(this, "ApiCnameTargetOutput", {
+        exportName: "BookshelfApiCnameTarget",
+        description: `Create CNAME ${props.customDomain.apiHostname} → this value at the registrar`,
+        value: apiDomainName.regionalDomainName,
+      });
+      new cdk.CfnOutput(this, "ApiCustomUrlOutput", {
+        exportName: "BookshelfApiCustomUrl",
+        value: `https://${props.customDomain.apiHostname}`,
+      });
+    }
 
     // ── SSM Parameters ─────────────────────────────────────────────────────
     new ssm.StringParameter(this, "ApiUrlParam", {

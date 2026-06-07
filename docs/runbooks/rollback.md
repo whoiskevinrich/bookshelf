@@ -60,7 +60,8 @@ Use this when a merge to `main` caused a regression and you want to restore a kn
 3. The workflow will:
    - Check out the code at `v0.1.3`
    - Validate the version matches `package.json`
-   - Run `cdk deploy --all` against prod
+   - Run `cdk deploy --all -c env=prod` against prod (the `env=prod` selector
+     applies the full prod topology — domain, self-signup; see ADR-009)
 
 For dev/sandbox rollback, check out the tag locally and run:
 

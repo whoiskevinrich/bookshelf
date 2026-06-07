@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Amplify } from "aws-amplify";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "./lib/api-client";
+import { loadRuntimeConfig } from "./lib/runtime-config";
 import { App } from "./App";
 import "./index.css";
 
@@ -21,27 +22,36 @@ const queryClient = new QueryClient({
 
 const MOCK_MODE = import.meta.env.VITE_MOCK_API === "true";
 
-Amplify.configure({
-  Auth: {
-    Cognito: {
-      userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID as string,
-      userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID as string,
-    },
-  },
-});
+// Async bootstrap (no module-level top-level await — unsupported by the build
+// target). Loads deploy-time runtime config (/config.json), then configures
+// Amplify and renders. Config must resolve before any API call.
+async function bootstrap(): Promise<void> {
+  const runtimeConfig = await loadRuntimeConfig();
 
-if (MOCK_MODE) {
-  const { worker } = await import("./mocks/browser");
-  await worker.start({ onUnhandledRequest: "bypass" });
+  Amplify.configure({
+    Auth: {
+      Cognito: {
+        userPoolId: runtimeConfig.cognito.userPoolId,
+        userPoolClientId: runtimeConfig.cognito.userPoolClientId,
+      },
+    },
+  });
+
+  if (MOCK_MODE) {
+    const { worker } = await import("./mocks/browser");
+    await worker.start({ onUnhandledRequest: "bypass" });
+  }
+
+  const root = document.getElementById("root");
+  if (!root) throw new Error("Root element not found");
+
+  createRoot(root).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </StrictMode>,
+  );
 }
 
-const root = document.getElementById("root");
-if (!root) throw new Error("Root element not found");
-
-createRoot(root).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+void bootstrap();

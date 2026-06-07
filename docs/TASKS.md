@@ -6,8 +6,20 @@
 - [ ] After merge: verify CI deploy passes all 11 smoke tests in dev
 - [ ] Deploy invitation-only dev auth — `cdk deploy BookshelfAuth` (dev, no `-c allowSelfSignUp`); redeploy is non-breaking, existing accounts are preserved
 - [ ] Merge PR #21 — visual polish (cover hover, stagger, shimmer skeleton, empty state, section headers, DemoShelf parity, worktree-setup hook)
+- [ ] Ship **prod-interim** to the prod account — `cdk deploy --all -c env=prod-interim -c version=v<X.Y.Z>` (live on `*.cloudfront.net`, same-origin/no-CORS, invite-only). First clean up the orphaned `bookshelf` table + failed `BookshelfApi` stack from the earlier cert-blocked deploy (prod account `071526660165`, us-west-2)
+- [ ] Follow up on **Hover support ticket** — `SERVFAIL` on the ACM validation CNAME `_82debdb….bookshelf.whoiskevinrich.com` (correct record, healthy zone, DNSSEC off). Blocks the prod custom domain; see ADR-010
 
 ## Backlog
+
+### Phase 5 — Production custom domain (deferred)
+
+> Gated on the Hover registrar fix (the ticket above), or a pivot to **ACM email
+> validation** / **move DNS to Route53** if Hover can't serve the record.
+
+- [ ] Switch prod from interim to the full custom domain `bookshelf.whoiskevinrich.com` — `-c env=prod` (in-place stack update of `BookshelfApi`/`BookshelfWeb`; also enables Cognito self-signup)
+- [ ] Issue the ACM certs once the validation CNAME resolves, then `cdk deploy --all -c env=prod`, then add the `bookshelf` + `api.bookshelf` CNAMEs from the stack outputs — full steps in `docs/runbooks/prod-domain-setup.md`
+- [ ] Verify: SPA on `https://bookshelf.whoiskevinrich.com`, API door `https://api.bookshelf.whoiskevinrich.com/health`, same-origin `/api/*`, no CORS
+- [ ] (When self-signup goes on) reconsider WAF / rate limiting on the public book-search proxy
 
 ### Phase 2 — API (remaining)
 

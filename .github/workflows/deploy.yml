@@ -65,7 +65,7 @@ jobs:
       - name: Deploy Auth and API stacks
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
-            --require-approval never -c version=${{ steps.version.outputs.tag }}
+            --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }}
 
       - name: Resolve stack outputs
         id: outputs
@@ -87,11 +87,9 @@ jobs:
           echo "client_id=$CLIENT_ID"       >> "$GITHUB_OUTPUT"
 
       - name: Build web app
-        env:
-          VITE_API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
-          VITE_COGNITO_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
-          VITE_COGNITO_CLIENT_ID: ${{ steps.outputs.outputs.client_id }}
-          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
+        # No VITE_* env needed: the bundle fetches /config.json at runtime, which
+        # WebStack writes to S3 at deploy time from the Auth/API stack properties
+        # (ADR-011). The same artifact works in any environment.
         run: pnpm --filter @bookshelf/web run build
 
       - name: Deploy Web stack
@@ -99,7 +97,7 @@ jobs:
         # CloudFront — no separate sync or invalidation steps needed.
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
-            --require-approval never -c version=${{ steps.version.outputs.tag }}
+            --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }}
 
       - name: Smoke tests
         id: smoke
@@ -110,11 +108,6 @@ jobs:
 
       - name: Rollback to last good version
         if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
-        env:
-          VITE_API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
-          VITE_COGNITO_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
-          VITE_COGNITO_CLIENT_ID: ${{ steps.outputs.outputs.client_id }}
-          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
         run: |
           echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.tag }}"
           git checkout ${{ steps.last-good.outputs.tag }}
@@ -122,10 +115,10 @@ jobs:
           pnpm --filter @bookshelf/api run build
           mkdir -p apps/web/dist
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
-            --require-approval never -c version=${{ steps.last-good.outputs.tag }}
+            --require-approval never -c env=dev -c version=${{ steps.last-good.outputs.tag }}
           pnpm --filter @bookshelf/web run build
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
-            --require-approval never -c version=${{ steps.last-good.outputs.tag }}
+            --require-approval never -c env=dev -c version=${{ steps.last-good.outputs.tag }}
 
       - name: Fail job after rollback
         if: steps.smoke.outcome == 'failure'
