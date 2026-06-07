@@ -5,6 +5,7 @@ import { useShelf, useMoveShelfEntry, useRemoveFromShelf, flattenShelf } from ".
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
+import { Button } from "../components/ui/Button";
 
 export function WishlistPage() {
   const {
@@ -75,13 +76,13 @@ export function WishlistPage() {
 
             {hasNextPage && (
               <div className="text-center mt-8">
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white disabled:opacity-40"
                 >
                   {isFetchingNextPage ? "Loading more…" : "Load more"}
-                </button>
+                </Button>
               </div>
             )}
           </>

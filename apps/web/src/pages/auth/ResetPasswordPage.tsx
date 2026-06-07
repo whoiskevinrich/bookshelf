@@ -127,7 +127,10 @@ export function ResetPasswordPage() {
       </form>
 
       <p className="text-center text-sm text-slate-600 dark:text-slate-400">
-        <Link to="/auth/login" className="font-medium text-blue-600 hover:text-blue-500">
+        <Link
+          to="/auth/login"
+          className="font-medium underline underline-offset-2 text-slate-900 dark:text-white hover:no-underline"
+        >
           Back to sign in
         </Link>
       </p>

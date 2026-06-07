@@ -59,25 +59,26 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search by title, author, or paste an ISBN…"
-        className="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500"
+        className="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300"
       />
 
-      {loading && <p className="text-sm text-slate-500 dark:text-slate-400">Searching…</p>}
-      {error && (
-        <p className="text-sm text-red-500 dark:text-red-400">
-          {error}{" "}
-          <button
-            onClick={() => void runSearch(query.trim())}
-            className="underline hover:no-underline"
-          >
-            Try again
-          </button>
-        </p>
-      )}
-
-      {results.length === 0 && !loading && !error && query.trim().length > 0 && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No results found.</p>
-      )}
+      <div role="status" aria-live="polite" aria-atomic="true">
+        {loading && <p className="text-sm text-slate-500 dark:text-slate-400">Searching…</p>}
+        {error && (
+          <p className="text-sm text-red-500 dark:text-red-400">
+            {error}{" "}
+            <button
+              onClick={() => void runSearch(query.trim())}
+              className="underline hover:no-underline"
+            >
+              Try again
+            </button>
+          </p>
+        )}
+        {results.length === 0 && !loading && !error && query.trim().length > 0 && (
+          <p className="text-sm text-slate-500 dark:text-slate-400">No results found.</p>
+        )}
+      </div>
 
       <div className="space-y-3">
         {results.map((book) => (
