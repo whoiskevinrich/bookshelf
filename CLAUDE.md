@@ -56,7 +56,7 @@ This skill checks for active AWS credentials, acquires them via
 
 1. `/product-management:brainstorm` — if idea is vague
 2. `/product-management:write-spec` — required; output to `docs/specs/<slug>.md`
-3. `/productivity:task-management` — convert spec into TASKS.md items
+3. `/productivity:task-management` — convert spec into `todo/TASKS.md` items
 
 ### Phase 2 — Architecture (before implementation)
 
