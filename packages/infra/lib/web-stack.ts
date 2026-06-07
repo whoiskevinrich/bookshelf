@@ -5,8 +5,22 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as cloudfrontOrigins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
+
+/**
+ * Custom-domain config for the web "door" (full prod only): CloudFront serves the
+ * SPA at `webHostname` with the ACM cert. Independent of `apiOrigin` — the interim
+ * topology runs the same-origin `/api/*` routing on the default `*.cloudfront.net`
+ * domain without a custom hostname/cert. See ADR-008.
+ */
+export interface WebCustomDomainConfig {
+  /** CloudFront cert (from CdnCertStack, us-east-1) covering webHostname. */
+  certificate: acm.ICertificate;
+  /** SPA hostname, e.g. "bookshelf.whoiskevinrich.com". */
+  webHostname: string;
+}
 
 export interface WebStackProps extends cdk.StackProps {
   /** Semver version string from CI, e.g. "v1.2.3". Used as the active S3 prefix. */
@@ -17,6 +31,28 @@ export interface WebStackProps extends cdk.StackProps {
    * Override in tests to point at a fixture directory.
    */
   webDistPath?: string;
+  /**
+   * Bare execute-api host of the API (no scheme/path). When set, CloudFront adds a
+   * same-origin `/api/*` behavior (with the `/api`-strip Function) so the browser
+   * never makes a cross-origin API call → no CORS. Set for `prod-interim` and
+   * `prod`; omit for dev.
+   */
+  apiOrigin?: string;
+  /** Custom domain (full prod): cert + alias hostname. Omit for dev and interim. */
+  customDomain?: WebCustomDomainConfig;
+  /**
+   * Runtime config written to S3 as `/config.json` and fetched by the SPA at boot
+   * (see `apps/web/src/lib/runtime-config.ts`) — so the bundle bakes in NO
+   * environment values. Sourced from the Auth/API stacks' public readonly
+   * properties; CDK tokens are resolved at deploy time by `Source.jsonData`.
+   */
+  runtimeConfig: {
+    cognitoUserPoolId: string;
+    cognitoUserPoolClientId: string;
+    cognitoRegion: string;
+    /** "/api" (same-origin) or the absolute execute-api URL (dev). */
+    apiBaseUrl: string;
+  };
 }
 
 export class WebStack extends cdk.Stack {
@@ -60,10 +96,55 @@ export class WebStack extends cdk.Stack {
       signing: cloudfront.Signing.SIGV4_NO_OVERRIDE,
     });
 
+    // ── Same-origin API door (prod) ────────────────────────────────────────
+    //
+    // CloudFront forwards `/api/*` to the API Gateway origin so the browser
+    // calls the API same-origin (no CORS). A CloudFront Function strips the
+    // `/api` prefix so Hono's existing `/v1/...` routes match unchanged. The
+    // behavior is caching-disabled and forwards the Authorization header (via
+    // ALL_VIEWER_EXCEPT_HOST_HEADER — Host is dropped so API Gateway accepts it).
+    const apiBehavior: Record<string, cloudfront.BehaviorOptions> = {};
+    if (props.apiOrigin) {
+      const stripApiPrefix = new cloudfront.Function(this, "StripApiPrefix", {
+        comment: "Strip the /api prefix before forwarding to the API origin",
+        code: cloudfront.FunctionCode.fromInline(
+          [
+            "function handler(event) {",
+            "  var req = event.request;",
+            "  req.uri = req.uri.replace(/^\\/api/, '');",
+            "  if (req.uri === '') { req.uri = '/'; }",
+            "  return req;",
+            "}",
+          ].join("\n"),
+        ),
+      });
+
+      apiBehavior["/api/*"] = {
+        origin: new cloudfrontOrigins.HttpOrigin(props.apiOrigin),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        compress: true,
+        functionAssociations: [
+          {
+            function: stripApiPrefix,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
+      };
+    }
+
     // ── CloudFront distribution ────────────────────────────────────────────
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       comment: "Bookshelf web SPA",
       defaultRootObject: "index.html",
+      ...(props.customDomain
+        ? {
+            domainNames: [props.customDomain.webHostname],
+            certificate: props.customDomain.certificate,
+          }
+        : {}),
       defaultBehavior: {
         origin: cloudfrontOrigins.S3BucketOrigin.withOriginAccessControl(bucket, {
           originAccessControl: oac,
@@ -74,6 +155,7 @@ export class WebStack extends cdk.Stack {
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         compress: true,
       },
+      additionalBehaviors: apiBehavior,
       // SPA routing: all 404s → index.html so React Router handles the path
       errorResponses: [
         {
@@ -114,7 +196,19 @@ export class WebStack extends cdk.Stack {
     // CloudFront — replacing the manual `aws s3 sync` + `create-invalidation`
     // CI steps. prune: false preserves previous prefixes for rollback.
     new s3deploy.BucketDeployment(this, "DeployWeb", {
-      sources: [s3deploy.Source.asset(webDistPath)],
+      sources: [
+        s3deploy.Source.asset(webDistPath),
+        // Deploy-time runtime config the SPA fetches at boot (lib/runtime-config.ts).
+        // Token values (Cognito IDs) are resolved here at deploy time.
+        s3deploy.Source.jsonData("config.json", {
+          cognito: {
+            userPoolId: props.runtimeConfig.cognitoUserPoolId,
+            userPoolClientId: props.runtimeConfig.cognitoUserPoolClientId,
+            region: props.runtimeConfig.cognitoRegion,
+          },
+          apiBaseUrl: props.runtimeConfig.apiBaseUrl,
+        }),
+      ],
       destinationBucket: bucket,
       destinationKeyPrefix: `builds/${props.version}`,
       distribution,
@@ -135,6 +229,17 @@ export class WebStack extends cdk.Stack {
       description: "Currently active web build version — update to roll back",
     });
 
+    // ── CNAME target output (prod) ─────────────────────────────────────────
+    // DNS lives at the registrar (Hover): create CNAME `<webHostname>` → this
+    // CloudFront domain there (see docs/runbooks/prod-domain-setup.md).
+    if (props.customDomain) {
+      new cdk.CfnOutput(this, "WebCnameTargetOutput", {
+        exportName: "BookshelfWebCnameTarget",
+        description: `Create CNAME ${props.customDomain.webHostname} → this value at the registrar`,
+        value: distribution.distributionDomainName,
+      });
+    }
+
     // ── Outputs ────────────────────────────────────────────────────────────
     this.distributionUrl = `https://${distribution.distributionDomainName}`;
 
@@ -142,5 +247,12 @@ export class WebStack extends cdk.Stack {
       exportName: "BookshelfDistributionUrl",
       value: this.distributionUrl,
     });
+
+    if (props.customDomain) {
+      new cdk.CfnOutput(this, "WebCustomUrlOutput", {
+        exportName: "BookshelfWebCustomUrl",
+        value: `https://${props.customDomain.webHostname}`,
+      });
+    }
   }
 }

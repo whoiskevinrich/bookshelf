@@ -1,6 +1,5 @@
 import { getSession } from "./auth";
-
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+import { getRuntimeConfig } from "./runtime-config";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -58,7 +57,7 @@ async function authedFetch(path: string, init?: RequestInit): Promise<Response> 
     ...(init?.headers as Record<string, string>),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${getRuntimeConfig().apiBaseUrl}${path}`, { ...init, headers });
   return res;
 }
 

@@ -63,12 +63,23 @@ jobs:
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
 
-      - name: Deploy Auth and API stacks
+      - name: Stub web dist for CDK synth
+        # WebStack references apps/web/dist as an S3 asset at synth time. The real
+        # build runs after stack outputs are resolved; this stub lets CDK
+        # synthesise all stacks before the dist directory exists.
+        run: mkdir -p apps/web/dist
+
+      - name: Deploy cert, Auth, and API stacks
+        # NOTE: the FIRST prod deploy requires the manual bootstrap in
+        # docs/runbooks/prod-domain-setup.md (issue the ACM certs by adding a
+        # validation CNAME at Hover, then add the host CNAMEs) — otherwise ACM DNS
+        # validation blocks the deploy. This workflow is steady-state promotion;
+        # once the certs are issued and the CNAMEs exist these are fast no-ops.
+        # `-c env=prod` applies the full prod topology atomically (ADR-009).
         run: |
-          pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
-            --require-approval never -c version=v${{ inputs.version }}
-        env:
-          BOOKSHELF_ENV: prod
+          pnpm --filter @bookshelf/infra run cdk deploy \
+            BookshelfCdnCert BookshelfAuth BookshelfApi \
+            --require-approval never -c env=prod -c version=v${{ inputs.version }}
 
       - name: Resolve stack outputs (prod)
         id: outputs
@@ -90,11 +101,9 @@ jobs:
           echo "client_id=$CLIENT_ID"       >> "$GITHUB_OUTPUT"
 
       - name: Build web app
-        env:
-          VITE_API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
-          VITE_COGNITO_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
-          VITE_COGNITO_CLIENT_ID: ${{ steps.outputs.outputs.client_id }}
-          VITE_COGNITO_REGION: ${{ vars.AWS_REGION }}
+        # No VITE_* env needed: the bundle fetches /config.json at runtime, which
+        # WebStack writes to S3 at deploy time from the Auth/API stack properties
+        # (ADR-011). apiBaseUrl resolves to "/api" (same-origin) for prod.
         run: pnpm --filter @bookshelf/web run build
 
       - name: Deploy Web stack
@@ -102,9 +111,7 @@ jobs:
         # CloudFront — no separate sync or invalidation steps needed.
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
-            --require-approval never -c version=v${{ inputs.version }}
-        env:
-          BOOKSHELF_ENV: prod
+            --require-approval never -c env=prod -c version=v${{ inputs.version }}
 
       - name: Smoke tests (prod)
         env:
