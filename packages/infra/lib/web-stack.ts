@@ -251,9 +251,7 @@ export class WebStack extends cdk.Stack {
         new route53.ARecord(this, "WebAliasRecord", {
           zone,
           recordName: props.customDomain.webHostname,
-          target: route53.RecordTarget.fromAlias(
-            new route53Targets.CloudFrontTarget(distribution),
-          ),
+          target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
         });
       }
 

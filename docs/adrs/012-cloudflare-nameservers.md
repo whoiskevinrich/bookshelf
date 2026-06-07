@@ -38,11 +38,11 @@ globally distributed with strong reliability.
 
 ## Decision Options
 
-| Option | Mechanism | Trade-offs |
-|--------|-----------|------------|
-| **A — Wait for Hover to fix SERVFAIL** | Keep DNS at Hover; block on Hover support | Zero work; timeline is entirely out of our control. Custom domain stays blocked indefinitely. |
-| **B — ACM email validation fallback** | Switch cert to email validation (avoids DNS records entirely) | ACM email validation requires a working MX record; Hover forwards are not a real mail server. Risky and non-standard. |
-| **C — Full apex delegation to Route53** | Change NS at Hover → Route53 hosted zone | Most CDK-automatable. **Breaks existing apex/www/presentation/home HTTP forwards** — Route53 has no forwarding. |
+| Option                                          | Mechanism                                                                  | Trade-offs                                                                                                                                                     |
+| ----------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A — Wait for Hover to fix SERVFAIL**          | Keep DNS at Hover; block on Hover support                                  | Zero work; timeline is entirely out of our control. Custom domain stays blocked indefinitely.                                                                  |
+| **B — ACM email validation fallback**           | Switch cert to email validation (avoids DNS records entirely)              | ACM email validation requires a working MX record; Hover forwards are not a real mail server. Risky and non-standard.                                          |
+| **C — Full apex delegation to Route53**         | Change NS at Hover → Route53 hosted zone                                   | Most CDK-automatable. **Breaks existing apex/www/presentation/home HTTP forwards** — Route53 has no forwarding.                                                |
 | **D — Move nameservers to Cloudflare (chosen)** | Change NS at Hover → Cloudflare; recreate records + forwards at Cloudflare | Resolves SERVFAIL. Cloudflare Redirect Rules replace Hover forwards. NS records available for future subdomain delegation. Free plan. No architectural change. |
 
 ---
@@ -65,6 +65,7 @@ ADR-008:
   ACM validation CNAME (underscore-prefixed) will be served correctly.
 
 Additionally:
+
 - The **free plan** is sufficient for this use case.
 - **Cloudflare proxy** (orange-cloud) is available as an optional upgrade for DDoS
   protection on the personal domain apex, at no cost.
@@ -138,22 +139,23 @@ wiring.
 
 ```typescript
 // Phase 1 (this ADR) — manual; cdk deploy blocks until CNAME is added at Cloudflare
-new acm.Certificate(this, 'Cert', {
-  domainName: '*.bookshelf.whoiskevinrich.com',
+new acm.Certificate(this, "Cert", {
+  domainName: "*.bookshelf.whoiskevinrich.com",
   validation: acm.CertificateValidation.fromDns(),
 });
 
 // Phase 2 — automated; CDK writes the validation CNAME to Route53 automatically
-const zone = route53.HostedZone.fromLookup(this, 'Zone', {
-  domainName: 'bookshelf.whoiskevinrich.com',
+const zone = route53.HostedZone.fromLookup(this, "Zone", {
+  domainName: "bookshelf.whoiskevinrich.com",
 });
-new acm.Certificate(this, 'Cert', {
-  domainName: '*.bookshelf.whoiskevinrich.com',
+new acm.Certificate(this, "Cert", {
+  domainName: "*.bookshelf.whoiskevinrich.com",
   validation: acm.CertificateValidation.fromDns(zone),
 });
 ```
 
 **One-time bootstrap per new app:**
+
 1. `cdk deploy DnsStack` → stack outputs 4 Route53 NS values.
 2. In Cloudflare → DNS → add one NS record: `<app>.whoiskevinrich.com` → those 4 NS values.
 3. All future `cdk deploy` runs automate cert validation and DNS records. No manual
@@ -163,6 +165,7 @@ A reusable skill (`dns-app-subdomain`, in `~/.claude/skills/`) captures this run
 for future projects.
 
 **Other future options:**
+
 - **Cloudflare API / IaC**: Terraform Cloudflare provider or a CDK Custom Resource
   can automate the one-time NS delegation step — removes the only remaining manual
   action. Worth revisiting once ≥ 2 apps are live.
@@ -171,12 +174,12 @@ for future projects.
 
 ### Risks
 
-| Risk | Likelihood | Mitigation |
-|------|-----------|------------|
-| Hover forwards not fully recreated before cutover | Medium | Pre-cutover checklist: enumerate all forwards from Hover's DNS editor and verify each as a Cloudflare Redirect Rule before changing NS |
-| Record gap during NS propagation | Low | All records created at Cloudflare before NS change; propagation serves from Cloudflare immediately for resolvers that have picked up the new NS |
-| Cloudflare auto-scan misses a record | Low | Manually audit Cloudflare's import against Hover's DNS editor before cutover |
-| CNAME accidentally set to proxied (orange-cloud) | Low | Explicitly verify gray-cloud on all CloudFront/API Gateway CNAMEs; CDK stacks validate via custom domain health check |
+| Risk                                              | Likelihood | Mitigation                                                                                                                                      |
+| ------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hover forwards not fully recreated before cutover | Medium     | Pre-cutover checklist: enumerate all forwards from Hover's DNS editor and verify each as a Cloudflare Redirect Rule before changing NS          |
+| Record gap during NS propagation                  | Low        | All records created at Cloudflare before NS change; propagation serves from Cloudflare immediately for resolvers that have picked up the new NS |
+| Cloudflare auto-scan misses a record              | Low        | Manually audit Cloudflare's import against Hover's DNS editor before cutover                                                                    |
+| CNAME accidentally set to proxied (orange-cloud)  | Low        | Explicitly verify gray-cloud on all CloudFront/API Gateway CNAMEs; CDK stacks validate via custom domain health check                           |
 
 ### What does NOT change
 
