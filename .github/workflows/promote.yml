@@ -69,13 +69,80 @@ jobs:
         # synthesise all stacks before the dist directory exists.
         run: mkdir -p apps/web/dist
 
+      - name: Bootstrap Route53 hosted zone and inject CDK context
+        # HostedZone.fromLookup() in ApiStack and WebStack is a synth-time Route53
+        # query. CDK caches the result in cdk.context.json; without a cached entry it
+        # hits the live API, which fails if BookshelfDns hasn't been deployed yet.
+        #
+        # This step breaks the chicken-and-egg:
+        #   1. If the zone already exists — inject its ID into context; done.
+        #   2. If not — write a placeholder into context so CDK can synthesise all
+        #      stacks, deploy BookshelfDns only (which creates the zone), then
+        #      replace the placeholder with the real zone ID.
+        #
+        # Subsequent cdk deploy steps read the cached value and skip the live lookup.
+        # Context key format confirmed from aws-cdk-lib@2.x source (context-provider.js):
+        #   hosted-zone:account=<stack.account>:domainName=<domain>:region=<stack.region>
+        #   Fields are sorted alphabetically; undefined props (privateZone, vpcId) omitted.
+        #   ApiStack and WebStack are both in us-west-2, so region=us-west-2.
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          DOMAIN="bookshelf.whoiskevinrich.com"
+          CTX_FILE="packages/infra/cdk.context.json"
+          CTX_KEY="hosted-zone:account=${ACCOUNT_ID}:domainName=${DOMAIN}:region=us-west-2"
+
+          # Check whether the hosted zone already exists in Route53.
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+            --dns-name "${DOMAIN}." \
+            --query "HostedZones[?Name=='${DOMAIN}.'].Id" \
+            --output text | sed 's|.*/hostedzone/||')
+
+          if [ -z "$ZONE_ID" ]; then
+            echo "Hosted zone not found — running BookshelfDns bootstrap..."
+
+            # Inject a placeholder so CDK synth succeeds for all stacks.
+            # Only BookshelfDns is deployed here; the placeholder is never used
+            # in a real CloudFormation resource in this step.
+            jq --arg key "$CTX_KEY" --arg domain "$DOMAIN" \
+              '. + {($key): {"Id": "PLACEHOLDER", "Name": $domain}}' \
+              "$CTX_FILE" > /tmp/cdk.context.json \
+              && mv /tmp/cdk.context.json "$CTX_FILE"
+
+            pnpm --filter @bookshelf/infra run cdk deploy BookshelfDns \
+              --require-approval never -c env=prod -c version=v${{ inputs.version }}
+
+            # Fetch the real zone ID and NS values from the CloudFormation output.
+            ZONE_ID=$(aws cloudformation describe-stacks \
+              --stack-name BookshelfDns \
+              --query "Stacks[0].Outputs[?OutputKey=='HostedZoneId'].OutputValue" \
+              --output text)
+            NS_VALUES=$(aws cloudformation describe-stacks \
+              --stack-name BookshelfDns \
+              --query "Stacks[0].Outputs[?OutputKey=='NameServers'].OutputValue" \
+              --output text)
+            echo "::notice::BookshelfDns bootstrap complete."
+            echo "::notice::Add an NS record for '${DOMAIN}' at Cloudflare pointing to:"
+            echo "::notice::${NS_VALUES}"
+            echo "::notice::Then wait for DNS propagation (~15 min) before re-running this workflow."
+            echo "::warning::ACM cert validation (next step) will stall until the NS delegation is live."
+          fi
+
+          echo "Hosted zone: ${ZONE_ID}"
+
+          # Write (or overwrite) the real zone ID so all subsequent cdk deploy
+          # steps use the cached value rather than a live Route53 lookup.
+          jq --arg key "$CTX_KEY" \
+            --arg id "/hostedzone/${ZONE_ID}" \
+            --arg domain "$DOMAIN" \
+            '. + {($key): {"Id": $id, "Name": $domain}}' \
+            "$CTX_FILE" > /tmp/cdk.context.json \
+            && mv /tmp/cdk.context.json "$CTX_FILE"
+
       - name: Deploy cert, Auth, and API stacks
-        # NOTE: the FIRST prod deploy requires the manual bootstrap in
-        # docs/runbooks/prod-domain-setup.md (issue the ACM certs by adding a
-        # validation CNAME at Hover, then add the host CNAMEs) — otherwise ACM DNS
-        # validation blocks the deploy. This workflow is steady-state promotion;
-        # once the certs are issued and the CNAMEs exist these are fast no-ops.
         # `-c env=prod` applies the full prod topology atomically (ADR-009).
+        # BookshelfDns is included as a dependency and is either already deployed
+        # (bootstrap ran above) or a no-op on subsequent runs.
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy \
             BookshelfCdnCert BookshelfAuth BookshelfApi \
