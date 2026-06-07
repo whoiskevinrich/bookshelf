@@ -114,12 +114,15 @@ export function VerifyPage() {
           onClick={() => {
             void handleResend();
           }}
-          className="font-medium text-blue-600 hover:text-blue-500 disabled:opacity-50"
+          className="font-medium underline underline-offset-2 text-slate-900 dark:text-white hover:no-underline disabled:opacity-50"
         >
           {resending ? "Sending…" : "Resend code"}
         </button>
         {" · "}
-        <Link to="/auth/login" className="text-blue-600 hover:text-blue-500">
+        <Link
+          to="/auth/login"
+          className="text-slate-600 dark:text-slate-400 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white hover:no-underline"
+        >
           Back to sign in
         </Link>
       </p>
