@@ -1,3 +1,5 @@
+import { Button } from "../ui/Button";
+
 interface ShelfErrorStateProps {
   message?: string;
   onRetry: () => void;
@@ -15,13 +17,9 @@ export function ShelfErrorState({
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
         Check your connection or try again.
       </p>
-      <button
-        onClick={onRetry}
-        disabled={isRetrying}
-        className="text-sm bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 disabled:opacity-40 transition-colors"
-      >
+      <Button variant="app" onClick={onRetry} disabled={isRetrying}>
         {isRetrying ? "Retrying…" : "Try again"}
-      </button>
+      </Button>
     </div>
   );
 }

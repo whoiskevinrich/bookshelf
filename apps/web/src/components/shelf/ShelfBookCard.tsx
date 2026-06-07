@@ -1,4 +1,5 @@
 import { BookCover } from "../BookCover";
+import { Button } from "../ui/Button";
 import type { ShelfEntry, ShelfStatus } from "../../lib/api-client";
 
 // Stagger: cards animate in sequentially up to MAX_STAGGER_INDEX, then all share the same delay.
@@ -57,20 +58,22 @@ export function ShelfBookCard({
             </p>
           )}
           <div className="flex gap-3 mt-2">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => onMove(isbn, targetStatus)}
               disabled={isMoving || isRemoving}
-              className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-40"
             >
               {isMoving ? "Moving…" : moveLabel}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={() => onRemove(isbn)}
               disabled={isMoving || isRemoving}
-              className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-40"
             >
               {isRemoving ? "Removing…" : "Remove"}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
