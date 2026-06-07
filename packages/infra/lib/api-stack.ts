@@ -108,10 +108,10 @@ export class ApiStack extends cdk.Stack {
 
     // ── API Gateway HTTP API ───────────────────────────────────────────────
     //
-    // CORS: when `sameOrigin` (prod-interim + prod) the browser reaches the API
-    // same-origin via CloudFront `/api/*` and MCP is non-browser, so no CORS is
-    // needed and it is omitted. In dev the SPA calls the execute-api URL
-    // cross-origin, so permissive CORS is kept. Resolves the historical
+    // CORS: when `sameOrigin` (all deployed envs — dev, prod-interim, prod) the
+    // browser reaches the API same-origin via CloudFront `/api/*` and MCP is
+    // non-browser, so no CORS is configured. The fallback (sameOrigin false) keeps
+    // permissive CORS for a cross-origin SPA. Resolves the historical
     // "tighten to CloudFront domain" TODO — see ADR-008.
     const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {
       apiName: "bookshelf-api",

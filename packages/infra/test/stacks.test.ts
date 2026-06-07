@@ -359,8 +359,9 @@ describe("Interim topology (same-origin, no custom domain)", () => {
   });
 });
 
-// ── Dev topology keeps permissive CORS (cross-origin SPA) ───────────────────
-describe("Dev topology (cross-origin, CORS kept)", () => {
+// ── CORS fallback: sameOrigin=false keeps permissive CORS (cross-origin SPA) ──
+// No deployed env uses this path (all are same-origin), but it guards the fallback.
+describe("API CORS fallback (sameOrigin=false)", () => {
   const cApp = new cdk.App();
   const cEnv = { account: "123456789012", region: "us-west-2" };
   const cAuth = new AuthStack(cApp, "CTestAuth", { env: cEnv });

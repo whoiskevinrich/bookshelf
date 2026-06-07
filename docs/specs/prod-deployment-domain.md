@@ -164,10 +164,11 @@ function handler(event) {
   `api.bookshelf.whoiskevinrich.com`.
 - Output `ApiCnameTargetOutput` = the custom domain's `regionalDomainName` (the
   CNAME target for `api.bookshelf` at Hover).
-- **Remove `corsPreflight`** when a domain is configured — the browser is now
-  same-origin via CloudFront and MCP is non-browser, so no client needs CORS.
-  (Resolves the `// tightened to CloudFront domain` TODO in `api-stack.ts`.) Dev
-  (domainless) keeps permissive CORS for the cross-origin SPA.
+- **Remove `corsPreflight`** when `sameOrigin` is set — the browser is same-origin
+  via CloudFront `/api/*` and MCP is non-browser, so no client needs CORS. All
+  deployed envs (dev, prod-interim, prod) are same-origin; the permissive-CORS
+  fallback only applies to a hypothetical cross-origin SPA. (Resolves the
+  `// tightened to CloudFront domain` TODO in `api-stack.ts`.)
 
 ### `bin/bookshelf.ts` (wiring)
 

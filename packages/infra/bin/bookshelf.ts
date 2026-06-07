@@ -17,20 +17,21 @@ import { CdnCertStack } from "../lib/cdn-cert-stack";
  * assumed credentials (one AWS account per environment), keeping account IDs out
  * of source. `region` and the behavioural flags are environment traits.
  *
- * Three environments:
- *   - `dev`          — domainless; SPA calls the execute-api URL cross-origin (CORS).
- *   - `prod-interim` — domainless but same-origin (`/api/*` via CloudFront, no CORS),
- *                      invite-only. Live on `*.cloudfront.net` while the custom
- *                      domain is blocked at the registrar (ADR-010). No certs.
- *   - `prod`         — same-origin + custom domain `bookshelf.whoiskevinrich.com`.
+ * Three environments — all same-origin (`/api/*` via CloudFront, no CORS):
+ *   - `dev`          — domainless, invite-only. Mirrors prod's request topology on
+ *                      `*.cloudfront.net` (separate dev account).
+ *   - `prod-interim` — domainless, invite-only. Live on `*.cloudfront.net` while the
+ *                      custom domain is blocked at the registrar (ADR-010). No certs.
+ *   - `prod`         — self-signup on + custom domain `bookshelf.whoiskevinrich.com`.
  */
 interface EnvConfig {
   region: string;
   /** Cognito self-signup — off for dev/interim (invite-only), on for full prod. */
   allowSelfSignUp: boolean;
   /**
-   * Route the API through CloudFront `/api/*` (same-origin → no CORS). True for
-   * prod-interim and prod; false for dev (which calls execute-api cross-origin).
+   * Route the API through CloudFront `/api/*` (same-origin → no CORS). True for all
+   * deployed environments. The false path keeps permissive CORS for a cross-origin
+   * SPA (kept as a fallback for any future non-CloudFront setup).
    */
   apiThroughCloudFront: boolean;
   /** Custom domain subtree, e.g. "bookshelf.whoiskevinrich.com" (full prod only). */
@@ -41,7 +42,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
   dev: {
     region: "us-west-2",
     allowSelfSignUp: false,
-    apiThroughCloudFront: false,
+    apiThroughCloudFront: true,
   },
   "prod-interim": {
     region: "us-west-2",

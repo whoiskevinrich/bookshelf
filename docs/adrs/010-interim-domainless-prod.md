@@ -17,9 +17,10 @@ We want production **live and properly locked down now**, on the AWS-generated
 hostnames, and flip the custom domain on later when the registrar is fixed —
 without weakening anything except the hostname.
 
-The naive "domainless = dev topology" path is **not** acceptable as prod: dev
-leaves API Gateway CORS at `allowOrigins: ["*"]` (the SPA calls the execute-api URL
-cross-origin). For a production surface we want that tightened.
+The naive "domainless = dev topology" path was **not** acceptable as prod: at the
+time, dev left API Gateway CORS at `allowOrigins: ["*"]` (the SPA called the
+execute-api URL cross-origin). For a production surface we want that tightened.
+(Dev was subsequently converged to the same same-origin posture — see Consequences.)
 
 ## Decision
 
@@ -44,7 +45,7 @@ To make this possible, the stack props were **decoupled**: `ApiStack.sameOrigin`
 
 | env | self-signup | API via CloudFront / CORS | custom domain + certs |
 | --- | --- | --- | --- |
-| `dev` | off | no — cross-origin, CORS `*` | none |
+| `dev` | off | yes — same-origin, no CORS | none |
 | `prod-interim` | off | yes — same-origin, **no CORS** | none |
 | `prod` | on | yes — same-origin, no CORS | `bookshelf.whoiskevinrich.com` |
 
@@ -65,6 +66,11 @@ and data access are identical. See the security analysis in the session notes.
   the flip is a normal stack update, not a new deployment.
 - Switching the custom domain on is tracked as a future phase (TASKS.md) and gated
   on the registrar fix (the Hover ticket) or a pivot (email validation / Route53).
+- **`dev` was subsequently converged to the same same-origin topology**
+  (`apiThroughCloudFront: true`), so all deployed environments share one request
+  topology and dev exercises the `/api` routing prod uses. dev now differs from prod
+  only by self-signup, the custom domain, and the AWS account — and the
+  permissive-CORS path is retained only as an inert fallback.
 - Minor residual: the public book-search proxy is reachable on the CloudFront URL
   pre-launch; it's a public endpoint by design (quota, not data). Revisit with WAF /
   rate limiting if abused.
