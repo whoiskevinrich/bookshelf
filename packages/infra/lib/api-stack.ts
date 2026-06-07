@@ -7,6 +7,8 @@ import * as apigatewayv2Integrations from "aws-cdk-lib/aws-apigatewayv2-integrat
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
 
 /**
@@ -21,6 +23,13 @@ export interface ApiCustomDomainConfig {
   certificateDomainName: string;
   /** Optional extra SANs for the regional cert. */
   certificateSans?: string[];
+  /**
+   * Route53 zone name for automated cert validation and alias record (ADR-013, Phase 2).
+   * E.g. "bookshelf.whoiskevinrich.com". When set, CDK validates the regional cert
+   * automatically via fromDns and creates an A-alias record for `apiHostname`.
+   * Omit to fall back to manual DNS validation (Phase 1).
+   */
+  hostedZoneName?: string;
 }
 
 export interface ApiStackProps extends cdk.StackProps {
@@ -146,19 +155,32 @@ export class ApiStack extends cdk.Stack {
     // ── Custom domain (prod) — canonical API door for MCP / programmatic clients ─
     //
     // api.<app>.<root> → API Gateway, serving the same Hono /v1 routes with no
-    // path rewrite (unlike the browser's CloudFront /api/* door). DNS lives at the
-    // registrar (Hover): the regional cert is DNS-validated by a CNAME added there
-    // by hand (the deploy blocks until it is), and the public hostname is a CNAME
-    // → this custom domain's regional name. See ADR-008 /
-    // docs/runbooks/prod-domain-setup.md.
+    // path rewrite (unlike the browser's CloudFront /api/* door). See ADR-008.
+    //
+    // Phase 2 (ADR-013, hostedZoneName set): regional cert validates automatically
+    // via fromDns and a Route53 A-alias record replaces the manual CNAME at the
+    // DNS provider. Phase 1 fallback: cert validates manually; CNAME added by hand.
     if (props.customDomain) {
+      // Look up the hosted zone for cert validation + alias record.
+      // Requires BookshelfDns to be deployed first (ADR-013 bootstrap sequence).
+      // Route53 is a global API — lookup succeeds from this us-west-2 stack.
+      // Result cached in cdk.context.json after first successful synth.
+      const certZone = props.customDomain.hostedZoneName
+        ? route53.HostedZone.fromLookup(this, "ApiCertHostedZone", {
+            domainName: props.customDomain.hostedZoneName,
+          })
+        : undefined;
+
       const apiCert = new acm.Certificate(this, "ApiCertificate", {
         domainName: props.customDomain.certificateDomainName,
         ...(props.customDomain.certificateSans
           ? { subjectAlternativeNames: props.customDomain.certificateSans }
           : {}),
-        // No Route53 zone — add the validation CNAME manually at the registrar.
-        validation: acm.CertificateValidation.fromDns(),
+        // Phase 2: CDK adds the validation CNAME automatically.
+        // Phase 1: add the CNAME manually at the DNS provider (Cloudflare).
+        validation: certZone
+          ? acm.CertificateValidation.fromDns(certZone)
+          : acm.CertificateValidation.fromDns(),
       });
 
       const apiDomainName = new apigatewayv2.DomainName(this, "ApiDomainName", {
@@ -172,10 +194,23 @@ export class ApiStack extends cdk.Stack {
         stage: httpApi.defaultStage,
       });
 
-      // CNAME target to create at the registrar: api.<zone> → this value.
+      // Phase 2: A-alias record in Route53 replaces the manual CNAME at Cloudflare.
+      if (certZone) {
+        new route53.ARecord(this, "ApiAliasRecord", {
+          zone: certZone,
+          recordName: props.customDomain.apiHostname,
+          target: route53.RecordTarget.fromAlias(
+            new route53Targets.ApiGatewayv2DomainProperties(
+              apiDomainName.regionalDomainName,
+              apiDomainName.regionalHostedZoneId,
+            ),
+          ),
+        });
+      }
+
       new cdk.CfnOutput(this, "ApiCnameTargetOutput", {
         exportName: "BookshelfApiCnameTarget",
-        description: `Create CNAME ${props.customDomain.apiHostname} → this value at the registrar`,
+        description: `API Gateway regional domain for ${props.customDomain.apiHostname}. Phase 1: create CNAME here at the DNS provider. Phase 2: managed by Route53 alias record.`,
         value: apiDomainName.regionalDomainName,
       });
       new cdk.CfnOutput(this, "ApiCustomUrlOutput", {

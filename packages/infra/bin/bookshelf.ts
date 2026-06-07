@@ -5,6 +5,7 @@ import { AuthStack } from "../lib/auth-stack";
 import { ApiStack, ApiCustomDomainConfig } from "../lib/api-stack";
 import { WebStack, WebCustomDomainConfig } from "../lib/web-stack";
 import { CdnCertStack } from "../lib/cdn-cert-stack";
+import { DnsStack } from "../lib/dns-stack";
 
 /**
  * Typed per-environment configuration.
@@ -88,20 +89,47 @@ const auth = new AuthStack(app, "BookshelfAuth", {
 });
 
 // ── Custom domain (full prod only) ──────────────────────────────────────────
-// DNS lives at the registrar (Hover) — no Route53. Both ACM certs use manual DNS
-// validation; public hostnames are CNAMEs → the CloudFront / API custom-domain
-// names (stack outputs). See ADR-008 + docs/runbooks/prod-domain-setup.md.
+// Two-tier DNS (ADR-012 + ADR-013): Cloudflare owns the apex zone and holds a
+// single NS delegation record pointing the bookshelf subtree at DnsStack's
+// Route53 hosted zone. CDK manages all records — cert validation CNAMEs,
+// CloudFront alias, API Gateway alias — automatically after a one-time bootstrap.
+//
+// Bootstrap (once): cdk deploy BookshelfDns → capture 4 NS values from output
+// → add NS record at Cloudflare → wait for propagation → cdk deploy --all.
+// After bootstrap, cdk deploy --all is fully hands-free.
+//
+// Note: ApiStack and WebStack call HostedZone.fromLookup at synth time (Route53
+// is a global API; no regional affinity). The zone must exist before the first
+// cdk synth of those stacks. Result cached in cdk.context.json — commit this file.
+let dns: DnsStack | undefined;
 let webCustomDomain: WebCustomDomainConfig | undefined;
 let apiCustomDomain: ApiCustomDomainConfig | undefined;
 if (config.domain) {
   const wildcard = `*.${config.domain}`; // covers api. and future www./mcp.
+
+  dns = new DnsStack(app, "BookshelfDns", {
+    env: usEast1Env,
+    appSubdomain: config.domain,
+  });
+
   const cdnCert = new CdnCertStack(app, "BookshelfCdnCert", {
     env: usEast1Env,
-    domainName: config.domain, // subtree apex
+    domainName: config.domain,
     subjectAlternativeNames: [wildcard],
+    hostedZone: dns.hostedZone, // same-region ref; automated cert validation (ADR-013)
   });
-  webCustomDomain = { certificate: cdnCert.certificate, webHostname: config.domain };
-  apiCustomDomain = { apiHostname: `api.${config.domain}`, certificateDomainName: wildcard };
+  cdnCert.addDependency(dns);
+
+  webCustomDomain = {
+    certificate: cdnCert.certificate,
+    webHostname: config.domain,
+    hostedZoneName: config.domain, // Route53 A-alias record for CloudFront
+  };
+  apiCustomDomain = {
+    apiHostname: `api.${config.domain}`,
+    certificateDomainName: wildcard,
+    hostedZoneName: config.domain, // automated cert validation + API Gateway alias
+  };
 }
 
 const api = new ApiStack(app, "BookshelfApi", {
@@ -134,6 +162,12 @@ const web = new WebStack(app, "BookshelfWeb", {
 web.addDependency(auth);
 if (config.apiThroughCloudFront) {
   web.addDependency(api);
+}
+// Ensure BookshelfDns is deployed before ApiStack/WebStack so their
+// HostedZone.fromLookup synth-time queries find the zone.
+if (dns) {
+  api.addDependency(dns);
+  web.addDependency(dns);
 }
 
 cdk.Tags.of(app).add("Project", "bookshelf");
