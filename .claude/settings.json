@@ -24,51 +24,10 @@
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "if": "Bash(gh pr create*)",
-            "command": "claude /productivity:update",
-            "shell": "powershell",
-            "async": true,
-            "statusMessage": "Syncing productivity after PR..."
-          },
-          {
-            "type": "command",
-            "if": "Bash(gh pr create*)",
-            "command": "claude /pr-review-toolkit:review-pr all",
-            "shell": "powershell",
-            "async": true,
-            "statusMessage": "Running comprehensive PR review..."
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo \"[docs-check] If this edit changes public API, component props, or env vars - run /engineering:documentation\"",
-            "shell": "powershell",
-            "async": false
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "matcher": "startup",
         "hooks": [
-          {
-            "type": "command",
-            "command": "claude /productivity:start",
-            "shell": "powershell",
-            "async": true,
-            "statusMessage": "Starting productivity system..."
-          },
           {
             "type": "command",
             "command": "case \"$PWD\" in *.claude/worktrees/*) MAIN=\"G:/source/bookshelf\"; for f in apps/api/.env.local apps/web/.env.local; do [ -f \"$MAIN/$f\" ] && [ ! -f \"$f\" ] && cp \"$MAIN/$f\" \"$f\" && echo \"Copied: $f\"; done ;; esac",
@@ -78,30 +37,10 @@
           },
           {
             "type": "command",
-            "command": "pnpm install --frozen-lockfile",
+            "command": "pnpm install",
             "shell": "bash",
-            "async": false,
+            "async": true,
             "statusMessage": "Installing dependencies..."
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "claude /productivity:update",
-            "shell": "powershell",
-            "async": true,
-            "statusMessage": "Syncing productivity at end of session..."
-          },
-          {
-            "type": "command",
-            "command": "claude --print /simplify",
-            "shell": "powershell",
-            "async": true,
-            "statusMessage": "Running /simplify code quality review..."
           }
         ]
       }
