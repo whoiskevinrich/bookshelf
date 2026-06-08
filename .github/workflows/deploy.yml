@@ -133,5 +133,5 @@ jobs:
           echo "Tagging commit as $TAG"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG"
-          git push origin "$TAG"
+          git tag -f "$TAG"
+          git push origin -f "$TAG"
