@@ -129,7 +129,9 @@ export class ApiStack extends cdk.Stack {
         ? {}
         : {
             corsPreflight: {
-              allowOrigins: ["*"],
+              // Restrict to local dev origins — this path is only reached when
+              // sameOrigin is false, which no deployed environment sets.
+              allowOrigins: ["http://localhost:3000", "http://localhost:5173"],
               allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
               allowHeaders: ["Authorization", "Content-Type"],
               maxAge: cdk.Duration.days(1),
