@@ -7,13 +7,19 @@ on:
         description: "Version to promote (e.g. 1.2.3) — must exist as a git tag v{version}"
         required: true
         type: string
+  workflow_call:
+    inputs:
+      version:
+        description: "Version to promote (e.g. 1.2.3) — must exist as a git tag v{version}"
+        required: true
+        type: string
 
 concurrency:
   group: deploy-prod
   cancel-in-progress: false # never cancel an in-flight deploy
 
 permissions:
-  contents: read
+  contents: write # create GitHub release
   id-token: write # OIDC for AWS
 
 jobs:
@@ -184,3 +190,12 @@ jobs:
         env:
           API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            --title "v${{ inputs.version }}" \
+            --generate-notes \
+            --verify-tag
