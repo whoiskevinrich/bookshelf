@@ -18,6 +18,7 @@ cdk.context.json
 .env
 .env.local
 .env.*.local
+.env.mock
 
 # OS
 .DS_Store

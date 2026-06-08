@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          DOMAIN="bookshelf.whoiskevinrich.com"
+          DOMAIN="${{ vars.PROD_DOMAIN }}"
           CTX_FILE="packages/infra/cdk.context.json"
           CTX_KEY="hosted-zone:account=${ACCOUNT_ID}:domainName=${DOMAIN}:region=us-west-2"
 
