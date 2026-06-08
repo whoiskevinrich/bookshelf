@@ -121,8 +121,11 @@ export async function removeFromShelf(isbn: string): Promise<void> {
 
 // ── Account API ───────────────────────────────────────────────────────────
 
-export async function deleteAccount(): Promise<void> {
-  const res = await authedFetch("/v1/users/me", { method: "DELETE" });
+export async function deleteAccount(password: string): Promise<void> {
+  const res = await authedFetch("/v1/users/me", {
+    method: "DELETE",
+    body: JSON.stringify({ password }),
+  });
   if (res.status === 204) return;
   await throwIfError(res);
 }

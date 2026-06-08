@@ -49,7 +49,7 @@ export class AuthStack extends cdk.Stack {
       generateSecret: false, // PKCE flow — the SPA cannot keep a secret safe in the browser
       authFlows: {
         userSrp: true, // standard SRP auth for the Amplify Auth SDK
-        userPassword: false, // disabled — prefer SRP
+        userPassword: true, // enabled for server-side password re-auth (DELETE /v1/users/me)
       },
       oAuth: {
         flows: { authorizationCodeGrant: true },
