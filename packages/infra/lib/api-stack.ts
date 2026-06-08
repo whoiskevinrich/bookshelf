@@ -115,6 +115,16 @@ export class ApiStack extends cdk.Stack {
       }),
     );
 
+    // Allow Lambda to delete users from Cognito (account deletion endpoint)
+    apiFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["cognito-idp:AdminDeleteUser"],
+        resources: [
+          `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${props.userPoolId}`,
+        ],
+      }),
+    );
+
     // ── API Gateway HTTP API ───────────────────────────────────────────────
     //
     // CORS: when `sameOrigin` (all deployed envs — dev, prod-interim, prod) the

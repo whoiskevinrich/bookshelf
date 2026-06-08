@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { booksRouter } from "./routes/books.js";
 import { shelfRouter } from "./routes/shelf.js";
+import { usersRouter } from "./routes/users.js";
 
 /**
  * Shared Hono app instance — used by both the Lambda handler (index.ts)
@@ -26,6 +27,7 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 
 app.route("/v1/books", booksRouter);
 app.route("/v1/shelf", shelfRouter);
+app.route("/v1/users", usersRouter);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 app.onError((err, c) => {

@@ -51,9 +51,9 @@ describe("authMiddleware", () => {
     expect(res.status).toBe(401);
   });
 
-  it("sets auth context on valid token", async () => {
+  it("sets auth context on valid id token", async () => {
     vi.mocked(jwtVerify).mockResolvedValueOnce({
-      payload: { sub: "user-123" },
+      payload: { sub: "user-123", "cognito:username": "user@example.com", token_use: "id" },
       protectedHeader: {} as never,
     });
     const app = makeApp();
@@ -65,14 +65,50 @@ describe("authMiddleware", () => {
     expect(body.userId).toBe("user-123");
   });
 
+  it("returns 401 when token is an access token (token_use: access)", async () => {
+    vi.mocked(jwtVerify).mockResolvedValueOnce({
+      payload: { sub: "user-123", "cognito:username": "user@example.com", token_use: "access" },
+      protectedHeader: {} as never,
+    });
+    const app = makeApp();
+    const res = await app.request("/protected", {
+      headers: { Authorization: "Bearer access.token.here" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when token has no token_use claim", async () => {
+    vi.mocked(jwtVerify).mockResolvedValueOnce({
+      payload: { sub: "user-123", "cognito:username": "user@example.com" },
+      protectedHeader: {} as never,
+    });
+    const app = makeApp();
+    const res = await app.request("/protected", {
+      headers: { Authorization: "Bearer no.token-use.token" },
+    });
+    expect(res.status).toBe(401);
+  });
+
   it("returns 401 when token has no sub claim", async () => {
     vi.mocked(jwtVerify).mockResolvedValueOnce({
-      payload: {},
+      payload: { token_use: "id" },
       protectedHeader: {} as never,
     });
     const app = makeApp();
     const res = await app.request("/protected", {
       headers: { Authorization: "Bearer no.sub.token" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when token has no cognito:username claim", async () => {
+    vi.mocked(jwtVerify).mockResolvedValueOnce({
+      payload: { sub: "user-123", token_use: "id" },
+      protectedHeader: {} as never,
+    });
+    const app = makeApp();
+    const res = await app.request("/protected", {
+      headers: { Authorization: "Bearer no.username.token" },
     });
     expect(res.status).toBe(401);
   });

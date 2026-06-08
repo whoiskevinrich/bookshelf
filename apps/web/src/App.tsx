@@ -7,6 +7,9 @@ import { LandingPage } from "./pages/LandingPage";
 import { AboutPage } from "./pages/AboutPage";
 import { ShelfPage } from "./pages/ShelfPage";
 import { WishlistPage } from "./pages/WishlistPage";
+import { AccountSettingsPage } from "./pages/account/AccountSettingsPage";
+import { ChangePasswordPage } from "./pages/account/ChangePasswordPage";
+import { DeleteAccountPage } from "./pages/account/DeleteAccountPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { SignUpPage } from "./pages/auth/SignUpPage";
 import { VerifyPage } from "./pages/auth/VerifyPage";
@@ -65,6 +68,30 @@ export function App() {
               element={
                 <ProtectedRoute>
                   <WishlistPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/account/settings"
+              element={
+                <ProtectedRoute>
+                  <AccountSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/account/change-password"
+              element={
+                <ProtectedRoute>
+                  <ChangePasswordPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/account/delete"
+              element={
+                <ProtectedRoute>
+                  <DeleteAccountPage />
                 </ProtectedRoute>
               }
             />

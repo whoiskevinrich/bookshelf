@@ -1,4 +1,4 @@
-import { PublicHeader } from "../components/PublicHeader";
+import { AppHeader } from "../components/AppHeader";
 
 const isRepoPublic = import.meta.env.VITE_SHOW_REPO_LINK === "true";
 
@@ -8,7 +8,7 @@ const sectionHeadingClass =
 export function AboutPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
-      <PublicHeader />
+      <AppHeader />
 
       <main className="max-w-2xl mx-auto px-6 py-16">
         <article>
