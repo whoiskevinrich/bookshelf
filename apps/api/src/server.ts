@@ -46,6 +46,8 @@ server.on("error", (err: NodeJS.ErrnoException) => {
 });
 
 process.on("SIGTERM", () => {
-  server.closeAllConnections();
+  // @hono/node-server's ServerType union doesn't expose closeAllConnections,
+  // but at runtime this is a Node http.Server (closeAllConnections: Node 18.2+).
+  (server as unknown as import("node:http").Server).closeAllConnections();
   server.close(() => process.exit(0));
 });
