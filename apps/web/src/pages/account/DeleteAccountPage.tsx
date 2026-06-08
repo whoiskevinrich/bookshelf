@@ -4,24 +4,22 @@ import { deleteAccount } from "../../lib/api-client";
 import { useAuth } from "../../context/AuthContext";
 import { AppHeader } from "../../components/AppHeader";
 import { Button } from "../../components/ui/Button";
+import { ApiError } from "../../lib/api-client";
 import { inputClass, labelClass } from "../../lib/form-styles";
 
 export function DeleteAccountPage() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const [confirmation, setConfirmation] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const confirmed = confirmation === "DELETE";
-
   async function handleDelete(e: FormEvent) {
     e.preventDefault();
-    if (!confirmed) return;
     setError(null);
     setLoading(true);
     try {
-      await deleteAccount();
+      await deleteAccount(password);
       // signOut clears local Amplify session; Cognito account already gone so call may fail
       try {
         await signOut();
@@ -32,7 +30,13 @@ export function DeleteAccountPage() {
         state: { banner: "Your account has been permanently deleted." },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete account. Please try again.");
+      if (err instanceof ApiError && err.status === 403) {
+        setError("Incorrect password. Please try again.");
+      } else if (err instanceof ApiError && err.status === 429) {
+        setError("Too many attempts. Please wait a moment and try again.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to delete account. Please try again.");
+      }
       setLoading(false);
     }
   }
@@ -69,22 +73,23 @@ export function DeleteAccountPage() {
           )}
 
           <div>
-            <label htmlFor="confirmation" className={labelClass}>
-              Type <strong>DELETE</strong> to confirm
+            <label htmlFor="password" className={labelClass}>
+              Confirm your password
             </label>
             <input
-              id="confirmation"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              value={confirmation}
-              onChange={(e) => setConfirmation(e.target.value)}
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              autoFocus
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className={inputClass}
             />
           </div>
 
           <div className="flex items-center gap-4">
-            <Button type="submit" variant="danger" loading={loading} disabled={!confirmed}>
+            <Button type="submit" variant="danger" loading={loading}>
               {loading ? "Deleting…" : "Permanently delete my account"}
             </Button>
             <Link
