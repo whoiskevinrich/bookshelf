@@ -17,6 +17,8 @@ jobs:
     name: CDK Deploy → dev
     runs-on: ubuntu-latest
     environment: dev
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -52,6 +54,7 @@ jobs:
         run: |
           VERSION=$(jq -r .version package.json)
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
@@ -135,3 +138,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -f "$TAG"
           git push origin -f "$TAG"
+
+  promote:
+    name: Promote → prod
+    needs: deploy
+    uses: ./.github/workflows/promote.yml
+    with:
+      version: ${{ needs.deploy.outputs.version }}
+    permissions:
+      id-token: write
+      contents: write
