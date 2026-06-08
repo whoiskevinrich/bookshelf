@@ -32,10 +32,16 @@ export function AppHeader() {
         <NavLink to="/about" className={navLinkClass}>
           About
         </NavLink>
-        <span className="text-xs text-slate-500 dark:text-slate-400">{user?.username}</span>
-        <Button variant="ghost" size="sm" onClick={() => void handleSignOut()}>
-          Sign out
-        </Button>
+        {user && (
+          <>
+            <NavLink to="/account/settings" className={navLinkClass}>
+              Account
+            </NavLink>
+            <Button variant="ghost" size="sm" onClick={() => void handleSignOut()}>
+              Sign out
+            </Button>
+          </>
+        )}
         <ThemeToggle />
       </nav>
     </header>

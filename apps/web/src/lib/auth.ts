@@ -4,6 +4,7 @@ import {
   resendSignUpCode as amplifyResendCode,
   signIn as amplifySignIn,
   signOut as amplifySignOut,
+  updatePassword as amplifyUpdatePassword,
   fetchAuthSession,
   getCurrentUser as amplifyGetCurrentUser,
   resetPassword as amplifyResetPassword,
@@ -129,6 +130,17 @@ export async function confirmResetPassword(
   try {
     await amplifyConfirmResetPassword({ username: email, confirmationCode: code, newPassword });
   } catch (err) {
+    throw new Error(mapCognitoError(err), { cause: err });
+  }
+}
+
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  try {
+    await amplifyUpdatePassword({ oldPassword, newPassword });
+  } catch (err) {
+    if (err instanceof Error && err.name === "NotAuthorizedException") {
+      throw new Error("Current password is incorrect.", { cause: err });
+    }
     throw new Error(mapCognitoError(err), { cause: err });
   }
 }

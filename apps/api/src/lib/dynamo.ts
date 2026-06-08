@@ -6,6 +6,7 @@ import {
   PutCommand,
   DeleteCommand,
   BatchGetCommand,
+  BatchWriteCommand,
   type NativeAttributeValue,
 } from "@aws-sdk/lib-dynamodb";
 
@@ -244,6 +245,48 @@ export async function updateShelfStatus(
       Item: shelfItem(userId, isbn, newStatus, addedAt, notes),
     }),
   );
+}
+
+// ── Account deletion ───────────────────────────────────────────────────────
+
+export async function deleteAllUserData(userId: string): Promise<void> {
+  const pk = userPk(userId);
+  let lastKey: Record<string, NativeAttributeValue> | undefined;
+
+  do {
+    const result = await dynamo().send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "PK = :pk",
+        ExpressionAttributeValues: { ":pk": pk },
+        ProjectionExpression: "PK, SK",
+        ...(lastKey ? { ExclusiveStartKey: lastKey } : {}),
+      }),
+    );
+
+    const items = (result.Items ?? []) as Array<Record<string, NativeAttributeValue>>;
+    lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
+
+    // BatchWriteItem supports up to 25 delete requests per call.
+    // Retry UnprocessedItems with backoff — DynamoDB may return partial results under load.
+    for (let i = 0; i < items.length; i += 25) {
+      const chunk = items.slice(i, i + 25);
+      let unprocessed = chunk.map((item) => ({
+        DeleteRequest: { Key: { PK: item["PK"], SK: item["SK"] } },
+      }));
+      let delay = 50;
+      while (unprocessed.length > 0) {
+        const result = await dynamo().send(
+          new BatchWriteCommand({ RequestItems: { [TABLE_NAME]: unprocessed } }),
+        );
+        unprocessed = (result.UnprocessedItems?.[TABLE_NAME] ?? []) as typeof unprocessed;
+        if (unprocessed.length > 0) {
+          await new Promise((r) => setTimeout(r, delay));
+          delay = Math.min(delay * 2, 2000);
+        }
+      }
+    }
+  } while (lastKey);
 }
 
 // ── Book metadata cache ────────────────────────────────────────────────────

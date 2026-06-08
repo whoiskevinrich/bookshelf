@@ -119,6 +119,14 @@ export async function removeFromShelf(isbn: string): Promise<void> {
   await throwIfError(res);
 }
 
+// ── Account API ───────────────────────────────────────────────────────────
+
+export async function deleteAccount(): Promise<void> {
+  const res = await authedFetch("/v1/users/me", { method: "DELETE" });
+  if (res.status === 204) return;
+  await throwIfError(res);
+}
+
 // ── Books API ──────────────────────────────────────────────────────────────
 
 export async function searchBooks(q: string): Promise<BookSearchResult[]> {

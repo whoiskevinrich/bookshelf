@@ -9,8 +9,8 @@
     },
     {
       "name": "api",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@bookshelf/api", "run", "dev"],
+      "runtimeExecutable": "pwsh",
+      "runtimeArgs": ["-File", "scripts/dev-api.ps1"],
       "port": 3001,
       "autoPort": false
     }

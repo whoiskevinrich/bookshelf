@@ -15,6 +15,8 @@ function getJwks(): ReturnType<typeof createRemoteJWKSet> {
 
 export interface AuthContext {
   userId: string;
+  /** Cognito username (email for this pool) — required for admin API calls like AdminDeleteUser */
+  cognitoUsername: string;
 }
 
 declare module "hono" {
@@ -38,12 +40,26 @@ export async function authMiddleware(c: Context, next: Next): Promise<Response |
       ...(audience ? { audience } : {}),
     });
 
+    // Reject access tokens — only Cognito ID tokens are accepted here.
+    // ID tokens carry identity claims (sub, cognito:username, email) while
+    // access tokens only carry scopes; accepting access tokens would allow
+    // API calls with a token type never intended for resource authorization.
+    const tokenUse = payload["token_use"];
+    if (tokenUse !== "id") {
+      return c.json({ error: "Invalid token: expected id token" }, 401);
+    }
+
     const sub = payload["sub"];
     if (typeof sub !== "string" || !sub) {
       return c.json({ error: "Invalid token: missing sub claim" }, 401);
     }
 
-    c.set("auth", { userId: sub });
+    const cognitoUsername = payload["cognito:username"];
+    if (typeof cognitoUsername !== "string" || !cognitoUsername) {
+      return c.json({ error: "Invalid token: missing cognito:username claim" }, 401);
+    }
+
+    c.set("auth", { userId: sub, cognitoUsername });
     await next();
   } catch {
     return c.json({ error: "Invalid or expired token" }, 401);

@@ -372,8 +372,12 @@ describe("API CORS fallback (sameOrigin=false)", () => {
   });
 
   it("keeps permissive CORS when not same-origin", () => {
+    // sameOrigin=false is local dev only; origins are scoped to localhost
+    // rather than wildcard "*" to minimise the cross-origin surface.
     Template.fromStack(cApi).hasResourceProperties("AWS::ApiGatewayV2::Api", {
-      CorsConfiguration: Match.objectLike({ AllowOrigins: ["*"] }),
+      CorsConfiguration: Match.objectLike({
+        AllowOrigins: ["http://localhost:3000", "http://localhost:5173"],
+      }),
     });
   });
 });
