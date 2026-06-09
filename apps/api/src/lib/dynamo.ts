@@ -37,8 +37,16 @@ function userPk(userId: string): string {
   return `USER#${userId}`;
 }
 
-function shelfSk(status: ShelfStatus, isbn: string): string {
-  return `SHELF#${status}#${isbn}`;
+function entrySk(isbn: string): string {
+  return `ENTRY#${isbn}`;
+}
+
+function shelfMetaSk(shelfId: string): string {
+  return `SHELFMETA#${shelfId}`;
+}
+
+function shelfMemberSk(shelfId: string, isbn: string): string {
+  return `SMEMBER#${shelfId}#${isbn}`;
 }
 
 function bookPk(isbn: string): string {
@@ -68,6 +76,16 @@ export interface ShelfEntryWithBook extends ShelfEntry {
   book: BookMetadata | null;
 }
 
+export interface ShelfMeta {
+  shelfId: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface ShelfWithBookIds extends ShelfMeta {
+  bookIds: string[];
+}
+
 // ── Coercion helpers ───────────────────────────────────────────────────────
 
 const str = (v: unknown): string | null => (v != null ? String(v) : null);
@@ -94,20 +112,11 @@ function toBookMetadata(item: Record<string, unknown>): BookMetadata {
   };
 }
 
-function shelfItem(
-  userId: string,
-  isbn: string,
-  status: ShelfStatus,
-  addedAt: string,
-  notes: string | null = null,
-) {
+function toShelfMeta(item: Record<string, unknown>): ShelfMeta {
   return {
-    PK: userPk(userId),
-    SK: shelfSk(status, isbn),
-    isbn,
-    status,
-    addedAt,
-    notes,
+    shelfId: String(item["shelfId"]),
+    name: String(item["name"]),
+    createdAt: String(item["createdAt"]),
   };
 }
 
@@ -116,7 +125,7 @@ function shelfItem(
 /**
  * Thrown by {@link decodeCursor} when the cursor string is not a valid
  * base64url-encoded non-null JSON object. Route handlers should catch this
- * and return HTTP 400; any other error from {@link queryShelf} is a 500.
+ * and return HTTP 400; any other error from {@link queryBookEntries} is a 500.
  */
 export class InvalidCursorError extends Error {
   constructor(cause?: unknown) {
@@ -143,88 +152,109 @@ export function decodeCursor(cursor: string): Record<string, NativeAttributeValu
   }
 }
 
-// ── Shelf CRUD ─────────────────────────────────────────────────────────────
+// ── Book entry CRUD (new schema: ENTRY#<isbn>) ────────────────────────────
 
-export interface QueryShelfOptions {
+export interface QueryBookEntriesOptions {
   userId: string;
   status?: ShelfStatus;
   cursor?: string;
   limit?: number;
 }
 
-export interface QueryShelfResult {
+export interface QueryBookEntriesResult {
   entries: ShelfEntryWithBook[];
   nextCursor: string | null;
   total: number;
 }
 
-/**
- * Query a user's shelf with optional status filter and cursor-based pagination.
- * @throws {InvalidCursorError} if opts.cursor is present but malformed
- */
-export async function queryShelf(opts: QueryShelfOptions): Promise<QueryShelfResult> {
-  const limit = Math.min(opts.limit ?? 20, 100);
-  const skPrefix = opts.status ? `SHELF#${opts.status}#` : "SHELF#";
-  const baseQuery = {
-    TableName: TABLE_NAME,
-    KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
-    ExpressionAttributeValues: {
-      ":pk": userPk(opts.userId),
-      ":prefix": skPrefix,
-    },
-  };
-
-  // Data query and count query run in parallel
-  const [queryResult, countResult] = await Promise.all([
-    dynamo().send(
-      new QueryCommand({
-        ...baseQuery,
-        Limit: limit,
-        ExclusiveStartKey: opts.cursor ? decodeCursor(opts.cursor) : undefined,
-      }),
-    ),
-    dynamo().send(new QueryCommand({ ...baseQuery, Select: "COUNT" })),
-  ]);
-
-  const items = queryResult.Items ?? [];
-  const entries = items.map(toShelfEntry);
-
-  // Fetch book metadata in a single BatchGetItem
+async function fetchBookMetadataMap(isbns: string[]): Promise<Record<string, BookMetadata>> {
+  if (isbns.length === 0) return {};
   const bookMap: Record<string, BookMetadata> = {};
-  if (entries.length > 0) {
-    const keys = entries.map((e) => ({ PK: bookPk(e.isbn), SK: BOOK_SK }));
-    const batchResult = await dynamo().send(
-      new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }),
-    );
-    for (const book of batchResult.Responses?.[TABLE_NAME] ?? []) {
-      bookMap[String(book["isbn"])] = toBookMetadata(book);
-    }
+  const keys = isbns.map((isbn) => ({ PK: bookPk(isbn), SK: BOOK_SK }));
+  const batchResult = await dynamo().send(
+    new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }),
+  );
+  for (const book of (batchResult.Responses?.[TABLE_NAME] ?? []) as Record<string, unknown>[]) {
+    bookMap[String(book["isbn"])] = toBookMetadata(book);
   }
+  return bookMap;
+}
+
+export async function queryBookEntries(
+  opts: QueryBookEntriesOptions,
+): Promise<QueryBookEntriesResult> {
+  const limit = Math.min(opts.limit ?? 20, 100);
+  const pk = userPk(opts.userId);
+
+  // Without status filter: use DynamoDB-native pagination with cursor
+  if (!opts.status) {
+    const baseQuery = {
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+      ExpressionAttributeValues: { ":pk": pk, ":prefix": "ENTRY#" },
+    };
+    const [queryResult, countResult] = await Promise.all([
+      dynamo().send(
+        new QueryCommand({
+          ...baseQuery,
+          Limit: limit,
+          ExclusiveStartKey: opts.cursor ? decodeCursor(opts.cursor) : undefined,
+        }),
+      ),
+      dynamo().send(new QueryCommand({ ...baseQuery, Select: "COUNT" })),
+    ]);
+
+    const items = (queryResult.Items ?? []) as Record<string, unknown>[];
+    const entries = items.map(toShelfEntry);
+    const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
+
+    return {
+      entries: entries.map((e) => ({ ...e, book: bookMap[e.isbn] ?? null })),
+      nextCursor: queryResult.LastEvaluatedKey ? encodeCursor(queryResult.LastEvaluatedKey) : null,
+      total: countResult.Count ?? 0,
+    };
+  }
+
+  // With status filter: loop through all DynamoDB pages to ensure completeness.
+  // Filtered queries return all matching items at once (no cursor pagination).
+  const allItems: Record<string, unknown>[] = [];
+  let lastKey: Record<string, NativeAttributeValue> | undefined;
+  do {
+    const result = await dynamo().send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+        FilterExpression: "#status = :status",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: { ":pk": pk, ":prefix": "ENTRY#", ":status": opts.status },
+        ExclusiveStartKey: lastKey,
+      }),
+    );
+    allItems.push(...((result.Items ?? []) as Record<string, unknown>[]));
+    lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
+  } while (lastKey);
+
+  const entries = allItems.map(toShelfEntry);
+  const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
 
   return {
     entries: entries.map((e) => ({ ...e, book: bookMap[e.isbn] ?? null })),
-    nextCursor: queryResult.LastEvaluatedKey ? encodeCursor(queryResult.LastEvaluatedKey) : null,
-    total: countResult.Count ?? 0,
+    nextCursor: null,
+    total: entries.length,
   };
 }
 
-export async function getShelfEntry(userId: string, isbn: string): Promise<ShelfEntry | null> {
-  // Both status keys are probed in parallel — we don't know which prefix applies
-  const [r1, r2] = await Promise.all(
-    (["owned", "want"] as ShelfStatus[]).map((status) =>
-      dynamo().send(
-        new GetCommand({
-          TableName: TABLE_NAME,
-          Key: { PK: userPk(userId), SK: shelfSk(status, isbn) },
-        }),
-      ),
-    ),
+export async function getBookEntry(userId: string, isbn: string): Promise<ShelfEntry | null> {
+  const result = await dynamo().send(
+    new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: entrySk(isbn) },
+    }),
   );
-  const item = r1?.Item ?? r2?.Item ?? null;
-  return item ? toShelfEntry(item) : null;
+  return result.Item ? toShelfEntry(result.Item as Record<string, unknown>) : null;
 }
 
-export async function putShelfEntry(
+export async function putBookEntry(
   userId: string,
   isbn: string,
   status: ShelfStatus,
@@ -233,57 +263,264 @@ export async function putShelfEntry(
   await dynamo().send(
     new PutCommand({
       TableName: TABLE_NAME,
-      Item: shelfItem(userId, isbn, status, addedAt),
-      // Fail if entry already exists (either status)
+      Item: { PK: userPk(userId), SK: entrySk(isbn), isbn, status, addedAt, notes: null },
       ConditionExpression: "attribute_not_exists(PK)",
     }),
   );
 }
 
-export async function deleteShelfEntry(
+export async function updateBookEntryStatus(
   userId: string,
   isbn: string,
-  status: ShelfStatus,
-): Promise<void> {
-  await dynamo().send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: { PK: userPk(userId), SK: shelfSk(status, isbn) },
-    }),
-  );
-}
-
-export async function updateShelfStatus(
-  userId: string,
-  isbn: string,
-  oldStatus: ShelfStatus,
   newStatus: ShelfStatus,
-  addedAt: string,
-  notes: string | null = null,
 ): Promise<void> {
-  // DynamoDB has no rename-key operation — delete old SK, put new SK
-  await deleteShelfEntry(userId, isbn, oldStatus);
   await dynamo().send(
-    new PutCommand({
+    new UpdateCommand({
       TableName: TABLE_NAME,
-      Item: shelfItem(userId, isbn, newStatus, addedAt, notes),
+      Key: { PK: userPk(userId), SK: entrySk(isbn) },
+      UpdateExpression: "SET #status = :status",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: { ":status": newStatus },
+      ConditionExpression: "attribute_exists(PK)",
     }),
   );
 }
 
-export async function updateShelfNotes(
+export async function updateBookEntryNotes(
   userId: string,
   isbn: string,
-  status: ShelfStatus,
   notes: string | null,
 ): Promise<void> {
   await dynamo().send(
     new UpdateCommand({
       TableName: TABLE_NAME,
-      Key: { PK: userPk(userId), SK: shelfSk(status, isbn) },
+      Key: { PK: userPk(userId), SK: entrySk(isbn) },
       UpdateExpression: notes !== null ? "SET notes = :notes" : "REMOVE notes",
       ...(notes !== null ? { ExpressionAttributeValues: { ":notes": notes } } : {}),
       ConditionExpression: "attribute_exists(PK)",
+    }),
+  );
+}
+
+export async function deleteBookEntry(userId: string, isbn: string): Promise<void> {
+  // Collect all SMEMBER# items for this user, then filter for this isbn.
+  // Must paginate in case the user has a very large number of shelf memberships.
+  const memberKeys: Array<Record<string, string>> = [];
+  let lastKey: Record<string, NativeAttributeValue> | undefined;
+  do {
+    const result = await dynamo().send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+        ExpressionAttributeValues: { ":pk": userPk(userId), ":prefix": "SMEMBER#" },
+        ExclusiveStartKey: lastKey,
+      }),
+    );
+    for (const item of result.Items ?? []) {
+      if ((item["SK"] as string).endsWith(`#${isbn}`)) {
+        memberKeys.push({ PK: item["PK"] as string, SK: item["SK"] as string });
+      }
+    }
+    lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
+  } while (lastKey);
+
+  const allKeys = [{ PK: userPk(userId), SK: entrySk(isbn) }, ...memberKeys];
+
+  for (let i = 0; i < allKeys.length; i += 25) {
+    const chunk = allKeys.slice(i, i + 25);
+    await dynamo().send(
+      new BatchWriteCommand({
+        RequestItems: {
+          [TABLE_NAME]: chunk.map((Key) => ({ DeleteRequest: { Key } })),
+        },
+      }),
+    );
+  }
+}
+
+// ── Named shelf CRUD (SHELFMETA#<shelfId>) ────────────────────────────────
+
+export async function queryShelvesMeta(userId: string): Promise<ShelfMeta[]> {
+  const result = await dynamo().send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+      ExpressionAttributeValues: {
+        ":pk": userPk(userId),
+        ":prefix": "SHELFMETA#",
+      },
+    }),
+  );
+  return (result.Items ?? []).map((i) => toShelfMeta(i as Record<string, unknown>));
+}
+
+export async function getShelfMetaItem(userId: string, shelfId: string): Promise<ShelfMeta | null> {
+  const result = await dynamo().send(
+    new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: shelfMetaSk(shelfId) },
+    }),
+  );
+  return result.Item ? toShelfMeta(result.Item as Record<string, unknown>) : null;
+}
+
+export async function putShelfMeta(
+  userId: string,
+  shelfId: string,
+  name: string,
+  createdAt: string,
+): Promise<void> {
+  await dynamo().send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: { PK: userPk(userId), SK: shelfMetaSk(shelfId), shelfId, name, createdAt },
+    }),
+  );
+}
+
+export async function updateShelfMetaName(
+  userId: string,
+  shelfId: string,
+  name: string,
+): Promise<void> {
+  await dynamo().send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: shelfMetaSk(shelfId) },
+      UpdateExpression: "SET #name = :name",
+      ExpressionAttributeNames: { "#name": "name" },
+      ExpressionAttributeValues: { ":name": name },
+      ConditionExpression: "attribute_exists(PK)",
+    }),
+  );
+}
+
+export async function deleteShelfAndMembers(userId: string, shelfId: string): Promise<void> {
+  const memberResult = await dynamo().send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+      ExpressionAttributeValues: {
+        ":pk": userPk(userId),
+        ":prefix": `SMEMBER#${shelfId}#`,
+      },
+    }),
+  );
+
+  const allKeys = [
+    { PK: userPk(userId), SK: shelfMetaSk(shelfId) },
+    ...(memberResult.Items ?? []).map((item) => ({
+      PK: item["PK"] as string,
+      SK: item["SK"] as string,
+    })),
+  ];
+
+  for (let i = 0; i < allKeys.length; i += 25) {
+    const chunk = allKeys.slice(i, i + 25);
+    await dynamo().send(
+      new BatchWriteCommand({
+        RequestItems: {
+          [TABLE_NAME]: chunk.map((Key) => ({ DeleteRequest: { Key } })),
+        },
+      }),
+    );
+  }
+}
+
+// ── Shelf membership CRUD (SMEMBER#<shelfId>#<isbn>) ──────────────────────
+
+export async function batchGetBookEntries(
+  userId: string,
+  isbns: string[],
+): Promise<ShelfEntryWithBook[]> {
+  if (isbns.length === 0) return [];
+
+  const entryKeys = isbns.map((isbn) => ({ PK: userPk(userId), SK: entrySk(isbn) }));
+  const bookMetaKeys = isbns.map((isbn) => ({ PK: bookPk(isbn), SK: BOOK_SK }));
+
+  const [entryResult, metaResult] = await Promise.all([
+    dynamo().send(
+      new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: entryKeys } } }),
+    ),
+    dynamo().send(
+      new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: bookMetaKeys } } }),
+    ),
+  ]);
+
+  const bookMap: Record<string, BookMetadata> = {};
+  for (const book of (metaResult.Responses?.[TABLE_NAME] ?? []) as Record<string, unknown>[]) {
+    bookMap[String(book["isbn"])] = toBookMetadata(book);
+  }
+
+  return (entryResult.Responses?.[TABLE_NAME] ?? [])
+    .map((item) => {
+      const entry = toShelfEntry(item as Record<string, unknown>);
+      return { ...entry, book: bookMap[entry.isbn] ?? null };
+    });
+}
+
+export async function queryShelfMemberIsns(userId: string, shelfId: string): Promise<string[]> {
+  const result = await dynamo().send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+      ExpressionAttributeValues: {
+        ":pk": userPk(userId),
+        ":prefix": `SMEMBER#${shelfId}#`,
+      },
+    }),
+  );
+  return (result.Items ?? []).map((item) => String(item["isbn"]));
+}
+
+export async function queryAllShelvesWithBookIds(userId: string): Promise<ShelfWithBookIds[]> {
+  const shelves = await queryShelvesMeta(userId);
+  if (shelves.length === 0) return [];
+
+  const memberResults = await Promise.all(
+    shelves.map((s) =>
+      dynamo().send(
+        new QueryCommand({
+          TableName: TABLE_NAME,
+          KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+          ExpressionAttributeValues: {
+            ":pk": userPk(userId),
+            ":prefix": `SMEMBER#${s.shelfId}#`,
+          },
+        }),
+      ),
+    ),
+  );
+
+  return shelves.map((shelf, i) => ({
+    ...shelf,
+    bookIds: (memberResults[i]?.Items ?? []).map((item) => String(item["isbn"])),
+  }));
+}
+
+export async function putShelfMember(userId: string, shelfId: string, isbn: string): Promise<void> {
+  await dynamo().send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        PK: userPk(userId),
+        SK: shelfMemberSk(shelfId, isbn),
+        shelfId,
+        isbn,
+      },
+    }),
+  );
+}
+
+export async function deleteShelfMember(
+  userId: string,
+  shelfId: string,
+  isbn: string,
+): Promise<void> {
+  await dynamo().send(
+    new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: shelfMemberSk(shelfId, isbn) },
     }),
   );
 }

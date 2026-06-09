@@ -36,6 +36,13 @@ export interface BookSearchResult {
   description: string | null;
 }
 
+export interface Shelf {
+  shelfId: string;
+  name: string;
+  createdAt: string;
+  bookIds: string[];
+}
+
 // ── Errors ────────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
@@ -115,6 +122,58 @@ export async function updateShelfStatus(isbn: string, status: ShelfStatus): Prom
 
 export async function removeFromShelf(isbn: string): Promise<void> {
   const res = await authedFetch(`/v1/shelf/${isbn}`, { method: "DELETE" });
+  if (res.status === 204) return;
+  await throwIfError(res);
+}
+
+// ── Named shelves API ─────────────────────────────────────────────────────
+
+export async function fetchShelves(): Promise<Shelf[]> {
+  const res = await authedFetch("/v1/shelves");
+  await throwIfError(res);
+  return res.json() as Promise<Shelf[]>;
+}
+
+export async function createShelf(name: string): Promise<Shelf> {
+  const res = await authedFetch("/v1/shelves", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  await throwIfError(res);
+  return res.json() as Promise<Shelf>;
+}
+
+export async function updateShelf(shelfId: string, name: string): Promise<Shelf> {
+  const res = await authedFetch(`/v1/shelves/${encodeURIComponent(shelfId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+  await throwIfError(res);
+  return res.json() as Promise<Shelf>;
+}
+
+export async function deleteShelf(shelfId: string): Promise<void> {
+  const res = await authedFetch(`/v1/shelves/${encodeURIComponent(shelfId)}`, {
+    method: "DELETE",
+  });
+  if (res.status === 204) return;
+  await throwIfError(res);
+}
+
+export async function addBookToShelf(shelfId: string, isbn: string): Promise<void> {
+  const res = await authedFetch(
+    `/v1/shelves/${encodeURIComponent(shelfId)}/books/${encodeURIComponent(isbn)}`,
+    { method: "POST" },
+  );
+  if (res.status === 204) return;
+  await throwIfError(res);
+}
+
+export async function removeBookFromShelf(shelfId: string, isbn: string): Promise<void> {
+  const res = await authedFetch(
+    `/v1/shelves/${encodeURIComponent(shelfId)}/books/${encodeURIComponent(isbn)}`,
+    { method: "DELETE" },
+  );
   if (res.status === 204) return;
   await throwIfError(res);
 }

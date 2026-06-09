@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { booksRouter } from "./routes/books.js";
 import { shelfRouter } from "./routes/shelf.js";
+import { shelvesRouter } from "./routes/shelves.js";
 import { usersRouter } from "./routes/users.js";
 
 /**
@@ -41,6 +42,7 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 
 app.route("/v1/books", booksRouter);
 app.route("/v1/shelf", shelfRouter);
+app.route("/v1/shelves", shelvesRouter);
 app.route("/v1/users", usersRouter);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

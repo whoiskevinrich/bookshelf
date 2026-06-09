@@ -7,7 +7,7 @@ interface DemoBook {
   coverUrl: string;
 }
 
-const OWNED: DemoBook[] = [
+const SCI_FI: DemoBook[] = [
   {
     isbn: "9780441013593",
     title: "Dune",
@@ -21,37 +21,10 @@ const OWNED: DemoBook[] = [
     coverUrl: "/demo-covers/neuromancer.jpg",
   },
   {
-    isbn: "9780441478125",
-    title: "The Left Hand of Darkness",
-    authors: ["Ursula K. Le Guin"],
-    coverUrl: "/demo-covers/left-hand.jpg",
-  },
-  {
     isbn: "9780593135204",
     title: "Project Hail Mary",
     authors: ["Andy Weir"],
     coverUrl: "/demo-covers/project-hail-mary.jpg",
-  },
-  {
-    isbn: "9780756404741",
-    title: "The Name of the Wind",
-    authors: ["Patrick Rothfuss"],
-    coverUrl: "/demo-covers/name-of-the-wind.jpg",
-  },
-];
-
-const WANT: DemoBook[] = [
-  {
-    isbn: "9780765326355",
-    title: "The Way of Kings",
-    authors: ["Brandon Sanderson"],
-    coverUrl: "/demo-covers/way-of-kings.jpg",
-  },
-  {
-    isbn: "9780316229296",
-    title: "The Fifth Season",
-    authors: ["N.K. Jemisin"],
-    coverUrl: "/demo-covers/fifth-season.jpg",
   },
   {
     isbn: "9781447273127",
@@ -65,15 +38,80 @@ const WANT: DemoBook[] = [
     authors: ["Vernor Vinge"],
     coverUrl: "/demo-covers/fire-upon-the-deep.jpg",
   },
+];
+
+const FANTASY: DemoBook[] = [
+  {
+    isbn: "9780756404741",
+    title: "The Name of the Wind",
+    authors: ["Patrick Rothfuss"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780756404741-M.jpg",
+  },
+  {
+    isbn: "9780765326355",
+    title: "The Way of Kings",
+    authors: ["Brandon Sanderson"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780765326355-M.jpg",
+  },
+  {
+    isbn: "9780316229296",
+    title: "The Fifth Season",
+    authors: ["N.K. Jemisin"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780316229296-M.jpg",
+  },
   {
     isbn: "9781635575637",
     title: "Piranesi",
     authors: ["Susanna Clarke"],
     coverUrl: "/demo-covers/piranesi.jpg",
   },
+  {
+    isbn: "9780441478125",
+    title: "The Left Hand of Darkness",
+    authors: ["Ursula K. Le Guin"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780441478125-M.jpg",
+  },
 ];
 
-// Stagger constants — mirror ShelfBookCard for visual consistency
+const LEADERSHIP: DemoBook[] = [
+  {
+    isbn: "9780062663986",
+    title: "Extreme Ownership",
+    authors: ["Jocko Willink", "Leif Babin"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780062663986-M.jpg",
+  },
+  {
+    isbn: "9781501156700",
+    title: "Leaders Eat Last",
+    authors: ["Simon Sinek"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9781501156700-M.jpg",
+  },
+  {
+    isbn: "9781591845379",
+    title: "Start with Why",
+    authors: ["Simon Sinek"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9781591845379-M.jpg",
+  },
+  {
+    isbn: "9780062455628",
+    title: "The Hard Thing About Hard Things",
+    authors: ["Ben Horowitz"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780062455628-M.jpg",
+  },
+  {
+    isbn: "9780062309471",
+    title: "The Effective Executive",
+    authors: ["Peter F. Drucker"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780062309471-M.jpg",
+  },
+];
+
+const SHELVES = [
+  { name: "Sci-Fi", books: SCI_FI },
+  { name: "Fantasy", books: FANTASY },
+  { name: "Leadership", books: LEADERSHIP },
+];
+
 const MAX_STAGGER_INDEX = 9;
 const STAGGER_STEP_MS = 50;
 
@@ -120,17 +158,19 @@ function BookGrid({ books, indexOffset = 0 }: { books: DemoBook[]; indexOffset?:
 }
 
 export function DemoShelf() {
+  let offset = 0;
   return (
     <div className="space-y-8">
-      <section>
-        <SectionHeader title="Owned" count={OWNED.length} />
-        <BookGrid books={OWNED} indexOffset={0} />
-      </section>
-      <section>
-        <SectionHeader title="Want to Read" count={WANT.length} />
-        {/* Offset by OWNED.length so Want to Read stagger continues from where Owned left off */}
-        <BookGrid books={WANT} indexOffset={OWNED.length} />
-      </section>
+      {SHELVES.map(({ name, books }) => {
+        const currentOffset = offset;
+        offset += books.length;
+        return (
+          <section key={name}>
+            <SectionHeader title={name} count={books.length} />
+            <BookGrid books={books} indexOffset={currentOffset} />
+          </section>
+        );
+      })}
     </div>
   );
 }

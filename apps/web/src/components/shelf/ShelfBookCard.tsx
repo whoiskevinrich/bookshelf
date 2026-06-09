@@ -1,28 +1,110 @@
+import { useState, useRef, useEffect } from "react";
 import { BookCover } from "../BookCover";
 import { Button } from "../ui/Button";
-import type { ShelfEntry, ShelfStatus } from "../../lib/api-client";
+import type { ShelfEntry, ShelfStatus, Shelf } from "../../lib/api-client";
 
-// Stagger: cards animate in sequentially up to MAX_STAGGER_INDEX, then all share the same delay.
 const MAX_STAGGER_INDEX = 9;
 const STAGGER_STEP_MS = 50;
 
 interface ShelfBookCardProps {
   entry: ShelfEntry;
+  shelves: Shelf[];
   onMove: (isbn: string, status: ShelfStatus) => void;
   onRemove: (isbn: string) => void;
+  onAddToShelf: (shelfId: string, isbn: string) => void;
+  onRemoveFromShelf: (shelfId: string, isbn: string) => void;
   isMoving?: boolean;
   isRemoving?: boolean;
+  isUpdatingShelves?: boolean;
   error?: string | null;
-  /** Position in the list — drives the mount stagger animation. */
   staggerIndex?: number;
+}
+
+function StatusBadge({ status }: { status: ShelfStatus }) {
+  return status === "owned" ? (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+      <span
+        className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"
+        aria-hidden="true"
+      />
+      Owned
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400">
+      <span className="w-1.5 h-1.5 rounded-full bg-sky-500 dark:bg-sky-400" aria-hidden="true" />
+      Wishlist
+    </span>
+  );
+}
+
+function ShelfPicker({
+  isbn,
+  shelves,
+  onAdd,
+  onRemove,
+  disabled,
+}: {
+  isbn: string;
+  shelves: Shelf[];
+  onAdd: (shelfId: string) => void;
+  onRemove: (shelfId: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  if (shelves.length === 0) return null;
+
+  return (
+    <div className="relative" ref={ref}>
+      <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)}>
+        Shelves
+      </Button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-10 min-w-[160px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-md py-1">
+          {shelves.map((shelf) => {
+            const checked = shelf.bookIds.includes(isbn);
+            return (
+              <label
+                key={shelf.shelfId}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/60"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => (checked ? onRemove(shelf.shelfId) : onAdd(shelf.shelfId))}
+                  className="accent-slate-700 dark:accent-slate-300 disabled:opacity-50"
+                />
+                <span className="truncate dark:text-white">{shelf.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ShelfBookCard({
   entry,
+  shelves,
   onMove,
   onRemove,
+  onAddToShelf,
+  onRemoveFromShelf,
   isMoving,
   isRemoving,
+  isUpdatingShelves,
   error,
   staggerIndex,
 }: ShelfBookCardProps) {
@@ -38,8 +120,6 @@ export function ShelfBookCard({
       : undefined;
 
   return (
-    // animate-fade-up fires on mount only — stable isbn keys prevent remount on re-renders.
-    // An entry leaving and re-entering (e.g. move mutation) will re-animate, which is desirable.
     <div
       className="group flex flex-col gap-1 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 animate-fade-up"
       style={staggerStyle}
@@ -59,7 +139,10 @@ export function ShelfBookCard({
               {authors.join(", ")}
             </p>
           )}
-          <div className="flex gap-3 mt-2">
+          <div className="mt-1">
+            <StatusBadge status={status} />
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -68,6 +151,13 @@ export function ShelfBookCard({
             >
               {isMoving ? "Moving…" : moveLabel}
             </Button>
+            <ShelfPicker
+              isbn={isbn}
+              shelves={shelves}
+              onAdd={(shelfId) => onAddToShelf(shelfId, isbn)}
+              onRemove={(shelfId) => onRemoveFromShelf(shelfId, isbn)}
+              disabled={isUpdatingShelves === true}
+            />
             <Button
               variant="destructive"
               size="sm"
