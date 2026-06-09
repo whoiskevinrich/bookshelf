@@ -44,7 +44,12 @@ function SectionHeader({
         {count}
       </span>
       {onDelete && (
-        <Button variant="destructive" size="sm" onClick={onDelete} aria-label={`Delete shelf ${title}`}>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={onDelete}
+          aria-label={`Delete shelf ${title}`}
+        >
           Delete shelf
         </Button>
       )}

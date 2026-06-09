@@ -439,12 +439,8 @@ export async function batchGetBookEntries(
   const bookMetaKeys = isbns.map((isbn) => ({ PK: bookPk(isbn), SK: BOOK_SK }));
 
   const [entryResult, metaResult] = await Promise.all([
-    dynamo().send(
-      new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: entryKeys } } }),
-    ),
-    dynamo().send(
-      new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: bookMetaKeys } } }),
-    ),
+    dynamo().send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: entryKeys } } })),
+    dynamo().send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: bookMetaKeys } } })),
   ]);
 
   const bookMap: Record<string, BookMetadata> = {};
@@ -452,11 +448,10 @@ export async function batchGetBookEntries(
     bookMap[String(book["isbn"])] = toBookMetadata(book);
   }
 
-  return (entryResult.Responses?.[TABLE_NAME] ?? [])
-    .map((item) => {
-      const entry = toShelfEntry(item as Record<string, unknown>);
-      return { ...entry, book: bookMap[entry.isbn] ?? null };
-    });
+  return (entryResult.Responses?.[TABLE_NAME] ?? []).map((item) => {
+    const entry = toShelfEntry(item as Record<string, unknown>);
+    return { ...entry, book: bookMap[entry.isbn] ?? null };
+  });
 }
 
 export async function queryShelfMemberIsns(userId: string, shelfId: string): Promise<string[]> {
