@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <clipPath id="c">
+      <rect x="6" y="4" width="20" height="24" rx="2.5"/>
+    </clipPath>
+  </defs>
+  <style>
+    .s { fill: #0f172a; }
+    .b { fill: #334155; }
+    .p { fill: #e2e8f0; }
+    @media (prefers-color-scheme: dark) {
+      .s { fill: #475569; }
+      .b { fill: #e2e8f0; }
+      .p { fill: #f8fafc; }
+    }
+  </style>
+  <g clip-path="url(#c)">
+    <rect class="b" x="6" y="4" width="20" height="24"/>
+    <rect class="s" x="6" y="4" width="5" height="24"/>
+    <rect class="p" x="22" y="4" width="4" height="24"/>
+  </g>
+</svg>
