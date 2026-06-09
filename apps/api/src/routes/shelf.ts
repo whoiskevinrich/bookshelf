@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
+import { ConditionalCheckFailedException, ValidationException } from "@aws-sdk/client-dynamodb";
 import { authMiddleware } from "../middleware/auth.js";
 import {
   queryShelf,
@@ -10,7 +10,9 @@ import {
   updateShelfNotes,
   putBookMetadata,
   isValidStatus,
+  InvalidCursorError,
   type BookMetadata,
+  type ShelfEntry,
   type ShelfStatus,
 } from "../lib/dynamo.js";
 import { getBookByIsbn } from "../lib/books/search.js";
@@ -20,6 +22,29 @@ import type { Context } from "hono";
 export const shelfRouter = new Hono();
 
 shelfRouter.use("*", authMiddleware);
+
+const NOTES_MAX_LENGTH = 2000;
+
+// BookMetadata field caps — applied before every putBookMetadata write.
+// The BOOK#${isbn} cache is shared across all users, so we bound the fields
+// regardless of whether metadata comes from the client or Google Books.
+const BOOK_TITLE_MAX_LENGTH = 512;
+const BOOK_DESCRIPTION_MAX_LENGTH = 4000;
+const BOOK_COVER_URL_MAX_LENGTH = 2048;
+const BOOK_AUTHOR_NAME_MAX_LENGTH = 200;
+const BOOK_AUTHORS_MAX_COUNT = 20;
+
+function sanitizeBookMetadata(m: BookMetadata): BookMetadata {
+  return {
+    title: m.title.slice(0, BOOK_TITLE_MAX_LENGTH),
+    authors: m.authors
+      .slice(0, BOOK_AUTHORS_MAX_COUNT)
+      .map((a) => a.slice(0, BOOK_AUTHOR_NAME_MAX_LENGTH)),
+    coverUrl: m.coverUrl ? m.coverUrl.slice(0, BOOK_COVER_URL_MAX_LENGTH) : null,
+    publishedYear: m.publishedYear,
+    description: m.description ? m.description.slice(0, BOOK_DESCRIPTION_MAX_LENGTH) : null,
+  };
+}
 
 function parseIsbnParam(c: Context, raw: string): string | Response {
   if (!isValidIsbn(raw)) {
@@ -31,8 +56,12 @@ function parseIsbnParam(c: Context, raw: string): string | Response {
 async function parseJsonBody(c: Context): Promise<unknown | Response> {
   try {
     return await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400) as Response;
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      return c.json({ error: "Invalid JSON body" }, 400) as Response;
+    }
+    console.error("Unexpected error reading request body:", err);
+    return c.json({ error: "Failed to read request body" }, 500) as Response;
   }
 }
 
@@ -67,6 +96,13 @@ shelfRouter.get("/", async (c) => {
     const result = await queryShelf(opts);
     return c.json(result);
   } catch (err) {
+    // InvalidCursorError: cursor was syntactically invalid (decodeCursor threw).
+    // ValidationException: cursor decoded fine but DynamoDB rejected the key shape.
+    // Both are client errors — the cursor token is unusable.
+    if (err instanceof InvalidCursorError || err instanceof ValidationException) {
+      console.warn("Invalid pagination cursor rejected", { userId, cursor });
+      return c.json({ error: "Invalid cursor" }, 400);
+    }
     console.error("Shelf query error:", err);
     return c.json({ error: "Failed to fetch shelf" }, 500);
   }
@@ -125,7 +161,7 @@ shelfRouter.post("/", async (c) => {
 
   try {
     const metadata = clientBook ?? (await getBookByIsbn(isbn));
-    if (metadata) await putBookMetadata(isbn, metadata, addedAt);
+    if (metadata) await putBookMetadata(isbn, sanitizeBookMetadata(metadata), addedAt);
   } catch (err) {
     console.error("Book metadata cache error:", err);
     // Non-fatal — shelf entry was saved; cover/title will be missing until next lookup
@@ -151,7 +187,17 @@ shelfRouter.patch("/:isbn/notes", async (c) => {
   }
   const notes = rawNotes as string | null;
 
-  const existing = await getShelfEntry(userId, isbn);
+  if (typeof notes === "string" && notes.length > NOTES_MAX_LENGTH) {
+    return c.json({ error: `notes must be ${NOTES_MAX_LENGTH} characters or fewer` }, 400);
+  }
+
+  let existing: ShelfEntry | null;
+  try {
+    existing = await getShelfEntry(userId, isbn);
+  } catch (err) {
+    console.error("Shelf entry lookup error (notes):", err);
+    return c.json({ error: "Failed to look up book" }, 500);
+  }
   if (!existing) {
     return c.json({ error: "Book not found on your shelf" }, 404);
   }
@@ -183,7 +229,13 @@ shelfRouter.patch("/:isbn", async (c) => {
   }
   const newStatus = rawStatus;
 
-  const existing = await getShelfEntry(userId, isbn);
+  let existing: ShelfEntry | null;
+  try {
+    existing = await getShelfEntry(userId, isbn);
+  } catch (err) {
+    console.error("Shelf entry lookup error (status):", err);
+    return c.json({ error: "Failed to look up book" }, 500);
+  }
   if (!existing) {
     return c.json({ error: "Book not found on your shelf" }, 404);
   }
@@ -216,7 +268,13 @@ shelfRouter.delete("/:isbn", async (c) => {
   if (isbnOrErr instanceof Response) return isbnOrErr;
   const isbn = isbnOrErr;
 
-  const existing = await getShelfEntry(userId, isbn);
+  let existing: ShelfEntry | null;
+  try {
+    existing = await getShelfEntry(userId, isbn);
+  } catch (err) {
+    console.error("Shelf entry lookup error (delete):", err);
+    return c.json({ error: "Failed to look up book" }, 500);
+  }
   if (!existing) {
     return c.json({ error: "Book not found on your shelf" }, 404);
   }

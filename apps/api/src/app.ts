@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
 import { booksRouter } from "./routes/books.js";
 import { shelfRouter } from "./routes/shelf.js";
 import { usersRouter } from "./routes/users.js";
@@ -20,6 +21,19 @@ app.use(
     allowHeaders: ["Authorization", "Content-Type"],
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     maxAge: 86400,
+  }),
+);
+
+// Reject oversized request bodies before they reach route handlers.
+// 64 KB is far above any legitimate payload in this API.
+app.use(
+  "*",
+  bodyLimit({
+    maxSize: 64 * 1024,
+    onError: (c) => {
+      console.error("Request body exceeded 64 KB limit");
+      return c.json({ error: "Request body too large" }, 413);
+    },
   }),
 );
 

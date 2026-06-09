@@ -20,6 +20,12 @@ cdk.context.json
 .env.*.local
 .env.mock
 
+# Playwright
+.auth/
+playwright-report/
+test-results/
+blob-report/
+
 # OS
 .DS_Store
 Thumbs.db

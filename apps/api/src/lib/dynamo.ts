@@ -113,15 +113,34 @@ function shelfItem(
 
 // ── Cursor helpers ─────────────────────────────────────────────────────────
 
+/**
+ * Thrown by {@link decodeCursor} when the cursor string is not a valid
+ * base64url-encoded non-null JSON object. Route handlers should catch this
+ * and return HTTP 400; any other error from {@link queryShelf} is a 500.
+ */
+export class InvalidCursorError extends Error {
+  constructor(cause?: unknown) {
+    super("Invalid pagination cursor");
+    this.name = "InvalidCursorError";
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
 export function encodeCursor(key: Record<string, NativeAttributeValue>): string {
   return Buffer.from(JSON.stringify(key)).toString("base64url");
 }
 
 export function decodeCursor(cursor: string): Record<string, NativeAttributeValue> {
-  return JSON.parse(Buffer.from(cursor, "base64url").toString()) as Record<
-    string,
-    NativeAttributeValue
-  >;
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString()) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new InvalidCursorError();
+    }
+    return parsed as Record<string, NativeAttributeValue>;
+  } catch (err) {
+    if (err instanceof InvalidCursorError) throw err;
+    throw new InvalidCursorError(err);
+  }
 }
 
 // ── Shelf CRUD ─────────────────────────────────────────────────────────────
@@ -139,6 +158,10 @@ export interface QueryShelfResult {
   total: number;
 }
 
+/**
+ * Query a user's shelf with optional status filter and cursor-based pagination.
+ * @throws {InvalidCursorError} if opts.cursor is present but malformed
+ */
 export async function queryShelf(opts: QueryShelfOptions): Promise<QueryShelfResult> {
   const limit = Math.min(opts.limit ?? 20, 100);
   const skPrefix = opts.status ? `SHELF#${opts.status}#` : "SHELF#";

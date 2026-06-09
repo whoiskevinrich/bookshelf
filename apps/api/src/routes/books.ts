@@ -1,17 +1,25 @@
 import { Hono } from "hono";
 import { searchBooks, getBookByIsbn, getBookByAsin } from "../lib/books/search.js";
+import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
+import { authMiddleware } from "../middleware/auth.js";
 
 export const booksRouter = new Hono();
 
-function isValidIsbn(isbn: string): boolean {
-  const cleaned = isbn.replace(/-/g, "");
-  return /^\d{10}$/.test(cleaned) || /^\d{13}$/.test(cleaned);
-}
+booksRouter.use("*", authMiddleware);
+
+const SEARCH_MAX_LENGTH = 200;
+// Real ASINs are 10 alphanumeric chars; ceiling raised to 20 so callers can
+// also pass ISBN-13 (13 chars) to this endpoint — the provider tries an ISBN
+// lookup first before falling back to a keyword search.
+const ASIN_PATTERN = /^[A-Za-z0-9]{1,20}$/;
 
 booksRouter.get("/search", async (c) => {
   const q = c.req.query("q");
   if (!q || q.trim().length === 0) {
     return c.json({ error: "Query parameter 'q' is required" }, 400);
+  }
+  if (q.trim().length > SEARCH_MAX_LENGTH) {
+    return c.json({ error: `Query must be ${SEARCH_MAX_LENGTH} characters or fewer` }, 400);
   }
 
   try {
@@ -24,10 +32,11 @@ booksRouter.get("/search", async (c) => {
 });
 
 booksRouter.get("/isbn/:isbn", async (c) => {
-  const { isbn } = c.req.param();
-  if (!isValidIsbn(isbn)) {
+  const raw = c.req.param("isbn");
+  if (!isValidIsbn(raw)) {
     return c.json({ error: "Invalid ISBN format" }, 400);
   }
+  const isbn = normalizeIsbn(raw);
   try {
     const book = await getBookByIsbn(isbn);
     if (!book) return c.json({ error: "Book not found" }, 404);
@@ -39,9 +48,12 @@ booksRouter.get("/isbn/:isbn", async (c) => {
 });
 
 booksRouter.get("/asin/:asin", async (c) => {
-  const { asin } = c.req.param();
+  const raw = c.req.param("asin").trim();
+  if (!ASIN_PATTERN.test(raw)) {
+    return c.json({ error: "Invalid ASIN format" }, 400);
+  }
   try {
-    const book = await getBookByAsin(asin.trim());
+    const book = await getBookByAsin(raw);
     if (!book) return c.json({ error: "Book not found" }, 404);
     return c.json(book);
   } catch (err) {

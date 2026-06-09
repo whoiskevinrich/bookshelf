@@ -108,7 +108,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 ### Bookshelf Domain
 
 - ISBN input: validated (length 10 or 13, check digit correct)
-- ASIN input: opaque string (non-empty check only)
+- ASIN input: alphanumeric, 1–20 chars (`/^[A-Za-z0-9]{1,20}$/`) — see endpoint checklist for rationale
 - Book API calls: error boundary + fallback UI required
 - Wishlist vs. Owned: states are distinct, never conflated in the same data structure
 - Zero-books state: empty shelf handled in all list views
@@ -129,6 +129,32 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 - **[NON-NEGOTIABLE] Environment variables must NEVER be committed to source control** — not in `.env`, `launch.json`, config files, or anywhere else. Use `.env.local` (gitignored) for local values; load them at runtime via `--env-file`, SSM, or equivalent. If a secret is already committed, treat it as compromised and rotate it.
 - No hardcoded API keys or secrets anywhere in source
 - ISBN/ASIN from user input sanitized before external API calls
+
+#### New endpoint checklist (required before merging any new route)
+
+**Input validation**
+
+- Every path parameter must be validated (format + allowlist where applicable) — never pass raw path params to DynamoDB keys or external APIs; return 400 on failure
+- Every free-text query string must have a max-length check (e.g. `q` ≤ 200 chars); forwarding unbounded strings to external APIs is a DoS vector
+- Every text field written to DynamoDB must have a maximum length cap — add it as a named constant near the write site (e.g. `NOTES_MAX_LENGTH = 2000`); this includes `BookMetadata` fields (`title`, `description`, `coverUrl`, author names) — sanitize via the `sanitizeBookMetadata` helper in `shelf.ts` before every `putBookMetadata` call
+- Use `isValidIsbn` / `normalizeIsbn` from `lib/isbn.ts` (checksum-validated) — never write a local digit-only ISBN check in a route file
+- ASIN format: `/^[A-Za-z0-9]{1,20}$/` — the provider falls back to keyword search so garbage strings waste quota and pollute logs
+- Pagination cursors must be validated to decode as a non-null, non-array JSON object; return **400** (not 500) on failure — catch `InvalidCursorError` from `lib/dynamo.ts`
+- Body size: a global `bodyLimit` middleware in the app entry point covers all routes — do not remove it; if a specific route needs a tighter cap, add a per-route `bodyLimit` before the handler
+
+**Auth**
+
+- All routes except `GET /health` must use `authMiddleware` — apply it at the router level (`router.use("*", authMiddleware)`), not per-route
+- Any new unauthenticated endpoint that proxies an external API is a rate-limiting target; note it in the backlog for WAF coverage (see rate-limiting task in `todo/TASKS.md`)
+
+**Shared data**
+
+- The `BOOK#${isbn}` metadata cache is keyed by ISBN only (not by user) — any authenticated user can overwrite it; never store user-controlled free text in shared keys
+
+**Error responses**
+
+- 500 responses must never include raw exception messages or stack traces — use generic strings and log the real error server-side with `console.error`
+- Be precise about status codes: malformed input → 400, not found → 404, duplicate → 409, bad upstream → 502
 
 ## Active Hooks
 

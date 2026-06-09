@@ -43,33 +43,25 @@ describe("Health", () => {
   });
 });
 
-describe("Books — unauthenticated", () => {
-  it("GET /v1/books/search?q=dune returns results array", async () => {
+describe("Books — auth gate", () => {
+  it("GET /v1/books/search without token returns 401", async () => {
     const res = await get("/v1/books/search?q=dune");
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { results: unknown[] };
-    expect(Array.isArray(body.results)).toBe(true);
-    expect(body.results.length).toBeGreaterThan(0);
+    expect(res.status).toBe(401);
   });
 
-  it("GET /v1/books/search without q returns 400", async () => {
+  it("GET /v1/books/search without token (no q) returns 401", async () => {
     const res = await get("/v1/books/search");
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
   });
 
-  it("GET /v1/books/isbn/9780441013593 returns a book or 404", async () => {
+  it("GET /v1/books/isbn/:isbn without token returns 401", async () => {
     const res = await get("/v1/books/isbn/9780441013593");
-    expect([200, 404]).toContain(res.status);
-    if (res.status === 200) {
-      const body = (await res.json()) as { isbn: string; title: string };
-      expect(typeof body.isbn).toBe("string");
-      expect(typeof body.title).toBe("string");
-    }
+    expect(res.status).toBe(401);
   });
 
-  it("GET /v1/books/isbn/<invalid> returns 400", async () => {
-    const res = await get("/v1/books/isbn/not-an-isbn");
-    expect(res.status).toBe(400);
+  it("GET /v1/books/asin/:asin without token returns 401", async () => {
+    const res = await get("/v1/books/asin/B000FC1DQ4");
+    expect(res.status).toBe(401);
   });
 });
 
