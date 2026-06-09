@@ -6,6 +6,7 @@ import {
   getShelfMetaItem,
   putShelfMeta,
   updateShelfMetaName,
+  updateShelfSortOrder,
   deleteShelfAndMembers,
   putShelfMember,
   deleteShelfMember,
@@ -50,9 +51,10 @@ shelvesRouter.post("/", async (c) => {
 
   const shelfId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
+  const sortOrder = Date.now();
 
   try {
-    await putShelfMeta(userId, shelfId, name.trim(), createdAt);
+    await putShelfMeta(userId, shelfId, name.trim(), createdAt, sortOrder);
   } catch (err) {
     console.error("Shelf create error:", err);
     return c.json({ error: "Failed to create shelf" }, 500);
@@ -60,6 +62,34 @@ shelvesRouter.post("/", async (c) => {
 
   const shelf: ShelfWithBookIds = { shelfId, name: name.trim(), createdAt, bookIds: [] };
   return c.json(shelf, 201);
+});
+
+// POST /v1/shelves/reorder — accepts { order: string[] } (shelfIds in desired order)
+// Registered before /:shelfId so the literal path segment wins.
+shelvesRouter.post("/reorder", async (c) => {
+  const { userId } = c.get("auth");
+
+  const bodyOrErr = await parseJsonBody(c);
+  if (bodyOrErr instanceof Response) return bodyOrErr;
+
+  const order = (bodyOrErr as Record<string, unknown>)?.["order"];
+  if (
+    !Array.isArray(order) ||
+    order.length === 0 ||
+    !order.every((id) => typeof id === "string" && id.length > 0)
+  ) {
+    return c.json({ error: "order must be a non-empty array of shelf ID strings" }, 400);
+  }
+
+  try {
+    await Promise.all(
+      (order as string[]).map((shelfId, i) => updateShelfSortOrder(userId, shelfId, i)),
+    );
+    return c.body(null, 204);
+  } catch (err) {
+    console.error("Shelf reorder error:", err);
+    return c.json({ error: "Failed to reorder shelves" }, 500);
+  }
 });
 
 // PATCH /v1/shelves/:shelfId

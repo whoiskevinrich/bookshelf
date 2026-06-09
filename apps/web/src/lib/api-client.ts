@@ -41,6 +41,7 @@ export interface Shelf {
   name: string;
   createdAt: string;
   bookIds: string[];
+  sortOrder?: number;
 }
 
 // ── Errors ────────────────────────────────────────────────────────────────
@@ -150,6 +151,15 @@ export async function updateShelf(shelfId: string, name: string): Promise<Shelf>
   });
   await throwIfError(res);
   return res.json() as Promise<Shelf>;
+}
+
+export async function reorderShelves(order: string[]): Promise<void> {
+  const res = await authedFetch("/v1/shelves/reorder", {
+    method: "POST",
+    body: JSON.stringify({ order }),
+  });
+  if (res.status === 204) return;
+  await throwIfError(res);
 }
 
 export async function deleteShelf(shelfId: string): Promise<void> {

@@ -15,61 +15,61 @@ const SCI_FI: DemoBook[] = [
     coverUrl: "/demo-covers/dune.jpg",
   },
   {
-    isbn: "9780441569595",
-    title: "Neuromancer",
-    authors: ["William Gibson"],
-    coverUrl: "/demo-covers/neuromancer.jpg",
-  },
-  {
     isbn: "9780593135204",
     title: "Project Hail Mary",
     authors: ["Andy Weir"],
     coverUrl: "/demo-covers/project-hail-mary.jpg",
   },
   {
-    isbn: "9781447273127",
-    title: "Children of Time",
-    authors: ["Adrian Tchaikovsky"],
-    coverUrl: "/demo-covers/children-of-time.jpg",
+    isbn: "9780345461612",
+    title: "Pandora's Star",
+    authors: ["Peter F. Hamilton"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345461612-M.jpg",
   },
   {
-    isbn: "9780812515282",
-    title: "A Fire Upon the Deep",
-    authors: ["Vernor Vinge"],
-    coverUrl: "/demo-covers/fire-upon-the-deep.jpg",
+    isbn: "9780345303066",
+    title: "2010: Odyssey Two",
+    authors: ["Arthur C. Clarke"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345303066-M.jpg",
+  },
+  {
+    isbn: "9780451228734",
+    title: "Daemon",
+    authors: ["Daniel Suarez"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780451228734-M.jpg",
   },
 ];
 
 const FANTASY: DemoBook[] = [
   {
-    isbn: "9780756404741",
-    title: "The Name of the Wind",
-    authors: ["Patrick Rothfuss"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780756404741-M.jpg",
+    isbn: "9780345300553",
+    title: "The Elfstones of Shannara",
+    authors: ["Terry Brooks"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345300553-M.jpg",
   },
   {
-    isbn: "9780765326355",
-    title: "The Way of Kings",
-    authors: ["Brandon Sanderson"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780765326355-M.jpg",
+    isbn: "9780547928227",
+    title: "The Hobbit",
+    authors: ["J.R.R. Tolkien"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780547928227-M.jpg",
   },
   {
-    isbn: "9780316229296",
-    title: "The Fifth Season",
-    authors: ["N.K. Jemisin"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780316229296-M.jpg",
+    isbn: "9780312367541",
+    title: "A Wrinkle in Time",
+    authors: ["Madeleine L'Engle"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780312367541-M.jpg",
   },
   {
-    isbn: "9781635575637",
-    title: "Piranesi",
-    authors: ["Susanna Clarke"],
-    coverUrl: "/demo-covers/piranesi.jpg",
+    isbn: "9780345277122",
+    title: "Dragonflight",
+    authors: ["Anne McCaffrey"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345277122-M.jpg",
   },
   {
-    isbn: "9780441478125",
-    title: "The Left Hand of Darkness",
-    authors: ["Ursula K. Le Guin"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780441478125-M.jpg",
+    isbn: "9780345335487",
+    title: "Pawn of Prophecy",
+    authors: ["David Eddings"],
+    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345335487-M.jpg",
   },
 ];
 
@@ -107,24 +107,21 @@ const LEADERSHIP: DemoBook[] = [
 ];
 
 const SHELVES = [
+  { name: "Leadership", books: LEADERSHIP },
   { name: "Sci-Fi", books: SCI_FI },
   { name: "Fantasy", books: FANTASY },
-  { name: "Leadership", books: LEADERSHIP },
 ];
 
 const MAX_STAGGER_INDEX = 9;
 const STAGGER_STEP_MS = 50;
 
-function SectionHeader({ title, count }: { title: string; count: number }) {
+function SectionHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-3 mb-4">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 shrink-0">
         {title}
       </h3>
       <span className="flex-1 h-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-      <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 rounded-full px-2 py-0.5">
-        {count}
-      </span>
     </div>
   );
 }
@@ -166,7 +163,7 @@ export function DemoShelf() {
         offset += books.length;
         return (
           <section key={name}>
-            <SectionHeader title={name} count={books.length} />
+            <SectionHeader title={name} />
             <BookGrid books={books} indexOffset={currentOffset} />
           </section>
         );

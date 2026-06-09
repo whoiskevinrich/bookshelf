@@ -4,6 +4,7 @@ import {
   createShelf,
   updateShelf,
   deleteShelf,
+  reorderShelves,
   addBookToShelf,
   removeBookFromShelf,
   type Shelf,
@@ -50,4 +51,8 @@ export function useRemoveBookFromShelf() {
   return useShelfMutation(({ shelfId, isbn }: { shelfId: string; isbn: string }) =>
     removeBookFromShelf(shelfId, isbn),
   );
+}
+
+export function useReorderShelves() {
+  return useShelfMutation((order: string[]) => reorderShelves(order));
 }

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { BookCover } from "../BookCover";
 import { Button } from "../ui/Button";
 import type { ShelfEntry, ShelfStatus, Shelf } from "../../lib/api-client";
@@ -37,6 +38,46 @@ function StatusBadge({ status }: { status: ShelfStatus }) {
   );
 }
 
+// Move-action icon: wishlist bookmark (owned→want) or owned checkmark (want→owned)
+function MoveIcon({ toStatus }: { toStatus: ShelfStatus }) {
+  if (toStatus === "want") {
+    // Move to Wishlist — bookmark outline
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        aria-hidden="true"
+      >
+        <path
+          d="M4 2.5h8a.5.5 0 01.5.5v10.25l-4.5-3-4.5 3V3a.5.5 0 01.5-.5z"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  // Mark as Owned — checkmark circle
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="6.5" />
+      <path d="M5.5 8.5l1.75 1.75L11 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * ShelfPicker dropdown rendered as a portal so it escapes the card's stacking
+ * context (created by the fade-up animation) and renders above all sibling cards.
+ */
 function ShelfPicker({
   isbn,
   shelves,
@@ -51,46 +92,79 @@ function ShelfPicker({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  function toggle() {
+    if (!open && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpen((v) => !v);
+  }
+
+  // Close on click outside
   useEffect(() => {
     if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    function onPointerDown(e: MouseEvent) {
+      if (
+        dropdownRef.current?.contains(e.target as Node) ||
+        containerRef.current?.contains(e.target as Node)
+      ) {
+        return;
+      }
+      setOpen(false);
     }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  // Close on scroll so the fixed dropdown doesn't drift from its anchor
+  useEffect(() => {
+    if (!open) return;
+    function onScroll() {
+      setOpen(false);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", onScroll, { capture: true });
   }, [open]);
 
   if (shelves.length === 0) return null;
 
   return (
-    <div className="relative" ref={ref}>
-      <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)}>
+    <div ref={containerRef} className="relative inline-flex">
+      <Button variant="ghost" size="sm" onClick={toggle}>
         Shelves
       </Button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-10 min-w-[160px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-md py-1">
-          {shelves.map((shelf) => {
-            const checked = shelf.bookIds.includes(isbn);
-            return (
-              <label
-                key={shelf.shelfId}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/60"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={disabled}
-                  onChange={() => (checked ? onRemove(shelf.shelfId) : onAdd(shelf.shelfId))}
-                  className="accent-slate-700 dark:accent-slate-300 disabled:opacity-50"
-                />
-                <span className="truncate dark:text-white">{shelf.name}</span>
-              </label>
-            );
-          })}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[200] min-w-[160px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1"
+            style={{ top: pos.top, left: pos.left }}
+          >
+            {shelves.map((shelf) => {
+              const checked = shelf.bookIds.includes(isbn);
+              return (
+                <label
+                  key={shelf.shelfId}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/60"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={() => (checked ? onRemove(shelf.shelfId) : onAdd(shelf.shelfId))}
+                    className="accent-slate-700 dark:accent-slate-300 disabled:opacity-50"
+                  />
+                  <span className="truncate dark:text-white">{shelf.name}</span>
+                </label>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -139,18 +213,47 @@ export function ShelfBookCard({
               {authors.join(", ")}
             </p>
           )}
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
+            {isbn}
+          </p>
           <div className="mt-1">
             <StatusBadge status={status} />
           </div>
-          <div className="flex flex-wrap gap-2 mt-2">
-            <Button
-              variant="ghost"
-              size="sm"
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            {/* Move-to icon button */}
+            <button
+              type="button"
+              className="p-1.5 rounded-md text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white disabled:opacity-40 transition-colors"
               onClick={() => onMove(isbn, targetStatus)}
               disabled={isMoving || isRemoving}
+              aria-label={isMoving ? "Moving…" : moveLabel}
+              title={isMoving ? "Moving…" : moveLabel}
             >
-              {isMoving ? "Moving…" : moveLabel}
-            </Button>
+              {isMoving ? (
+                <svg
+                  viewBox="0 0 16 16"
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  role="status"
+                  aria-label="Moving…"
+                >
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="6"
+                    strokeDasharray="28"
+                    strokeDashoffset="10"
+                    strokeOpacity="0.3"
+                  />
+                  <path d="M14 8a6 6 0 00-6-6" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <MoveIcon toStatus={targetStatus} />
+              )}
+            </button>
+
             <ShelfPicker
               isbn={isbn}
               shelves={shelves}

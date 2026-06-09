@@ -80,6 +80,8 @@ export interface ShelfMeta {
   shelfId: string;
   name: string;
   createdAt: string;
+  /** Ascending sort position. Absent on legacy items; those fall back to createdAt epoch ms. */
+  sortOrder?: number;
 }
 
 export interface ShelfWithBookIds extends ShelfMeta {
@@ -117,6 +119,7 @@ function toShelfMeta(item: Record<string, unknown>): ShelfMeta {
     shelfId: String(item["shelfId"]),
     name: String(item["name"]),
     createdAt: String(item["createdAt"]),
+    ...(item["sortOrder"] != null ? { sortOrder: Number(item["sortOrder"]) } : {}),
   };
 }
 
@@ -351,7 +354,12 @@ export async function queryShelvesMeta(userId: string): Promise<ShelfMeta[]> {
       },
     }),
   );
-  return (result.Items ?? []).map((i) => toShelfMeta(i as Record<string, unknown>));
+  const shelves = (result.Items ?? []).map((i) => toShelfMeta(i as Record<string, unknown>));
+  // Sort by sortOrder; fall back to createdAt epoch ms for legacy items without the field.
+  return shelves.sort(
+    (a, b) =>
+      (a.sortOrder ?? Date.parse(a.createdAt)) - (b.sortOrder ?? Date.parse(b.createdAt)),
+  );
 }
 
 export async function getShelfMetaItem(userId: string, shelfId: string): Promise<ShelfMeta | null> {
@@ -369,11 +377,28 @@ export async function putShelfMeta(
   shelfId: string,
   name: string,
   createdAt: string,
+  sortOrder: number,
 ): Promise<void> {
   await dynamo().send(
     new PutCommand({
       TableName: TABLE_NAME,
-      Item: { PK: userPk(userId), SK: shelfMetaSk(shelfId), shelfId, name, createdAt },
+      Item: { PK: userPk(userId), SK: shelfMetaSk(shelfId), shelfId, name, createdAt, sortOrder },
+    }),
+  );
+}
+
+export async function updateShelfSortOrder(
+  userId: string,
+  shelfId: string,
+  sortOrder: number,
+): Promise<void> {
+  await dynamo().send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: shelfMetaSk(shelfId) },
+      UpdateExpression: "SET sortOrder = :sortOrder",
+      ExpressionAttributeValues: { ":sortOrder": sortOrder },
+      ConditionExpression: "attribute_exists(PK)",
     }),
   );
 }
