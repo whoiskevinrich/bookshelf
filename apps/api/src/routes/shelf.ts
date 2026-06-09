@@ -7,6 +7,7 @@ import {
   putShelfEntry,
   deleteShelfEntry,
   updateShelfStatus,
+  updateShelfNotes,
   putBookMetadata,
   isValidStatus,
   type BookMetadata,
@@ -131,6 +132,38 @@ shelfRouter.post("/", async (c) => {
   }
 
   return c.json({ isbn, status, addedAt, notes: null }, 201);
+});
+
+// PATCH /v1/shelf/:isbn/notes
+shelfRouter.patch("/:isbn/notes", async (c) => {
+  const { userId } = c.get("auth");
+
+  const isbnOrErr = parseIsbnParam(c, c.req.param("isbn"));
+  if (isbnOrErr instanceof Response) return isbnOrErr;
+  const isbn = isbnOrErr;
+
+  const bodyOrErr = await parseJsonBody(c);
+  if (bodyOrErr instanceof Response) return bodyOrErr;
+
+  const rawNotes = (bodyOrErr as Record<string, unknown>)?.["notes"];
+  if (rawNotes !== null && typeof rawNotes !== "string") {
+    return c.json({ error: "notes must be a string or null" }, 400);
+  }
+  const notes = rawNotes as string | null;
+
+  const existing = await getShelfEntry(userId, isbn);
+  if (!existing) {
+    return c.json({ error: "Book not found on your shelf" }, 404);
+  }
+
+  try {
+    await updateShelfNotes(userId, isbn, existing.status, notes);
+  } catch (err) {
+    console.error("Shelf notes update error:", err);
+    return c.json({ error: "Failed to update notes" }, 500);
+  }
+
+  return c.json({ isbn, status: existing.status, addedAt: existing.addedAt, notes });
 });
 
 // PATCH /v1/shelf/:isbn

@@ -12,6 +12,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 
 $pairs = @(
   @{ Src = "$MainWorktree\apps\api\.env.local"; Dst = "$Root\apps\api\.env.local" },
+  @{ Src = "$MainWorktree\apps\mcp\.env.local"; Dst = "$Root\apps\mcp\.env.local" },
   @{ Src = "$MainWorktree\apps\web\.env.local"; Dst = "$Root\apps\web\.env.local" }
 )
 

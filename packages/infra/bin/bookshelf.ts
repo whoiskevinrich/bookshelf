@@ -3,6 +3,7 @@ import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { AuthStack } from "../lib/auth-stack";
 import { ApiStack, ApiCustomDomainConfig } from "../lib/api-stack";
+import { McpStack, McpCustomDomainConfig } from "../lib/mcp-stack";
 import { WebStack, WebCustomDomainConfig } from "../lib/web-stack";
 import { CdnCertStack } from "../lib/cdn-cert-stack";
 import { DnsStack } from "../lib/dns-stack";
@@ -104,8 +105,9 @@ const auth = new AuthStack(app, "BookshelfAuth", {
 let dns: DnsStack | undefined;
 let webCustomDomain: WebCustomDomainConfig | undefined;
 let apiCustomDomain: ApiCustomDomainConfig | undefined;
+let mcpCustomDomain: McpCustomDomainConfig | undefined;
 if (config.domain) {
-  const wildcard = `*.${config.domain}`; // covers api. and future www./mcp.
+  const wildcard = `*.${config.domain}`; // covers api. mcp. and future subdomains
 
   dns = new DnsStack(app, "BookshelfDns", {
     env: usEast1Env,
@@ -130,6 +132,11 @@ if (config.domain) {
     certificateDomainName: wildcard,
     hostedZoneName: config.domain, // automated cert validation + API Gateway alias
   };
+  mcpCustomDomain = {
+    mcpHostname: `mcp.${config.domain}`,
+    certificateDomainName: wildcard, // same wildcard cert covers mcp.
+    hostedZoneName: config.domain,
+  };
 }
 
 const api = new ApiStack(app, "BookshelfApi", {
@@ -140,6 +147,19 @@ const api = new ApiStack(app, "BookshelfApi", {
   sameOrigin: config.apiThroughCloudFront,
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
 });
+
+const mcp = new McpStack(app, "BookshelfMcp", {
+  env,
+  userPoolId: auth.userPoolId,
+  userPoolIssuer: auth.userPoolIssuer,
+  mcpClientId: auth.mcpClientId,
+  hostedUiBaseUrl: auth.hostedUiBaseUrl,
+  apiUrl: api.apiUrl,
+  ...(mcpCustomDomain ? { customDomain: mcpCustomDomain } : {}),
+});
+mcp.addDependency(auth);
+mcp.addDependency(api);
+if (dns) mcp.addDependency(dns);
 
 const web = new WebStack(app, "BookshelfWeb", {
   env,

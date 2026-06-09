@@ -35,7 +35,9 @@ export function DeleteAccountPage() {
       } else if (err instanceof ApiError && err.status === 429) {
         setError("Too many attempts. Please wait a moment and try again.");
       } else {
-        setError(err instanceof Error ? err.message : "Failed to delete account. Please try again.");
+        setError(
+          err instanceof Error ? err.message : "Failed to delete account. Please try again.",
+        );
       }
       setLoading(false);
     }
