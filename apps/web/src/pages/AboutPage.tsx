@@ -58,7 +58,7 @@ export function AboutPage() {
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Built by{" "}
               <a
-                href="https://github.com/whoiskevinrich"
+                href="https://whoiskevinrich.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-slate-900 dark:text-white underline hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
