@@ -168,6 +168,16 @@ function ShelfPicker({
     setOpen((v) => !v);
   }
 
+  // Flip dropdown above the trigger if it overflows the viewport bottom.
+  useEffect(() => {
+    if (!open || !dropdownRef.current || !containerRef.current) return;
+    const dropRect = dropdownRef.current.getBoundingClientRect();
+    if (dropRect.bottom > window.innerHeight) {
+      const triggerRect = containerRef.current.getBoundingClientRect();
+      setPos({ top: triggerRect.top - dropRect.height - 4, left: triggerRect.left });
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: MouseEvent) {
