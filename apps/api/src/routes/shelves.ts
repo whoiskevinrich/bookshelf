@@ -14,19 +14,11 @@ import {
   getBookEntry,
   type ShelfWithBookIds,
 } from "../lib/dynamo.js";
-import type { Context } from "hono";
+import { parseJsonBody } from "./_utils.js";
 
 export const shelvesRouter = new Hono();
 
 shelvesRouter.use("*", authMiddleware);
-
-async function parseJsonBody(c: Context): Promise<unknown | Response> {
-  try {
-    return await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400) as Response;
-  }
-}
 
 function validateShelfName(name: unknown): name is string {
   return typeof name === "string" && name.trim().length > 0 && name.trim().length <= 100;
@@ -93,10 +85,11 @@ shelvesRouter.patch("/:shelfId", async (c) => {
     return c.json({ error: "Failed to rename shelf" }, 500);
   }
 
-  const existing = await getShelfMetaItem(userId, shelfId);
+  const [existing, bookIds] = await Promise.all([
+    getShelfMetaItem(userId, shelfId),
+    queryShelfMemberIsns(userId, shelfId),
+  ]);
   if (!existing) return c.json({ error: "Shelf not found" }, 404);
-
-  const bookIds = await queryShelfMemberIsns(userId, shelfId);
   return c.json({ ...existing, bookIds });
 });
 
@@ -126,12 +119,13 @@ shelvesRouter.post("/:shelfId/books/:isbn", async (c) => {
   const shelfId = c.req.param("shelfId");
   const isbn = c.req.param("isbn");
 
-  const shelf = await getShelfMetaItem(userId, shelfId);
+  const [shelf, entry] = await Promise.all([
+    getShelfMetaItem(userId, shelfId),
+    getBookEntry(userId, isbn),
+  ]);
   if (!shelf) {
     return c.json({ error: "Shelf not found" }, 404);
   }
-
-  const entry = await getBookEntry(userId, isbn);
   if (!entry) {
     return c.json({ error: "Book not found on your shelf" }, 404);
   }

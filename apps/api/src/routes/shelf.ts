@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ConditionalCheckFailedException, ValidationException } from "@aws-sdk/client-dynamodb";
+import { ConditionalCheckFailedException, DynamoDBServiceException } from "@aws-sdk/client-dynamodb";
 import { authMiddleware } from "../middleware/auth.js";
 import {
   queryBookEntries,
@@ -18,6 +18,7 @@ import {
 import { getBookByIsbn } from "../lib/books/search.js";
 import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
 import type { Context } from "hono";
+import { parseJsonBody } from "./_utils.js";
 
 export const shelfRouter = new Hono();
 
@@ -51,18 +52,6 @@ function parseIsbnParam(c: Context, raw: string): string | Response {
     return c.json({ error: "Invalid ISBN" }, 400) as Response;
   }
   return normalizeIsbn(raw);
-}
-
-async function parseJsonBody(c: Context): Promise<unknown | Response> {
-  try {
-    return await c.req.json();
-  } catch (err) {
-    if (err instanceof SyntaxError) {
-      return c.json({ error: "Invalid JSON body" }, 400) as Response;
-    }
-    console.error("Unexpected error reading request body:", err);
-    return c.json({ error: "Failed to read request body" }, 500) as Response;
-  }
 }
 
 // GET /v1/shelf
@@ -100,7 +89,10 @@ shelfRouter.get("/", async (c) => {
     // InvalidCursorError: cursor was syntactically invalid (decodeCursor threw).
     // ValidationException: cursor decoded fine but DynamoDB rejected the key shape.
     // Both are client errors — the cursor token is unusable.
-    if (err instanceof InvalidCursorError || err instanceof ValidationException) {
+    if (
+      err instanceof InvalidCursorError ||
+      (err instanceof DynamoDBServiceException && err.name === "ValidationException")
+    ) {
       console.warn("Invalid pagination cursor rejected", { userId, cursor });
       return c.json({ error: "Invalid cursor" }, 400);
     }

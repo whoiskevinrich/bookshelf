@@ -186,10 +186,10 @@ export function ShelfPage() {
   const { namedShelfEntries, unshelved } = useMemo(() => {
     const allShelvedIsbns = new Set(shelves.flatMap((s) => s.bookIds));
     return {
-      namedShelfEntries: shelves.map((shelf) => ({
-        shelf,
-        entries: allEntries.filter((e) => shelf.bookIds.includes(e.isbn)),
-      })),
+      namedShelfEntries: shelves.map((shelf) => {
+        const shelfSet = new Set(shelf.bookIds);
+        return { shelf, entries: allEntries.filter((e) => shelfSet.has(e.isbn)) };
+      }),
       unshelved: allEntries.filter((e) => !allShelvedIsbns.has(e.isbn)),
     };
   }, [allEntries, shelves]);
@@ -284,7 +284,7 @@ export function ShelfPage() {
                 {(unshelved.length > 0 || namedShelfEntries.length === 0) && (
                   <ShelfSection
                     title={namedShelfEntries.length > 0 ? "Unshelved" : "All books"}
-                    entries={unshelved.length > 0 ? unshelved : allEntries}
+                    entries={unshelved}
                     emptyMessage="No books yet — add one above!"
                     shelves={shelves}
                     moveMutation={moveMutation}
