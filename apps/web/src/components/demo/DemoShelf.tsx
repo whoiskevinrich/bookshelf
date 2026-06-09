@@ -42,13 +42,13 @@ const SCI_FI: DemoBook[] = [
 
 const FANTASY: DemoBook[] = [
   {
-    isbn: "9780345458681",
+    isbn: "9780593725443",
     title: "The Elfstones of Shannara",
     authors: ["Terry Brooks"],
     coverUrl: "/demo-covers/elfstones-shannara.jpg",
   },
   {
-    isbn: "9780547928227",
+    isbn: "9780547951973",
     title: "The Hobbit",
     authors: ["J.R.R. Tolkien"],
     coverUrl: "/demo-covers/hobbit.jpg",
@@ -60,13 +60,13 @@ const FANTASY: DemoBook[] = [
     coverUrl: "/demo-covers/wrinkle-in-time.jpg",
   },
   {
-    isbn: "9780345277122",
+    isbn: "9780345484260",
     title: "Dragonflight",
     authors: ["Anne McCaffrey"],
     coverUrl: "/demo-covers/dragonflight.jpg",
   },
   {
-    isbn: "9780345290540",
+    isbn: "9780552168335",
     title: "Pawn of Prophecy",
     authors: ["David Eddings"],
     coverUrl: "/demo-covers/pawn-of-prophecy.jpg",
@@ -75,31 +75,31 @@ const FANTASY: DemoBook[] = [
 
 const LEADERSHIP: DemoBook[] = [
   {
-    isbn: "9780525543343",
+    isbn: "9780241373668",
     title: "Leadership is Language",
     authors: ["L. David Marquet"],
     coverUrl: null, // OpenLibrary has no cover for this 2020 title yet
   },
   {
-    isbn: "9781591846406",
+    isbn: "9780241250945",
     title: "Turn the Ship Around!",
     authors: ["L. David Marquet"],
     coverUrl: "/demo-covers/turn-the-ship-around.jpg",
   },
   {
-    isbn: "9780999743904",
+    isbn: "9780999743508",
     title: "Supportive Accountability",
     authors: ["Sylvia Melena"],
     coverUrl: "/demo-covers/supportive-accountability.jpg",
   },
   {
-    isbn: "9781400224166",
+    isbn: "9781639015078",
     title: "Serve Up, Coach Down",
     authors: ["Nathan Jamail"],
     coverUrl: "/demo-covers/serve-up-coach-down.jpg",
   },
   {
-    isbn: "9780201835953",
+    isbn: "9788178082530",
     title: "The Mythical Man-Month",
     authors: ["Frederick P. Brooks Jr."],
     coverUrl: "/demo-covers/mythical-man-month.jpg",
