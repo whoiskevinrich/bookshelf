@@ -7,8 +7,7 @@ let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 function parseGoogleIdentity(identities: unknown): boolean {
   if (!identities) return false;
   try {
-    const arr =
-      typeof identities === "string" ? (JSON.parse(identities) as unknown) : identities;
+    const arr = typeof identities === "string" ? (JSON.parse(identities) as unknown) : identities;
     if (!Array.isArray(arr)) return false;
     return arr.some(
       (id) =>

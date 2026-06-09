@@ -172,8 +172,7 @@ export async function isGoogleUser(): Promise<boolean> {
     const session = await fetchAuthSession();
     const identities = session.tokens?.idToken?.payload?.["identities"];
     if (!identities) return false;
-    const parsed: unknown =
-      typeof identities === "string" ? JSON.parse(identities) : identities;
+    const parsed: unknown = typeof identities === "string" ? JSON.parse(identities) : identities;
     if (!Array.isArray(parsed)) return false;
     return parsed.some(
       (id) =>

@@ -41,8 +41,12 @@ export class AuthStack extends cdk.Stack {
 
   constructor(scope: Construct, id: string, props: AuthStackProps = {}) {
     super(scope, id, props);
-    const { allowSelfSignUp = false, googleEmailAllowlist, oauthCallbackUrls, oauthLogoutUrls } =
-      props;
+    const {
+      allowSelfSignUp = false,
+      googleEmailAllowlist,
+      oauthCallbackUrls,
+      oauthLogoutUrls,
+    } = props;
 
     // ── User Pool ──────────────────────────────────────────────────────────
     const userPool = new cognito.UserPool(this, "UserPool", {

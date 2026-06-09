@@ -39,7 +39,11 @@ usersRouter.delete("/me", async (c) => {
   if (isGoogleUser) {
     // Google-federated users have no Cognito password; require typed confirmation instead.
     const confirmation = (body as Record<string, unknown>)?.["confirmation"];
-    if (typeof confirmation !== "string" || confirmation.length > 100 || confirmation !== "DELETE") {
+    if (
+      typeof confirmation !== "string" ||
+      confirmation.length > 100 ||
+      confirmation !== "DELETE"
+    ) {
       return c.json({ error: 'Type "DELETE" to confirm account deletion' }, 400);
     }
   } else {
