@@ -104,6 +104,28 @@ export async function getSession(): Promise<string | null> {
   }
 }
 
+/** Fetches the session once and derives both the ID token and Google-provider status. */
+export async function getSessionData(): Promise<{ idToken: string | null; isGoogleUser: boolean }> {
+  try {
+    const session = await fetchAuthSession();
+    const idToken = session.tokens?.idToken?.toString() ?? null;
+    const identities = session.tokens?.idToken?.payload?.["identities"];
+    const parsed: unknown =
+      typeof identities === "string" ? JSON.parse(identities) : identities;
+    const isGoogle =
+      Array.isArray(parsed) &&
+      parsed.some(
+        (id) =>
+          typeof id === "object" &&
+          id !== null &&
+          (id as Record<string, unknown>)["providerType"] === "Google",
+      );
+    return { idToken, isGoogleUser: isGoogle };
+  } catch {
+    return { idToken: null, isGoogleUser: false };
+  }
+}
+
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     const user = await amplifyGetCurrentUser();
@@ -157,8 +179,7 @@ export function safeNext(raw: string | null | undefined): string {
  * can restore it after the round-trip through Cognito and Google.
  */
 export async function signInWithGoogle(next?: string): Promise<void> {
-  const dest = safeNext(next);
-  if (dest) sessionStorage.setItem("oauth_next", dest);
+  sessionStorage.setItem("oauth_next", safeNext(next));
   await signInWithRedirect({ provider: "Google" });
 }
 

@@ -46,7 +46,7 @@ export function OAuthCallbackPage() {
     }
 
     return unsubscribe;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refreshAuth, navigate]);
 
   if (error) {
     return (
