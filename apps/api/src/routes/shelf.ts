@@ -10,6 +10,7 @@ import {
   updateShelfNotes,
   putBookMetadata,
   isValidStatus,
+  InvalidCursorError,
   type BookMetadata,
   type ShelfStatus,
 } from "../lib/dynamo.js";
@@ -20,6 +21,8 @@ import type { Context } from "hono";
 export const shelfRouter = new Hono();
 
 shelfRouter.use("*", authMiddleware);
+
+const NOTES_MAX_LENGTH = 2000;
 
 function parseIsbnParam(c: Context, raw: string): string | Response {
   if (!isValidIsbn(raw)) {
@@ -67,6 +70,9 @@ shelfRouter.get("/", async (c) => {
     const result = await queryShelf(opts);
     return c.json(result);
   } catch (err) {
+    if (err instanceof InvalidCursorError) {
+      return c.json({ error: "Invalid cursor" }, 400);
+    }
     console.error("Shelf query error:", err);
     return c.json({ error: "Failed to fetch shelf" }, 500);
   }
@@ -150,6 +156,10 @@ shelfRouter.patch("/:isbn/notes", async (c) => {
     return c.json({ error: "notes must be a string or null" }, 400);
   }
   const notes = rawNotes as string | null;
+
+  if (typeof notes === "string" && notes.length > NOTES_MAX_LENGTH) {
+    return c.json({ error: `notes must be ${NOTES_MAX_LENGTH} characters or fewer` }, 400);
+  }
 
   const existing = await getShelfEntry(userId, isbn);
   if (!existing) {

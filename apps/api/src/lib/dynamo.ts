@@ -113,15 +113,28 @@ function shelfItem(
 
 // ── Cursor helpers ─────────────────────────────────────────────────────────
 
+export class InvalidCursorError extends Error {
+  constructor() {
+    super("Invalid pagination cursor");
+    this.name = "InvalidCursorError";
+  }
+}
+
 export function encodeCursor(key: Record<string, NativeAttributeValue>): string {
   return Buffer.from(JSON.stringify(key)).toString("base64url");
 }
 
 export function decodeCursor(cursor: string): Record<string, NativeAttributeValue> {
-  return JSON.parse(Buffer.from(cursor, "base64url").toString()) as Record<
-    string,
-    NativeAttributeValue
-  >;
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString()) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new InvalidCursorError();
+    }
+    return parsed as Record<string, NativeAttributeValue>;
+  } catch (err) {
+    if (err instanceof InvalidCursorError) throw err;
+    throw new InvalidCursorError();
+  }
 }
 
 // ── Shelf CRUD ─────────────────────────────────────────────────────────────

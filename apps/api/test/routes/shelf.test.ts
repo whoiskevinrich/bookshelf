@@ -9,15 +9,25 @@ vi.mock("../../src/middleware/auth.js", () => ({
 }));
 
 // Mock dynamo
-vi.mock("../../src/lib/dynamo.js", () => ({
-  queryShelf: vi.fn(),
-  getShelfEntry: vi.fn(),
-  putShelfEntry: vi.fn(),
-  deleteShelfEntry: vi.fn(),
-  updateShelfStatus: vi.fn(),
-  putBookMetadata: vi.fn(),
-  isValidStatus: (s: unknown) => s === "owned" || s === "want",
-}));
+vi.mock("../../src/lib/dynamo.js", () => {
+  class InvalidCursorError extends Error {
+    constructor() {
+      super("Invalid pagination cursor");
+      this.name = "InvalidCursorError";
+    }
+  }
+  return {
+    queryShelf: vi.fn(),
+    getShelfEntry: vi.fn(),
+    putShelfEntry: vi.fn(),
+    deleteShelfEntry: vi.fn(),
+    updateShelfStatus: vi.fn(),
+    updateShelfNotes: vi.fn(),
+    putBookMetadata: vi.fn(),
+    isValidStatus: (s: unknown) => s === "owned" || s === "want",
+    InvalidCursorError,
+  };
+});
 
 // Mock book search
 vi.mock("../../src/lib/books/search.js", () => ({
@@ -32,6 +42,8 @@ import {
   putShelfEntry,
   deleteShelfEntry,
   updateShelfStatus,
+  updateShelfNotes,
+  InvalidCursorError,
 } from "../../src/lib/dynamo.js";
 import { shelfRouter } from "../../src/routes/shelf.js";
 
@@ -60,6 +72,7 @@ beforeEach(() => {
   vi.mocked(putShelfEntry).mockReset();
   vi.mocked(deleteShelfEntry).mockReset();
   vi.mocked(updateShelfStatus).mockReset();
+  vi.mocked(updateShelfNotes).mockReset();
 });
 
 describe("GET /v1/shelf", () => {
@@ -82,6 +95,13 @@ describe("GET /v1/shelf", () => {
   it("returns 400 for invalid limit", async () => {
     const app = makeApp();
     const res = await app.request("/v1/shelf?limit=200");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for a malformed cursor", async () => {
+    vi.mocked(queryShelf).mockRejectedValueOnce(new InvalidCursorError());
+    const app = makeApp();
+    const res = await app.request("/v1/shelf?cursor=not-valid-json");
     expect(res.status).toBe(400);
   });
 });
@@ -130,6 +150,46 @@ describe("POST /v1/shelf", () => {
       body: JSON.stringify({ isbn: "9780441013593", status: "reading" }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /v1/shelf/:isbn/notes", () => {
+  it("returns 400 when notes exceeds max length", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: "a".repeat(2001) }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("updates notes successfully", async () => {
+    vi.mocked(getShelfEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateShelfNotes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: "A great book." }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { notes: string | null };
+    expect(body.notes).toBe("A great book.");
+  });
+
+  it("clears notes when null is passed", async () => {
+    vi.mocked(getShelfEntry).mockResolvedValueOnce({ ...ENTRY, notes: "old note" });
+    vi.mocked(updateShelfNotes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: null }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { notes: string | null };
+    expect(body.notes).toBeNull();
   });
 });
 
