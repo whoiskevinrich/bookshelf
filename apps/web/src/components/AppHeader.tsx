@@ -24,7 +24,7 @@ export function AppHeader() {
       <span className="font-semibold text-lg tracking-tight dark:text-white">Bookshelf</span>
       <nav className="flex items-center gap-4">
         <NavLink to="/shelf" className={navLinkClass}>
-          My Shelf
+          My Library
         </NavLink>
         <NavLink to="/wishlist" className={navLinkClass}>
           Wishlist

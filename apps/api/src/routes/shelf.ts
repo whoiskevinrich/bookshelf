@@ -1,13 +1,16 @@
 import { Hono } from "hono";
-import { ConditionalCheckFailedException, ValidationException } from "@aws-sdk/client-dynamodb";
+import {
+  ConditionalCheckFailedException,
+  DynamoDBServiceException,
+} from "@aws-sdk/client-dynamodb";
 import { authMiddleware } from "../middleware/auth.js";
 import {
-  queryShelf,
-  getShelfEntry,
-  putShelfEntry,
-  deleteShelfEntry,
-  updateShelfStatus,
-  updateShelfNotes,
+  queryBookEntries,
+  getBookEntry,
+  putBookEntry,
+  deleteBookEntry,
+  updateBookEntryStatus,
+  updateBookEntryNotes,
   putBookMetadata,
   isValidStatus,
   InvalidCursorError,
@@ -18,6 +21,7 @@ import {
 import { getBookByIsbn } from "../lib/books/search.js";
 import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
 import type { Context } from "hono";
+import { parseJsonBody } from "./_utils.js";
 
 export const shelfRouter = new Hono();
 
@@ -53,18 +57,6 @@ function parseIsbnParam(c: Context, raw: string): string | Response {
   return normalizeIsbn(raw);
 }
 
-async function parseJsonBody(c: Context): Promise<unknown | Response> {
-  try {
-    return await c.req.json();
-  } catch (err) {
-    if (err instanceof SyntaxError) {
-      return c.json({ error: "Invalid JSON body" }, 400) as Response;
-    }
-    console.error("Unexpected error reading request body:", err);
-    return c.json({ error: "Failed to read request body" }, 500) as Response;
-  }
-}
-
 // GET /v1/shelf
 shelfRouter.get("/", async (c) => {
   const { userId } = c.get("auth");
@@ -89,17 +81,21 @@ shelfRouter.get("/", async (c) => {
   }
 
   try {
-    const opts: import("../lib/dynamo.js").QueryShelfOptions = { userId };
-    if (status !== undefined) opts.status = status;
-    if (cursor !== undefined) opts.cursor = cursor;
-    if (limit !== undefined) opts.limit = limit;
-    const result = await queryShelf(opts);
+    const result = await queryBookEntries({
+      userId,
+      ...(status !== undefined ? { status } : {}),
+      ...(cursor !== undefined ? { cursor } : {}),
+      ...(limit !== undefined ? { limit } : {}),
+    });
     return c.json(result);
   } catch (err) {
     // InvalidCursorError: cursor was syntactically invalid (decodeCursor threw).
     // ValidationException: cursor decoded fine but DynamoDB rejected the key shape.
     // Both are client errors — the cursor token is unusable.
-    if (err instanceof InvalidCursorError || err instanceof ValidationException) {
+    if (
+      err instanceof InvalidCursorError ||
+      (err instanceof DynamoDBServiceException && err.name === "ValidationException")
+    ) {
       console.warn("Invalid pagination cursor rejected", { userId, cursor });
       return c.json({ error: "Invalid cursor" }, 400);
     }
@@ -139,7 +135,7 @@ shelfRouter.post("/", async (c) => {
   const addedAt = new Date().toISOString();
 
   try {
-    await putShelfEntry(userId, isbn, status, addedAt);
+    await putBookEntry(userId, isbn, status, addedAt);
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
       return c.json({ error: "Book already exists on your shelf" }, 409);
@@ -148,9 +144,6 @@ shelfRouter.post("/", async (c) => {
     return c.json({ error: "Failed to add book" }, 500);
   }
 
-  // Save book metadata synchronously so it's available on the immediate shelf refetch.
-  // If the client passed metadata from search results, use it directly (no extra API call).
-  // Otherwise fall back to a Google Books lookup.
   const rawBook = (body as Record<string, unknown>)["book"];
   const clientBook =
     rawBook !== null &&
@@ -164,7 +157,6 @@ shelfRouter.post("/", async (c) => {
     if (metadata) await putBookMetadata(isbn, sanitizeBookMetadata(metadata), addedAt);
   } catch (err) {
     console.error("Book metadata cache error:", err);
-    // Non-fatal — shelf entry was saved; cover/title will be missing until next lookup
   }
 
   return c.json({ isbn, status, addedAt, notes: null }, 201);
@@ -193,7 +185,7 @@ shelfRouter.patch("/:isbn/notes", async (c) => {
 
   let existing: ShelfEntry | null;
   try {
-    existing = await getShelfEntry(userId, isbn);
+    existing = await getBookEntry(userId, isbn);
   } catch (err) {
     console.error("Shelf entry lookup error (notes):", err);
     return c.json({ error: "Failed to look up book" }, 500);
@@ -203,7 +195,7 @@ shelfRouter.patch("/:isbn/notes", async (c) => {
   }
 
   try {
-    await updateShelfNotes(userId, isbn, existing.status, notes);
+    await updateBookEntryNotes(userId, isbn, notes);
   } catch (err) {
     console.error("Shelf notes update error:", err);
     return c.json({ error: "Failed to update notes" }, 500);
@@ -231,7 +223,7 @@ shelfRouter.patch("/:isbn", async (c) => {
 
   let existing: ShelfEntry | null;
   try {
-    existing = await getShelfEntry(userId, isbn);
+    existing = await getBookEntry(userId, isbn);
   } catch (err) {
     console.error("Shelf entry lookup error (status):", err);
     return c.json({ error: "Failed to look up book" }, 500);
@@ -244,14 +236,7 @@ shelfRouter.patch("/:isbn", async (c) => {
   }
 
   try {
-    await updateShelfStatus(
-      userId,
-      isbn,
-      existing.status,
-      newStatus,
-      existing.addedAt,
-      existing.notes,
-    );
+    await updateBookEntryStatus(userId, isbn, newStatus);
   } catch (err) {
     console.error("Shelf update error:", err);
     return c.json({ error: "Failed to update book status" }, 500);
@@ -270,7 +255,7 @@ shelfRouter.delete("/:isbn", async (c) => {
 
   let existing: ShelfEntry | null;
   try {
-    existing = await getShelfEntry(userId, isbn);
+    existing = await getBookEntry(userId, isbn);
   } catch (err) {
     console.error("Shelf entry lookup error (delete):", err);
     return c.json({ error: "Failed to look up book" }, 500);
@@ -280,7 +265,7 @@ shelfRouter.delete("/:isbn", async (c) => {
   }
 
   try {
-    await deleteShelfEntry(userId, isbn, existing.status);
+    await deleteBookEntry(userId, isbn);
   } catch (err) {
     console.error("Shelf delete error:", err);
     return c.json({ error: "Failed to remove book" }, 500);

@@ -15,7 +15,25 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
   const [results, setResults] = useState<BookSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // -1 = nothing highlighted; ≥0 = that result is highlighted.
+  const [activeIndex, setActiveIndex] = useState(-1);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Tracks whether the last activeIndex change came from the keyboard.
+  // The focus-moving useEffect is gated on this so mouse hover never
+  // steals focus from the search input.
+  const isKeyboardNav = useRef(false);
+
+  function activateByKeyboard(index: number) {
+    isKeyboardNav.current = true;
+    setActiveIndex(index);
+  }
+
+  function activateByMouse(index: number) {
+    isKeyboardNav.current = false;
+    setActiveIndex(index);
+  }
 
   const runSearch = useCallback(async (q: string) => {
     setLoading(true);
@@ -43,21 +61,83 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
       setError(null);
       return;
     }
-
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => void runSearch(q), 400);
-
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [query, runSearch]);
 
+  // Reset when results change.
+  useEffect(() => {
+    setActiveIndex(-1);
+    resultRefs.current = [];
+  }, [results]);
+
+  // Move DOM focus — only when the change came from the keyboard.
+  useEffect(() => {
+    if (!isKeyboardNav.current) return;
+    if (activeIndex === -1) {
+      inputRef.current?.focus();
+    } else {
+      const el = resultRefs.current[activeIndex];
+      el?.focus();
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [activeIndex]);
+
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    switch (e.key) {
+      case "ArrowDown":
+        if (results.length > 0) {
+          e.preventDefault();
+          activateByKeyboard(0);
+        }
+        break;
+      // Enter while a result is highlighted (e.g. via mouse hover) adds it.
+      case "Enter":
+        if (activeIndex >= 0) {
+          e.preventDefault();
+          const book = results[activeIndex];
+          if (book && !isAdding) onAdd(book.isbn, "owned", book);
+        }
+        break;
+    }
+  }
+
+  function handleResultKeyDown(
+    e: React.KeyboardEvent<HTMLDivElement>,
+    index: number,
+    book: BookSearchResult,
+  ) {
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        activateByKeyboard(Math.min(index + 1, results.length - 1));
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        activateByKeyboard(index > 0 ? index - 1 : -1);
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (!isAdding) onAdd(book.isbn, "owned", book);
+        break;
+      case "Escape":
+        activateByKeyboard(-1);
+        break;
+    }
+  }
+
   return (
     <div className="space-y-4">
       <input
+        ref={inputRef}
+        autoFocus
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleInputKeyDown}
         placeholder="Search by title, author, or paste an ISBN…"
         className="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300"
       />
@@ -80,51 +160,70 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
         )}
       </div>
 
-      <div className="space-y-3">
-        {results.map((book) => (
-          <div
-            key={book.isbn}
-            className="flex gap-3 items-start border border-slate-100 dark:border-slate-700 rounded-lg p-3"
-          >
-            <BookCover
-              key={book.coverUrl ?? "no-cover"}
-              coverUrl={book.coverUrl}
-              title={book.title}
-              authors={book.authors}
-              className="w-10 h-14 flex-shrink-0 rounded"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>
-              {book.authors.length > 0 && (
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {book.authors.join(", ")}
-                </p>
-              )}
-              {book.publishedYear && (
-                <p className="text-xs text-slate-500 dark:text-slate-400">{book.publishedYear}</p>
-              )}
+      {results.length > 0 && (
+        <div
+          role="listbox"
+          aria-label="Search results"
+          className="space-y-2"
+          onMouseLeave={() => activateByMouse(-1)}
+        >
+          {results.map((book, index) => (
+            <div
+              key={book.isbn}
+              ref={(el) => {
+                resultRefs.current[index] = el;
+              }}
+              role="option"
+              aria-selected={activeIndex === index}
+              tabIndex={0}
+              onMouseEnter={() => activateByMouse(index)}
+              onKeyDown={(e) => handleResultKeyDown(e, index, book)}
+              className={`flex gap-3 items-start border rounded-lg p-3 outline-none cursor-default transition-colors duration-100 ${
+                activeIndex === index
+                  ? "border-slate-400 dark:border-slate-500 bg-slate-50 dark:bg-slate-700/50 ring-1 ring-slate-400 dark:ring-slate-500"
+                  : "border-slate-100 dark:border-slate-700"
+              }`}
+            >
+              <BookCover
+                key={book.coverUrl ?? "no-cover"}
+                coverUrl={book.coverUrl}
+                title={book.title}
+                authors={book.authors}
+                className="w-10 h-14 flex-shrink-0 rounded"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>
+                {book.authors.length > 0 && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {book.authors.join(", ")}
+                  </p>
+                )}
+                {book.publishedYear && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{book.publishedYear}</p>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 flex-shrink-0">
+                <Button
+                  variant="app"
+                  size="sm"
+                  onClick={() => onAdd(book.isbn, "owned", book)}
+                  disabled={isAdding}
+                >
+                  Add Owned
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onAdd(book.isbn, "want", book)}
+                  disabled={isAdding}
+                >
+                  Add to Wishlist
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5 flex-shrink-0">
-              <Button
-                variant="app"
-                size="sm"
-                onClick={() => onAdd(book.isbn, "owned", book)}
-                disabled={isAdding}
-              >
-                Add Owned
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => onAdd(book.isbn, "want", book)}
-                disabled={isAdding}
-              >
-                Add to Wishlist
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

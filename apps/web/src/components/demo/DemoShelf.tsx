@@ -4,27 +4,15 @@ interface DemoBook {
   isbn: string;
   title: string;
   authors: string[];
-  coverUrl: string;
+  coverUrl: string | null;
 }
 
-const OWNED: DemoBook[] = [
+const SCI_FI: DemoBook[] = [
   {
     isbn: "9780441013593",
     title: "Dune",
     authors: ["Frank Herbert"],
     coverUrl: "/demo-covers/dune.jpg",
-  },
-  {
-    isbn: "9780441569595",
-    title: "Neuromancer",
-    authors: ["William Gibson"],
-    coverUrl: "/demo-covers/neuromancer.jpg",
-  },
-  {
-    isbn: "9780441478125",
-    title: "The Left Hand of Darkness",
-    authors: ["Ursula K. Le Guin"],
-    coverUrl: "/demo-covers/left-hand.jpg",
   },
   {
     isbn: "9780593135204",
@@ -33,60 +21,107 @@ const OWNED: DemoBook[] = [
     coverUrl: "/demo-covers/project-hail-mary.jpg",
   },
   {
-    isbn: "9780756404741",
-    title: "The Name of the Wind",
-    authors: ["Patrick Rothfuss"],
-    coverUrl: "/demo-covers/name-of-the-wind.jpg",
+    isbn: "9780330518543",
+    title: "Pandora's Star",
+    authors: ["Peter F. Hamilton"],
+    coverUrl: "/demo-covers/pandoras-star.jpg",
+  },
+  {
+    isbn: "9780345303066",
+    title: "2010: Odyssey Two",
+    authors: ["Arthur C. Clarke"],
+    coverUrl: "/demo-covers/2010-odyssey-two.jpg",
+  },
+  {
+    isbn: "9780451228734",
+    title: "Daemon",
+    authors: ["Daniel Suarez"],
+    coverUrl: "/demo-covers/daemon.jpg",
   },
 ];
 
-const WANT: DemoBook[] = [
+const FANTASY: DemoBook[] = [
   {
-    isbn: "9780765326355",
-    title: "The Way of Kings",
-    authors: ["Brandon Sanderson"],
-    coverUrl: "/demo-covers/way-of-kings.jpg",
+    isbn: "9780593725443",
+    title: "The Elfstones of Shannara",
+    authors: ["Terry Brooks"],
+    coverUrl: "/demo-covers/elfstones-shannara.jpg",
   },
   {
-    isbn: "9780316229296",
-    title: "The Fifth Season",
-    authors: ["N.K. Jemisin"],
-    coverUrl: "/demo-covers/fifth-season.jpg",
+    isbn: "9780547951973",
+    title: "The Hobbit",
+    authors: ["J.R.R. Tolkien"],
+    coverUrl: "/demo-covers/hobbit.jpg",
   },
   {
-    isbn: "9781447273127",
-    title: "Children of Time",
-    authors: ["Adrian Tchaikovsky"],
-    coverUrl: "/demo-covers/children-of-time.jpg",
+    isbn: "9780312367541",
+    title: "A Wrinkle in Time",
+    authors: ["Madeleine L'Engle"],
+    coverUrl: "/demo-covers/wrinkle-in-time.jpg",
   },
   {
-    isbn: "9780812515282",
-    title: "A Fire Upon the Deep",
-    authors: ["Vernor Vinge"],
-    coverUrl: "/demo-covers/fire-upon-the-deep.jpg",
+    isbn: "9780345484260",
+    title: "Dragonflight",
+    authors: ["Anne McCaffrey"],
+    coverUrl: "/demo-covers/dragonflight.jpg",
   },
   {
-    isbn: "9781635575637",
-    title: "Piranesi",
-    authors: ["Susanna Clarke"],
-    coverUrl: "/demo-covers/piranesi.jpg",
+    isbn: "9780552168335",
+    title: "Pawn of Prophecy",
+    authors: ["David Eddings"],
+    coverUrl: "/demo-covers/pawn-of-prophecy.jpg",
   },
 ];
 
-// Stagger constants — mirror ShelfBookCard for visual consistency
+const LEADERSHIP: DemoBook[] = [
+  {
+    isbn: "9780241373668",
+    title: "Leadership is Language",
+    authors: ["L. David Marquet"],
+    coverUrl: "/demo-covers/leadership-is-language.jpg",
+  },
+  {
+    isbn: "9780241250945",
+    title: "Turn the Ship Around!",
+    authors: ["L. David Marquet"],
+    coverUrl: "/demo-covers/turn-the-ship-around.jpg",
+  },
+  {
+    isbn: "9780999743508",
+    title: "Supportive Accountability",
+    authors: ["Sylvia Melena"],
+    coverUrl: "/demo-covers/supportive-accountability.jpg",
+  },
+  {
+    isbn: "9781639015078",
+    title: "Serve Up, Coach Down",
+    authors: ["Nathan Jamail"],
+    coverUrl: "/demo-covers/serve-up-coach-down.jpg",
+  },
+  {
+    isbn: "9788178082530",
+    title: "The Mythical Man-Month",
+    authors: ["Frederick P. Brooks Jr."],
+    coverUrl: "/demo-covers/mythical-man-month.jpg",
+  },
+];
+
+const SHELVES = [
+  { name: "Leadership", books: LEADERSHIP },
+  { name: "Sci-Fi", books: SCI_FI },
+  { name: "Fantasy", books: FANTASY },
+];
+
 const MAX_STAGGER_INDEX = 9;
 const STAGGER_STEP_MS = 50;
 
-function SectionHeader({ title, count }: { title: string; count: number }) {
+function SectionHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-3 mb-4">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 shrink-0">
         {title}
       </h3>
       <span className="flex-1 h-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-      <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 rounded-full px-2 py-0.5">
-        {count}
-      </span>
     </div>
   );
 }
@@ -120,17 +155,19 @@ function BookGrid({ books, indexOffset = 0 }: { books: DemoBook[]; indexOffset?:
 }
 
 export function DemoShelf() {
+  let offset = 0;
   return (
     <div className="space-y-8">
-      <section>
-        <SectionHeader title="Owned" count={OWNED.length} />
-        <BookGrid books={OWNED} indexOffset={0} />
-      </section>
-      <section>
-        <SectionHeader title="Want to Read" count={WANT.length} />
-        {/* Offset by OWNED.length so Want to Read stagger continues from where Owned left off */}
-        <BookGrid books={WANT} indexOffset={OWNED.length} />
-      </section>
+      {SHELVES.map(({ name, books }) => {
+        const currentOffset = offset;
+        offset += books.length;
+        return (
+          <section key={name}>
+            <SectionHeader title={name} />
+            <BookGrid books={books} indexOffset={currentOffset} />
+          </section>
+        );
+      })}
     </div>
   );
 }

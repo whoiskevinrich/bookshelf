@@ -13,12 +13,12 @@ vi.mock("../../src/middleware/auth.js", () => ({
 vi.mock("../../src/lib/dynamo.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../src/lib/dynamo.js")>();
   return {
-    queryShelf: vi.fn(),
-    getShelfEntry: vi.fn(),
-    putShelfEntry: vi.fn(),
-    deleteShelfEntry: vi.fn(),
-    updateShelfStatus: vi.fn(),
-    updateShelfNotes: vi.fn(),
+    queryBookEntries: vi.fn(),
+    getBookEntry: vi.fn(),
+    putBookEntry: vi.fn(),
+    deleteBookEntry: vi.fn(),
+    updateBookEntryStatus: vi.fn(),
+    updateBookEntryNotes: vi.fn(),
     putBookMetadata: vi.fn(),
     isValidStatus: mod.isValidStatus,
     InvalidCursorError: mod.InvalidCursorError,
@@ -33,12 +33,12 @@ vi.mock("../../src/lib/books/search.js", () => ({
 import { Hono } from "hono";
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import {
-  queryShelf,
-  getShelfEntry,
-  putShelfEntry,
-  deleteShelfEntry,
-  updateShelfStatus,
-  updateShelfNotes,
+  queryBookEntries,
+  getBookEntry,
+  putBookEntry,
+  deleteBookEntry,
+  updateBookEntryStatus,
+  updateBookEntryNotes,
   putBookMetadata,
   InvalidCursorError,
 } from "../../src/lib/dynamo.js";
@@ -64,18 +64,18 @@ const SHELF_RESULT = {
 };
 
 beforeEach(() => {
-  vi.mocked(queryShelf).mockReset();
-  vi.mocked(getShelfEntry).mockReset();
-  vi.mocked(putShelfEntry).mockReset();
-  vi.mocked(deleteShelfEntry).mockReset();
-  vi.mocked(updateShelfStatus).mockReset();
-  vi.mocked(updateShelfNotes).mockReset();
+  vi.mocked(queryBookEntries).mockReset();
+  vi.mocked(getBookEntry).mockReset();
+  vi.mocked(putBookEntry).mockReset();
+  vi.mocked(deleteBookEntry).mockReset();
+  vi.mocked(updateBookEntryStatus).mockReset();
+  vi.mocked(updateBookEntryNotes).mockReset();
   vi.mocked(putBookMetadata).mockReset();
 });
 
 describe("GET /v1/shelf", () => {
   it("returns paginated shelf entries", async () => {
-    vi.mocked(queryShelf).mockResolvedValueOnce(SHELF_RESULT);
+    vi.mocked(queryBookEntries).mockResolvedValueOnce(SHELF_RESULT);
     const app = makeApp();
     const res = await app.request("/v1/shelf");
     expect(res.status).toBe(200);
@@ -97,7 +97,7 @@ describe("GET /v1/shelf", () => {
   });
 
   it("returns 400 for a malformed cursor", async () => {
-    vi.mocked(queryShelf).mockRejectedValueOnce(new InvalidCursorError());
+    vi.mocked(queryBookEntries).mockRejectedValueOnce(new InvalidCursorError());
     const app = makeApp();
     const res = await app.request("/v1/shelf?cursor=not-valid-json");
     expect(res.status).toBe(400);
@@ -106,7 +106,7 @@ describe("GET /v1/shelf", () => {
 
 describe("POST /v1/shelf", () => {
   it("adds a book successfully", async () => {
-    vi.mocked(putShelfEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf", {
       method: "POST",
@@ -119,7 +119,7 @@ describe("POST /v1/shelf", () => {
   });
 
   it("truncates description to 4000 chars before caching", async () => {
-    vi.mocked(putShelfEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
     vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf", {
@@ -146,7 +146,7 @@ describe("POST /v1/shelf", () => {
   });
 
   it("truncates title to 512 chars before caching", async () => {
-    vi.mocked(putShelfEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
     vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf", {
@@ -184,7 +184,7 @@ describe("POST /v1/shelf", () => {
 
   it("returns 409 on duplicate", async () => {
     const err = new ConditionalCheckFailedException({ message: "condition failed", $metadata: {} });
-    vi.mocked(putShelfEntry).mockRejectedValueOnce(err);
+    vi.mocked(putBookEntry).mockRejectedValueOnce(err);
     const app = makeApp();
     const res = await app.request("/v1/shelf", {
       method: "POST",
@@ -207,8 +207,8 @@ describe("POST /v1/shelf", () => {
 
 describe("PATCH /v1/shelf/:isbn/notes", () => {
   it("accepts notes at exactly the max length (2000 chars)", async () => {
-    vi.mocked(getShelfEntry).mockResolvedValueOnce(ENTRY);
-    vi.mocked(updateShelfNotes).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryNotes).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593/notes", {
       method: "PATCH",
@@ -229,8 +229,8 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
   });
 
   it("updates notes successfully", async () => {
-    vi.mocked(getShelfEntry).mockResolvedValueOnce(ENTRY);
-    vi.mocked(updateShelfNotes).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryNotes).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593/notes", {
       method: "PATCH",
@@ -243,8 +243,8 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
   });
 
   it("clears notes when null is passed", async () => {
-    vi.mocked(getShelfEntry).mockResolvedValueOnce({ ...ENTRY, notes: "old note" });
-    vi.mocked(updateShelfNotes).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, notes: "old note" });
+    vi.mocked(updateBookEntryNotes).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593/notes", {
       method: "PATCH",
@@ -279,8 +279,8 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
 
 describe("PATCH /v1/shelf/:isbn", () => {
   it("updates status from owned to want", async () => {
-    vi.mocked(getShelfEntry).mockResolvedValueOnce(ENTRY);
-    vi.mocked(updateShelfStatus).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryStatus).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593", {
       method: "PATCH",
@@ -293,7 +293,7 @@ describe("PATCH /v1/shelf/:isbn", () => {
   });
 
   it("returns 404 if book not on shelf", async () => {
-    vi.mocked(getShelfEntry).mockResolvedValueOnce(null);
+    vi.mocked(getBookEntry).mockResolvedValueOnce(null);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593", {
       method: "PATCH",
@@ -306,8 +306,8 @@ describe("PATCH /v1/shelf/:isbn", () => {
 
 describe("DELETE /v1/shelf/:isbn", () => {
   it("deletes an entry successfully", async () => {
-    vi.mocked(getShelfEntry).mockResolvedValueOnce(ENTRY);
-    vi.mocked(deleteShelfEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(deleteBookEntry).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593", {
       method: "DELETE",
@@ -316,7 +316,7 @@ describe("DELETE /v1/shelf/:isbn", () => {
   });
 
   it("returns 404 if book not on shelf", async () => {
-    vi.mocked(getShelfEntry).mockResolvedValueOnce(null);
+    vi.mocked(getBookEntry).mockResolvedValueOnce(null);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593", {
       method: "DELETE",

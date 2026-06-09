@@ -33,7 +33,7 @@ export function BookCover({ coverUrl, title, authors, className = "" }: BookCove
     <img
       src={coverUrl}
       alt={title}
-      className={`object-cover ${className}`}
+      className={`object-contain bg-slate-100 dark:bg-slate-700 ${className}`}
       onError={() => {
         if (import.meta.env.DEV) console.error(`[BookCover] failed to load: ${coverUrl}`);
         setFailed(true);
