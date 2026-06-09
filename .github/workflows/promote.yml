@@ -69,6 +69,9 @@ jobs:
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
 
+      - name: Build MCP bundle
+        run: pnpm --filter @bookshelf/mcp run build
+
       - name: Stub web dist for CDK synth
         # WebStack references apps/web/dist as an S3 asset at synth time. The real
         # build runs after stack outputs are resolved; this stub lets CDK
@@ -145,13 +148,13 @@ jobs:
             "$CTX_FILE" > /tmp/cdk.context.json \
             && mv /tmp/cdk.context.json "$CTX_FILE"
 
-      - name: Deploy cert, Auth, and API stacks
+      - name: Deploy cert, Auth, API, and MCP stacks
         # `-c env=prod` applies the full prod topology atomically (ADR-009).
         # BookshelfDns is included as a dependency and is either already deployed
         # (bootstrap ran above) or a no-op on subsequent runs.
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy \
-            BookshelfCdnCert BookshelfAuth BookshelfApi \
+            BookshelfCdnCert BookshelfAuth BookshelfApi BookshelfMcp \
             --require-approval never -c env=prod -c version=v${{ inputs.version }}
 
       - name: Resolve stack outputs (prod)
