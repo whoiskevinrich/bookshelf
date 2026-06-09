@@ -55,6 +55,7 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
   return (
     <div className="space-y-4">
       <input
+        autoFocus
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

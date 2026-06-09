@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { AppHeader } from "../components/AppHeader";
 import { inputClass } from "../lib/form-styles";
 import {
@@ -227,6 +227,7 @@ function ShelfSection({
 export function ShelfPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [showCreateShelf, setShowCreateShelf] = useState(false);
+  const searchPanelRef = useRef<HTMLDivElement>(null);
 
   const shelfQuery = useShelf();
   const shelvesQuery = useShelves();
@@ -279,6 +280,33 @@ export function ShelfPage() {
       unshelved: allEntries.filter((e) => !allShelvedIsbns.has(e.isbn)),
     };
   }, [allEntries, orderedShelves]);
+
+  // "a" shortcut — open the add-book panel (ignored when focus is in a field).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "a" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      )
+        return;
+      e.preventDefault();
+      setShowSearch(true);
+      setShowCreateShelf(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Scroll search panel into view whenever it opens.
+  useEffect(() => {
+    if (showSearch) {
+      searchPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [showSearch]);
 
   function handleAdd(isbn: string, status: ShelfStatus, book: BookSearchResult) {
     addMutation.mutate({ isbn, status, book });
@@ -355,7 +383,7 @@ export function ShelfPage() {
         )}
 
         {showSearch && (
-          <div className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
+          <div ref={searchPanelRef} className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
             <BookSearch onAdd={handleAdd} isAdding={addMutation.isPending} />
           </div>
         )}
