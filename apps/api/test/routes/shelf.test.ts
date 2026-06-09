@@ -43,6 +43,7 @@ import {
   deleteShelfEntry,
   updateShelfStatus,
   updateShelfNotes,
+  putBookMetadata,
   InvalidCursorError,
 } from "../../src/lib/dynamo.js";
 import { shelfRouter } from "../../src/routes/shelf.js";
@@ -73,6 +74,7 @@ beforeEach(() => {
   vi.mocked(deleteShelfEntry).mockReset();
   vi.mocked(updateShelfStatus).mockReset();
   vi.mocked(updateShelfNotes).mockReset();
+  vi.mocked(putBookMetadata).mockReset();
 });
 
 describe("GET /v1/shelf", () => {
@@ -118,6 +120,60 @@ describe("POST /v1/shelf", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as typeof ENTRY;
     expect(body.isbn).toBe("9780441013593");
+  });
+
+  it("truncates description to 4000 chars before caching", async () => {
+    vi.mocked(putShelfEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        isbn: "9780441013593",
+        status: "owned",
+        book: {
+          title: "Dune",
+          authors: ["Frank Herbert"],
+          coverUrl: null,
+          publishedYear: 1965,
+          description: "a".repeat(4001),
+        },
+      }),
+    });
+    expect(res.status).toBe(201);
+    expect(vi.mocked(putBookMetadata)).toHaveBeenCalledWith(
+      "9780441013593",
+      expect.objectContaining({ description: "a".repeat(4000) }),
+      expect.any(String),
+    );
+  });
+
+  it("truncates title to 512 chars before caching", async () => {
+    vi.mocked(putShelfEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        isbn: "9780441013593",
+        status: "owned",
+        book: {
+          title: "T".repeat(513),
+          authors: ["Frank Herbert"],
+          coverUrl: null,
+          publishedYear: 1965,
+          description: null,
+        },
+      }),
+    });
+    expect(res.status).toBe(201);
+    expect(vi.mocked(putBookMetadata)).toHaveBeenCalledWith(
+      "9780441013593",
+      expect.objectContaining({ title: "T".repeat(512) }),
+      expect.any(String),
+    );
   });
 
   it("returns 400 for invalid ISBN", async () => {

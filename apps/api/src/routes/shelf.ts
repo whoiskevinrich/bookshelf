@@ -24,6 +24,27 @@ shelfRouter.use("*", authMiddleware);
 
 const NOTES_MAX_LENGTH = 2000;
 
+// BookMetadata field caps — applied before every putBookMetadata write.
+// The BOOK#${isbn} cache is shared across all users, so we bound the fields
+// regardless of whether metadata comes from the client or Google Books.
+const BOOK_TITLE_MAX_LENGTH = 512;
+const BOOK_DESCRIPTION_MAX_LENGTH = 4000;
+const BOOK_COVER_URL_MAX_LENGTH = 2048;
+const BOOK_AUTHOR_NAME_MAX_LENGTH = 200;
+const BOOK_AUTHORS_MAX_COUNT = 20;
+
+function sanitizeBookMetadata(m: BookMetadata): BookMetadata {
+  return {
+    title: m.title.slice(0, BOOK_TITLE_MAX_LENGTH),
+    authors: m.authors
+      .slice(0, BOOK_AUTHORS_MAX_COUNT)
+      .map((a) => a.slice(0, BOOK_AUTHOR_NAME_MAX_LENGTH)),
+    coverUrl: m.coverUrl ? m.coverUrl.slice(0, BOOK_COVER_URL_MAX_LENGTH) : null,
+    publishedYear: m.publishedYear,
+    description: m.description ? m.description.slice(0, BOOK_DESCRIPTION_MAX_LENGTH) : null,
+  };
+}
+
 function parseIsbnParam(c: Context, raw: string): string | Response {
   if (!isValidIsbn(raw)) {
     return c.json({ error: "Invalid ISBN" }, 400) as Response;
@@ -131,7 +152,7 @@ shelfRouter.post("/", async (c) => {
 
   try {
     const metadata = clientBook ?? (await getBookByIsbn(isbn));
-    if (metadata) await putBookMetadata(isbn, metadata, addedAt);
+    if (metadata) await putBookMetadata(isbn, sanitizeBookMetadata(metadata), addedAt);
   } catch (err) {
     console.error("Book metadata cache error:", err);
     // Non-fatal — shelf entry was saved; cover/title will be missing until next lookup
