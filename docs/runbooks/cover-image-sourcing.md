@@ -6,9 +6,9 @@ Book cover images come from Google Books (primary) and OpenLibrary (fallback). B
 
 ## Source hierarchy
 
-1. **Google Books** — returned as `thumbnail` in the Books API response. Already handled by `apps/api/src/lib/books/providers/google-books.ts` (`extractCoverUrl`). Returns `null` when no image is available.
-2. **OpenLibrary by cover ID** — most reliable OpenLibrary path; requires a search to get the ID first.
-3. **OpenLibrary by ISBN** — fastest OpenLibrary path, but has a silent-failure mode (see below).
+1. **Google Books** — returned as `thumbnail` in the Books API response. Already handled by `apps/api/src/lib/books/providers/google-books.ts` (`extractCoverUrl`). Also normalizes `http://` URLs to `https://`. Returns `null` when no image is available.
+2. **OpenLibrary by ISBN** — fastest OpenLibrary path; tried first, but has a silent-failure mode (see below).
+3. **OpenLibrary by cover ID** — more reliable fallback; requires a search query to obtain the ID before fetching.
 4. **Placeholder** — `BookCover` component renders title + author when `coverUrl` is `null` or the image load fails.
 
 ## Critical: OpenLibrary silent failure
@@ -21,7 +21,7 @@ GET https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg
 → 200 OK, >1 KB     ← real cover image
 ```
 
-**Always check `Content-Length` (or the downloaded file size) against a minimum threshold of ~500 bytes before trusting an ISBN-based cover response.**
+**Always check `Content-Length` (or the downloaded file size) against a minimum threshold of ~500 bytes before trusting an ISBN-based cover response.** The 43-byte figure was observed in practice; 500 bytes gives a safe margin if OpenLibrary ever changes the placeholder size.
 
 ## Fallback sequence when Google Books returns no cover
 

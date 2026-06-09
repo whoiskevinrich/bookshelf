@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 interface BookCoverProps {
   coverUrl: string | null;
   title: string;
-  authors?: string[];
+  authors: string[];
   className?: string;
 }
 
@@ -15,7 +15,7 @@ export function BookCover({ coverUrl, title, authors, className = "" }: BookCove
   }, [coverUrl]);
 
   if (!coverUrl || failed) {
-    const authorLine = authors?.length ? authors.join(", ") : null;
+    const authorLine = authors.length ? authors.join(", ") : null;
     return (
       <div
         className={`flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-700 overflow-hidden p-1.5 gap-0.5 ${className}`}
@@ -38,7 +38,10 @@ export function BookCover({ coverUrl, title, authors, className = "" }: BookCove
       src={coverUrl}
       alt={title}
       className={`object-cover ${className}`}
-      onError={() => setFailed(true)}
+      onError={() => {
+        if (import.meta.env.DEV) console.error(`[BookCover] failed to load: ${coverUrl}`);
+        setFailed(true);
+      }}
     />
   );
 }
