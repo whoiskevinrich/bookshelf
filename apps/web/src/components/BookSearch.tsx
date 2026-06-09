@@ -15,10 +15,25 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
   const [results, setResults] = useState<BookSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeIndex, setActiveIndex] = useState(-1); // -1 = input focused
+  // -1 = nothing highlighted; ≥0 = that result is highlighted.
+  const [activeIndex, setActiveIndex] = useState(-1);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Tracks whether the last activeIndex change came from the keyboard.
+  // The focus-moving useEffect is gated on this so mouse hover never
+  // steals focus from the search input.
+  const isKeyboardNav = useRef(false);
+
+  function activateByKeyboard(index: number) {
+    isKeyboardNav.current = true;
+    setActiveIndex(index);
+  }
+
+  function activateByMouse(index: number) {
+    isKeyboardNav.current = false;
+    setActiveIndex(index);
+  }
 
   const runSearch = useCallback(async (q: string) => {
     setLoading(true);
@@ -46,23 +61,22 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
       setError(null);
       return;
     }
-
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => void runSearch(q), 400);
-
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [query, runSearch]);
 
-  // Reset active index whenever results change.
+  // Reset when results change.
   useEffect(() => {
     setActiveIndex(-1);
     resultRefs.current = [];
   }, [results]);
 
-  // Move DOM focus to match activeIndex.
+  // Move DOM focus — only when the change came from the keyboard.
   useEffect(() => {
+    if (!isKeyboardNav.current) return;
     if (activeIndex === -1) {
       inputRef.current?.focus();
     } else {
@@ -73,9 +87,21 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
   }, [activeIndex]);
 
   function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown" && results.length > 0) {
-      e.preventDefault();
-      setActiveIndex(0);
+    switch (e.key) {
+      case "ArrowDown":
+        if (results.length > 0) {
+          e.preventDefault();
+          activateByKeyboard(0);
+        }
+        break;
+      // Enter while a result is highlighted (e.g. via mouse hover) adds it.
+      case "Enter":
+        if (activeIndex >= 0) {
+          e.preventDefault();
+          const book = results[activeIndex];
+          if (book && !isAdding) onAdd(book.isbn, "owned", book);
+        }
+        break;
     }
   }
 
@@ -87,18 +113,18 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setActiveIndex(Math.min(index + 1, results.length - 1));
+        activateByKeyboard(Math.min(index + 1, results.length - 1));
         break;
       case "ArrowUp":
         e.preventDefault();
-        setActiveIndex(index > 0 ? index - 1 : -1);
+        activateByKeyboard(index > 0 ? index - 1 : -1);
         break;
       case "Enter":
         e.preventDefault();
         if (!isAdding) onAdd(book.isbn, "owned", book);
         break;
       case "Escape":
-        setActiveIndex(-1);
+        activateByKeyboard(-1);
         break;
     }
   }
@@ -135,7 +161,12 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
       </div>
 
       {results.length > 0 && (
-        <div role="listbox" aria-label="Search results" className="space-y-2">
+        <div
+          role="listbox"
+          aria-label="Search results"
+          className="space-y-2"
+          onMouseLeave={() => activateByMouse(-1)}
+        >
           {results.map((book, index) => (
             <div
               key={book.isbn}
@@ -145,9 +176,9 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
               role="option"
               aria-selected={activeIndex === index}
               tabIndex={0}
-              onFocus={() => setActiveIndex(index)}
+              onMouseEnter={() => activateByMouse(index)}
               onKeyDown={(e) => handleResultKeyDown(e, index, book)}
-              className={`flex gap-3 items-start border rounded-lg p-3 outline-none cursor-default transition-colors ${
+              className={`flex gap-3 items-start border rounded-lg p-3 outline-none cursor-default transition-colors duration-100 ${
                 activeIndex === index
                   ? "border-slate-400 dark:border-slate-500 bg-slate-50 dark:bg-slate-700/50 ring-1 ring-slate-400 dark:ring-slate-500"
                   : "border-slate-100 dark:border-slate-700"
