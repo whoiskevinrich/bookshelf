@@ -29,6 +29,13 @@ Full ADR documents are in `docs/adrs/`.
 | Route53 per-app hosted zone | `DnsStack` (us-east-1) creates `PublicHostedZone`; certs switch to `CertificateValidation.fromDns(zone)`; CloudFront + API Gateway records become CDK-managed A-aliases; one-time Cloudflare NS delegation bootstraps the zone | Eliminates the last manual DNS step (`cdk deploy` no longer blocks on cert validation); cross-account safe — each app's zone lives in its own AWS account — see `docs/adrs/013-route53-per-app-hosted-zone.md`                    | 2026-06-06 |
 | MCP Server                  | `apps/mcp`: Hono on Lambda, `WebStandardStreamableHTTPServerTransport` (stateless `enableJsonResponse`), OAuth PKCE via Cognito Hosted UI, thin proxy to existing API, `mcp.bookshelf.whoiskevinrich.com`                      | Stateless Lambda fits JSON-mode MCP (no SSE); thin proxy avoids logic duplication; separate `McpClient` Cognito app client enables independent token revocation; wildcard cert covers all subdomains                              | 2026-06-08 |
 
+## Data / Integration Decisions
+
+| Decision | Choice | Rationale | Date |
+| -------- | ------ | --------- | ---- |
+| Cover image sources | Google Books (primary) → OpenLibrary by cover ID (fallback) | Google Books is already the search provider; OpenLibrary ISBN endpoint silently returns a 43-byte GIF for missing covers — must check file size and fall back to cover ID lookup via search API — see `docs/runbooks/cover-image-sourcing.md` | 2026-06-08 |
+| Demo shelf covers | Bundled as static assets in `apps/web/public/demo-covers/` | External CDN URLs (OpenLibrary) are intermittently unavailable; landing page demo must always render correctly for new users | 2026-06-08 |
+
 ## UI / Design System Decisions
 
 | Decision           | Choice                                                                           | Rationale                                                                                                       | Date       |

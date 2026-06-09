@@ -89,6 +89,7 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
             <BookCover
               coverUrl={book.coverUrl}
               title={book.title}
+              authors={book.authors}
               className="w-10 h-14 flex-shrink-0 rounded"
             />
             <div className="flex-1 min-w-0">
