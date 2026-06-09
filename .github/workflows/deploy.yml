@@ -59,15 +59,18 @@ jobs:
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
 
+      - name: Build MCP bundle
+        run: pnpm --filter @bookshelf/mcp run build
+
       - name: Stub web dist for CDK synth
         # WebStack references apps/web/dist as an S3 asset at synth time.
         # The real build runs after stack outputs are resolved; this stub lets
         # CDK synthesise all stacks without the dist directory existing yet.
         run: mkdir -p apps/web/dist
 
-      - name: Deploy Auth and API stacks
+      - name: Deploy Auth, API, and MCP stacks
         run: |
-          pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi BookshelfMcp \
             --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }}
 
       - name: Resolve stack outputs
@@ -116,6 +119,7 @@ jobs:
           git checkout ${{ steps.last-good.outputs.tag }}
           pnpm install --frozen-lockfile
           pnpm --filter @bookshelf/api run build
+          pnpm --filter @bookshelf/mcp run build 2>/dev/null || mkdir -p apps/mcp/dist
           mkdir -p apps/web/dist
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
             --require-approval never -c env=dev -c version=${{ steps.last-good.outputs.tag }}
