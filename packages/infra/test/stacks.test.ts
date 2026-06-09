@@ -58,9 +58,9 @@ describe("AuthStack", () => {
     });
   });
 
-  it("creates an App Client without a secret", () => {
-    template.resourceCountIs("AWS::Cognito::UserPoolClient", 1);
-    template.hasResourceProperties("AWS::Cognito::UserPoolClient", {
+  it("creates two App Clients (SPA + MCP), both without a secret", () => {
+    template.resourceCountIs("AWS::Cognito::UserPoolClient", 2);
+    template.allResourcesProperties("AWS::Cognito::UserPoolClient", {
       GenerateSecret: false,
     });
   });

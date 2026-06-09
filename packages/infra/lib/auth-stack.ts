@@ -16,6 +16,10 @@ export class AuthStack extends cdk.Stack {
   readonly userPoolArn: string;
   /** App Client ID — passed to the SPA as a public identifier */
   readonly userPoolClientId: string;
+  /** MCP OAuth app client ID — used by McpStack for token audience validation */
+  readonly mcpClientId: string;
+  /** Cognito Hosted UI base URL — used by McpStack for OAuth discovery documents */
+  readonly hostedUiBaseUrl: string;
   /** JWKS issuer URL — used by Lambda JWT verification and ApiStack env vars */
   readonly userPoolIssuer: string;
 
@@ -61,6 +65,40 @@ export class AuthStack extends cdk.Stack {
       refreshTokenValidity: cdk.Duration.days(30),
     });
 
+    // ── Hosted UI domain (required for MCP OAuth authorization code flow) ────
+    //
+    // Uses a Cognito-managed domain (free). The prefix is unique per account so
+    // dev and prod don't collide. MCP clients (Claude Desktop) redirect the user
+    // here for login and receive an authorization code via PKCE callback.
+    const userPoolDomain = userPool.addDomain("HostedUiDomain", {
+      cognitoDomain: {
+        domainPrefix: `bookshelf-${cdk.Aws.ACCOUNT_ID}`,
+      },
+    });
+
+    // ── MCP app client (OAuth authorization code + PKCE) ─────────────────────
+    //
+    // Separate from the SPA client so MCP tokens can be independently revoked.
+    // Claude Desktop redirects to localhost after the user logs in — the port
+    // is not fixed, so we register the common range used by MCP clients.
+    const mcpClient = userPool.addClient("McpClient", {
+      userPoolClientName: "bookshelf-mcp",
+      generateSecret: false,
+      authFlows: { userSrp: false, userPassword: false },
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [cognito.OAuthScope.EMAIL, cognito.OAuthScope.OPENID, cognito.OAuthScope.PROFILE],
+        callbackUrls: [
+          "http://localhost:54321/callback", // Claude Desktop MCP OAuth callback port
+          "http://localhost:3000/callback", // local dev / MCP Inspector
+        ],
+      },
+      preventUserExistenceErrors: true,
+      accessTokenValidity: cdk.Duration.hours(1),
+      idTokenValidity: cdk.Duration.hours(1),
+      refreshTokenValidity: cdk.Duration.days(30),
+    });
+
     // ── Custom message Lambda (HTML email templates for Cognito-triggered emails) ──
     const customMessageFn = new lambda.Function(this, "CustomMessageFn", {
       functionName: "bookshelf-custom-message",
@@ -84,6 +122,16 @@ export class AuthStack extends cdk.Stack {
       stringValue: appClient.userPoolClientId,
       description: "Bookshelf Cognito SPA App Client ID",
     });
+    new ssm.StringParameter(this, "McpClientIdParam", {
+      parameterName: "/bookshelf/cognito/mcp-client-id",
+      stringValue: mcpClient.userPoolClientId,
+      description: "Bookshelf Cognito MCP App Client ID",
+    });
+    new ssm.StringParameter(this, "HostedUiBaseUrlParam", {
+      parameterName: "/bookshelf/cognito/hosted-ui-base-url",
+      stringValue: userPoolDomain.baseUrl(),
+      description: "Cognito Hosted UI base URL for OAuth discovery",
+    });
 
     // ── CloudFormation outputs ─────────────────────────────────────────────
     const issuer = `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`;
@@ -91,6 +139,8 @@ export class AuthStack extends cdk.Stack {
     this.userPoolId = userPool.userPoolId;
     this.userPoolArn = userPool.userPoolArn;
     this.userPoolClientId = appClient.userPoolClientId;
+    this.mcpClientId = mcpClient.userPoolClientId;
+    this.hostedUiBaseUrl = userPoolDomain.baseUrl();
     this.userPoolIssuer = issuer;
 
     new cdk.CfnOutput(this, "UserPoolIdOutput", {
@@ -100,6 +150,14 @@ export class AuthStack extends cdk.Stack {
     new cdk.CfnOutput(this, "UserPoolClientIdOutput", {
       exportName: "BookshelfUserPoolClientId",
       value: appClient.userPoolClientId,
+    });
+    new cdk.CfnOutput(this, "McpClientIdOutput", {
+      exportName: "BookshelfMcpClientId",
+      value: mcpClient.userPoolClientId,
+    });
+    new cdk.CfnOutput(this, "HostedUiBaseUrlOutput", {
+      exportName: "BookshelfHostedUiBaseUrl",
+      value: userPoolDomain.baseUrl(),
     });
     new cdk.CfnOutput(this, "UserPoolIssuerOutput", {
       exportName: "BookshelfUserPoolIssuer",

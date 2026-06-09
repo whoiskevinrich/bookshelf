@@ -5,6 +5,7 @@ import {
   GetCommand,
   PutCommand,
   DeleteCommand,
+  UpdateCommand,
   BatchGetCommand,
   BatchWriteCommand,
   type NativeAttributeValue,
@@ -243,6 +244,23 @@ export async function updateShelfStatus(
     new PutCommand({
       TableName: TABLE_NAME,
       Item: shelfItem(userId, isbn, newStatus, addedAt, notes),
+    }),
+  );
+}
+
+export async function updateShelfNotes(
+  userId: string,
+  isbn: string,
+  status: ShelfStatus,
+  notes: string | null,
+): Promise<void> {
+  await dynamo().send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: shelfSk(status, isbn) },
+      UpdateExpression: notes !== null ? "SET notes = :notes" : "REMOVE notes",
+      ...(notes !== null ? { ExpressionAttributeValues: { ":notes": notes } } : {}),
+      ConditionExpression: "attribute_exists(PK)",
     }),
   );
 }
