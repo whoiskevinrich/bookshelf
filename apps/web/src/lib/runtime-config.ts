@@ -15,6 +15,8 @@ export interface RuntimeConfig {
     userPoolId: string;
     userPoolClientId: string;
     region: string;
+    /** Hosted UI FQDN (no scheme) — used as Amplify loginWith.oauth.domain. */
+    oauthDomain: string;
   };
   /** "/api" (same-origin via CloudFront) or an absolute execute-api URL (dev). */
   apiBaseUrl: string;
@@ -40,6 +42,7 @@ function fromEnv(): RuntimeConfig {
       userPoolId: (import.meta.env.VITE_COGNITO_USER_POOL_ID as string | undefined) ?? "",
       userPoolClientId: (import.meta.env.VITE_COGNITO_CLIENT_ID as string | undefined) ?? "",
       region: (import.meta.env.VITE_COGNITO_REGION as string | undefined) ?? "us-west-2",
+      oauthDomain: (import.meta.env.VITE_COGNITO_OAUTH_DOMAIN as string | undefined) ?? "",
     },
     apiBaseUrl: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "",
   };

@@ -15,6 +15,7 @@ const testRuntimeConfig = {
   cognitoUserPoolId: "us-west-2_test",
   cognitoUserPoolClientId: "testclient",
   cognitoRegion: "us-west-2",
+  cognitoOauthDomain: "test-bookshelf.auth.us-west-2.amazoncognito.com",
   apiBaseUrl: "/api",
 };
 

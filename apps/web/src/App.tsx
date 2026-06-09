@@ -11,6 +11,7 @@ import { AccountSettingsPage } from "./pages/account/AccountSettingsPage";
 import { ChangePasswordPage } from "./pages/account/ChangePasswordPage";
 import { DeleteAccountPage } from "./pages/account/DeleteAccountPage";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { OAuthCallbackPage } from "./pages/auth/OAuthCallbackPage";
 import { SignUpPage } from "./pages/auth/SignUpPage";
 import { VerifyPage } from "./pages/auth/VerifyPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
@@ -53,6 +54,8 @@ export function App() {
               }
             />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            {/* OAuth callback — no auth wrapper; user is not yet signed in when this loads */}
+            <Route path="/auth/callback" element={<OAuthCallbackPage />} />
 
             {/* Protected routes */}
             <Route

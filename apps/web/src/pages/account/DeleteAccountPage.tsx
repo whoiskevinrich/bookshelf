@@ -9,8 +9,9 @@ import { inputClass, labelClass } from "../../lib/form-styles";
 
 export function DeleteAccountPage() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, isGoogleUser } = useAuth();
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,7 @@ export function DeleteAccountPage() {
     setError(null);
     setLoading(true);
     try {
-      await deleteAccount(password);
+      await deleteAccount(isGoogleUser ? { confirmation } : { password });
       // signOut clears local Amplify session; Cognito account already gone so call may fail
       try {
         await signOut();
@@ -74,21 +75,39 @@ export function DeleteAccountPage() {
             </div>
           )}
 
-          <div>
-            <label htmlFor="password" className={labelClass}>
-              Confirm your password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              autoFocus
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={inputClass}
-            />
-          </div>
+          {isGoogleUser ? (
+            <div>
+              <label htmlFor="confirmation" className={labelClass}>
+                Type <strong>DELETE</strong> to confirm
+              </label>
+              <input
+                id="confirmation"
+                type="text"
+                autoComplete="off"
+                required
+                autoFocus
+                value={confirmation}
+                onChange={(e) => setConfirmation(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          ) : (
+            <div>
+              <label htmlFor="password" className={labelClass}>
+                Confirm your password
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                autoFocus
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          )}
 
           <div className="flex items-center gap-4">
             <Button type="submit" variant="danger" loading={loading}>

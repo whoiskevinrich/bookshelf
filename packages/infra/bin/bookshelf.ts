@@ -38,6 +38,12 @@ interface EnvConfig {
   apiThroughCloudFront: boolean;
   /** Custom domain subtree, e.g. "bookshelf.whoiskevinrich.com" (full prod only). */
   domain?: string;
+  /**
+   * Comma-separated email allowlist for the Cognito PreSignUp Lambda.
+   * When set, only these emails can register or sign in (native or Google).
+   * Omit for open enrollment.
+   */
+  googleEmailAllowlist?: string;
 }
 
 const ENVIRONMENTS: Record<string, EnvConfig> = {
@@ -45,11 +51,13 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     region: "us-west-2",
     allowSelfSignUp: false,
     apiThroughCloudFront: true,
+    googleEmailAllowlist: "whoiskevinrich@gmail.com",
   },
   "prod-interim": {
     region: "us-west-2",
     allowSelfSignUp: false,
     apiThroughCloudFront: true,
+    googleEmailAllowlist: "whoiskevinrich@gmail.com",
   },
   prod: {
     region: "us-west-2",
@@ -84,9 +92,16 @@ const usEast1Env: cdk.Environment = account
   ? { account, region: "us-east-1" }
   : { region: "us-east-1" };
 
+// Derive OAuth callback/logout URLs from the custom domain when present
+const oauthCallbackUrls = config.domain ? [`https://${config.domain}/auth/callback`] : [];
+const oauthLogoutUrls = config.domain ? [`https://${config.domain}`] : [];
+
 const auth = new AuthStack(app, "BookshelfAuth", {
   env,
   allowSelfSignUp: config.allowSelfSignUp,
+  googleEmailAllowlist: config.googleEmailAllowlist,
+  oauthCallbackUrls,
+  oauthLogoutUrls,
 });
 
 // ── Custom domain (full prod only) ──────────────────────────────────────────
@@ -173,6 +188,7 @@ const web = new WebStack(app, "BookshelfWeb", {
     cognitoUserPoolId: auth.userPoolId,
     cognitoUserPoolClientId: auth.userPoolClientId,
     cognitoRegion: config.region,
+    cognitoOauthDomain: auth.hostedUiDomain,
     apiBaseUrl: config.apiThroughCloudFront ? "/api" : api.apiUrl,
   },
 });
