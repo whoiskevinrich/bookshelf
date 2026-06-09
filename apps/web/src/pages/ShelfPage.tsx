@@ -120,6 +120,26 @@ function CreateShelfForm({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Wheel → horizontal scroll ─────────────────────────────────────────────
+// React's onWheel is passive; we need a non-passive listener to preventDefault.
+
+function useHorizontalScrollOnWheel() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (el!.scrollWidth <= el!.clientWidth) return; // not scrollable — let page handle it
+      if (e.deltaY === 0) return; // pure horizontal trackpad delta — pass through
+      e.preventDefault();
+      el!.scrollLeft += e.deltaY;
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+  return ref;
+}
+
 // ── Shelf section ──────────────────────────────────────────────────────────
 
 interface ShelfSectionProps {
@@ -158,6 +178,7 @@ function ShelfSection({
   isDragging,
   isDropTarget,
 }: ShelfSectionProps) {
+  const scrollRef = useHorizontalScrollOnWheel();
   return (
     <section
       onDragOver={onDragOver}
@@ -183,6 +204,7 @@ function ShelfSection({
         <p className="text-sm text-slate-500 dark:text-slate-400">{emptyMessage}</p>
       ) : (
         <div
+          ref={scrollRef}
           className="overflow-x-auto -mx-6 px-6"
           style={{ scrollbarWidth: "thin", scrollbarColor: "rgb(148 163 184 / 0.4) transparent" }}
         >
@@ -383,7 +405,10 @@ export function ShelfPage() {
         )}
 
         {showSearch && (
-          <div ref={searchPanelRef} className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
+          <div
+            ref={searchPanelRef}
+            className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl"
+          >
             <BookSearch onAdd={handleAdd} isAdding={addMutation.isPending} />
           </div>
         )}
