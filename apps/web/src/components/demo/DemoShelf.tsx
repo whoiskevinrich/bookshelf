@@ -24,19 +24,19 @@ const SCI_FI: DemoBook[] = [
     isbn: "9780345461612",
     title: "Pandora's Star",
     authors: ["Peter F. Hamilton"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345461612-M.jpg",
+    coverUrl: "/demo-covers/pandoras-star.jpg",
   },
   {
     isbn: "9780345303066",
     title: "2010: Odyssey Two",
     authors: ["Arthur C. Clarke"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345303066-M.jpg",
+    coverUrl: "/demo-covers/2010-odyssey-two.jpg",
   },
   {
     isbn: "9780451228734",
     title: "Daemon",
     authors: ["Daniel Suarez"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780451228734-M.jpg",
+    coverUrl: "/demo-covers/daemon.jpg",
   },
 ];
 
@@ -45,31 +45,31 @@ const FANTASY: DemoBook[] = [
     isbn: "9780345300553",
     title: "The Elfstones of Shannara",
     authors: ["Terry Brooks"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345300553-M.jpg",
+    coverUrl: "/demo-covers/elfstones-shannara.jpg",
   },
   {
     isbn: "9780547928227",
     title: "The Hobbit",
     authors: ["J.R.R. Tolkien"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780547928227-M.jpg",
+    coverUrl: "/demo-covers/hobbit.jpg",
   },
   {
     isbn: "9780312367541",
     title: "A Wrinkle in Time",
     authors: ["Madeleine L'Engle"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780312367541-M.jpg",
+    coverUrl: "/demo-covers/wrinkle-in-time.jpg",
   },
   {
     isbn: "9780345277122",
     title: "Dragonflight",
     authors: ["Anne McCaffrey"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345277122-M.jpg",
+    coverUrl: "/demo-covers/dragonflight.jpg",
   },
   {
     isbn: "9780345335487",
     title: "Pawn of Prophecy",
     authors: ["David Eddings"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780345335487-M.jpg",
+    coverUrl: "/demo-covers/pawn-of-prophecy.jpg",
   },
 ];
 
@@ -78,31 +78,31 @@ const LEADERSHIP: DemoBook[] = [
     isbn: "9780062663986",
     title: "Extreme Ownership",
     authors: ["Jocko Willink", "Leif Babin"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780062663986-M.jpg",
+    coverUrl: "/demo-covers/extreme-ownership.jpg",
   },
   {
     isbn: "9781501156700",
     title: "Leaders Eat Last",
     authors: ["Simon Sinek"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9781501156700-M.jpg",
+    coverUrl: "/demo-covers/leaders-eat-last.jpg",
   },
   {
     isbn: "9781591845379",
     title: "Start with Why",
     authors: ["Simon Sinek"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9781591845379-M.jpg",
+    coverUrl: "/demo-covers/start-with-why.jpg",
   },
   {
     isbn: "9780062455628",
     title: "The Hard Thing About Hard Things",
     authors: ["Ben Horowitz"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780062455628-M.jpg",
+    coverUrl: "/demo-covers/hard-thing.jpg",
   },
   {
     isbn: "9780062309471",
     title: "The Effective Executive",
     authors: ["Peter F. Drucker"],
-    coverUrl: "https://covers.openlibrary.org/b/isbn/9780062309471-M.jpg",
+    coverUrl: "/demo-covers/effective-executive.jpg",
   },
 ];
 
