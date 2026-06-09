@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BookCover } from "../BookCover";
-import { Button } from "../ui/Button";
 import type { ShelfEntry, ShelfStatus, Shelf } from "../../lib/api-client";
 
 const MAX_STAGGER_INDEX = 9;
@@ -21,31 +20,14 @@ interface ShelfBookCardProps {
   staggerIndex?: number;
 }
 
-function StatusBadge({ status }: { status: ShelfStatus }) {
-  return status === "owned" ? (
-    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
-      <span
-        className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"
-        aria-hidden="true"
-      />
-      Owned
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400">
-      <span className="w-1.5 h-1.5 rounded-full bg-sky-500 dark:bg-sky-400" aria-hidden="true" />
-      Wishlist
-    </span>
-  );
-}
+// ── Icons ──────────────────────────────────────────────────────────────────
 
-// Move-action icon: wishlist bookmark (owned→want) or owned checkmark (want→owned)
 function MoveIcon({ toStatus }: { toStatus: ShelfStatus }) {
   if (toStatus === "want") {
-    // Move to Wishlist — bookmark outline
     return (
       <svg
         viewBox="0 0 16 16"
-        className="w-4 h-4"
+        className="w-3.5 h-3.5"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.5"
@@ -58,11 +40,10 @@ function MoveIcon({ toStatus }: { toStatus: ShelfStatus }) {
       </svg>
     );
   }
-  // Mark as Owned — checkmark circle
   return (
     <svg
       viewBox="0 0 16 16"
-      className="w-4 h-4"
+      className="w-3.5 h-3.5"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -74,10 +55,93 @@ function MoveIcon({ toStatus }: { toStatus: ShelfStatus }) {
   );
 }
 
-/**
- * ShelfPicker dropdown rendered as a portal so it escapes the card's stacking
- * context (created by the fade-up animation) and renders above all sibling cards.
- */
+function LayersIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-3.5 h-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path d="M2 5.5l6-3 6 3-6 3-6-3z" strokeLinejoin="round" />
+      <path d="M2 8.5l6 3 6-3M2 11.5l6 3 6-3" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-3.5 h-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path
+        d="M2.5 4h11M6 4V2.5h4V4M5 4l.5 9h5l.5-9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SpinIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-3.5 h-3.5 animate-spin"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      role="status"
+      aria-label="Working…"
+    >
+      <circle cx="8" cy="8" r="6" strokeDasharray="28" strokeDashoffset="10" strokeOpacity="0.3" />
+      <path d="M14 8a6 6 0 00-6-6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ── Overlay action button ──────────────────────────────────────────────────
+
+function OverlayButton({
+  onClick,
+  disabled,
+  title,
+  danger = false,
+  children,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  title: string;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`p-1.5 rounded-full transition-colors disabled:opacity-40 ${
+        danger
+          ? "bg-black/30 hover:bg-red-500/80 text-white"
+          : "bg-black/30 hover:bg-white/25 text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── ShelfPicker — portal dropdown with icon trigger ────────────────────────
+
 function ShelfPicker({
   isbn,
   shelves,
@@ -104,23 +168,20 @@ function ShelfPicker({
     setOpen((v) => !v);
   }
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: MouseEvent) {
       if (
         dropdownRef.current?.contains(e.target as Node) ||
         containerRef.current?.contains(e.target as Node)
-      ) {
+      )
         return;
-      }
       setOpen(false);
     }
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open]);
 
-  // Close on scroll so the fixed dropdown doesn't drift from its anchor
   useEffect(() => {
     if (!open) return;
     function onScroll() {
@@ -133,10 +194,17 @@ function ShelfPicker({
   if (shelves.length === 0) return null;
 
   return (
-    <div ref={containerRef} className="relative inline-flex">
-      <Button variant="ghost" size="sm" onClick={toggle}>
-        Shelves
-      </Button>
+    <div ref={containerRef} className="inline-flex">
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={disabled}
+        title="Manage shelves"
+        aria-label="Manage shelves"
+        className="p-1.5 rounded-full bg-black/30 hover:bg-white/25 text-white transition-colors disabled:opacity-40"
+      >
+        <LayersIcon />
+      </button>
       {open &&
         createPortal(
           <div
@@ -169,6 +237,8 @@ function ShelfPicker({
   );
 }
 
+// ── ShelfBookCard ──────────────────────────────────────────────────────────
+
 export function ShelfBookCard({
   entry,
   shelves,
@@ -195,64 +265,43 @@ export function ShelfBookCard({
 
   return (
     <div
-      className="group flex flex-col gap-1 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 animate-fade-up"
+      className="group/card flex flex-col gap-2 shrink-0 w-[130px] animate-fade-up"
       style={staggerStyle}
     >
-      <div className="flex gap-3">
+      {/* Cover + hover overlay */}
+      <div className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200">
         <BookCover
           key={book?.coverUrl ?? "no-cover"}
           coverUrl={book?.coverUrl ?? null}
           title={title}
           authors={authors}
-          className="w-12 h-[72px] flex-shrink-0 rounded shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all duration-200 ease-out"
+          className="w-full aspect-[2/3]"
         />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-tight truncate dark:text-white">{title}</p>
-          {authors.length > 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              {authors.join(", ")}
-            </p>
-          )}
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-            {isbn}
-          </p>
-          <div className="mt-1">
-            <StatusBadge status={status} />
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            {/* Move-to icon button */}
-            <button
-              type="button"
-              className="p-1.5 rounded-md text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white disabled:opacity-40 transition-colors"
+
+        {/* Status dot — always visible */}
+        <div
+          className={`absolute top-1.5 left-1.5 w-2 h-2 rounded-full ring-1 ring-black/20 ${
+            status === "owned" ? "bg-emerald-400" : "bg-sky-400"
+          }`}
+          title={status === "owned" ? "Owned" : "Wishlist"}
+          aria-label={status === "owned" ? "Owned" : "Wishlist"}
+        />
+
+        {/* Action overlay — hover (mouse) or focus-within (keyboard/touch) */}
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-end pb-2
+                     bg-gradient-to-t from-black/75 via-black/20 to-transparent
+                     opacity-0 group-hover/card:opacity-100 focus-within:opacity-100
+                     transition-opacity duration-200"
+        >
+          <div className="flex items-center gap-1">
+            <OverlayButton
               onClick={() => onMove(isbn, targetStatus)}
-              disabled={isMoving || isRemoving}
-              aria-label={isMoving ? "Moving…" : moveLabel}
+              {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
               title={isMoving ? "Moving…" : moveLabel}
             >
-              {isMoving ? (
-                <svg
-                  viewBox="0 0 16 16"
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  role="status"
-                  aria-label="Moving…"
-                >
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6"
-                    strokeDasharray="28"
-                    strokeDashoffset="10"
-                    strokeOpacity="0.3"
-                  />
-                  <path d="M14 8a6 6 0 00-6-6" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <MoveIcon toStatus={targetStatus} />
-              )}
-            </button>
+              {isMoving ? <SpinIcon /> : <MoveIcon toStatus={targetStatus} />}
+            </OverlayButton>
 
             <ShelfPicker
               isbn={isbn}
@@ -261,18 +310,37 @@ export function ShelfBookCard({
               onRemove={(shelfId) => onRemoveFromShelf(shelfId, isbn)}
               disabled={isUpdatingShelves === true}
             />
-            <Button
-              variant="destructive"
-              size="sm"
+
+            <OverlayButton
               onClick={() => onRemove(isbn)}
-              disabled={isMoving || isRemoving}
+              {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
+              title={isRemoving ? "Removing…" : "Remove from library"}
+              danger
             >
-              {isRemoving ? "Removing…" : "Remove"}
-            </Button>
+              {isRemoving ? <SpinIcon /> : <TrashIcon />}
+            </OverlayButton>
           </div>
         </div>
       </div>
-      {error && <p className="text-xs text-red-500 dark:text-red-400 pl-[60px]">{error}</p>}
+
+      {/* Book info */}
+      <div className="px-0.5">
+        <p className="text-xs font-medium leading-snug line-clamp-2 dark:text-white text-slate-900">
+          {title}
+        </p>
+        {authors.length > 0 && (
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate leading-tight">
+            {authors.join(", ")}
+          </p>
+        )}
+        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 truncate">
+          {isbn}
+        </p>
+      </div>
+
+      {error && (
+        <p className="text-[10px] text-red-500 dark:text-red-400 leading-tight px-0.5">{error}</p>
+      )}
     </div>
   );
 }

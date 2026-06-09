@@ -60,13 +60,7 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      {onDragStart && (
-        <DragHandle
-          draggable
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-        />
-      )}
+      {onDragStart && <DragHandle draggable onDragStart={onDragStart} onDragEnd={onDragEnd} />}
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 shrink-0">
         {title}
       </h2>
@@ -171,7 +165,9 @@ function ShelfSection({
       className={[
         "transition-opacity duration-150",
         isDragging ? "opacity-40" : "",
-        isDropTarget ? "outline outline-2 outline-slate-400 dark:outline-slate-500 rounded-xl -m-2 p-2" : "",
+        isDropTarget
+          ? "outline outline-2 outline-slate-400 dark:outline-slate-500 rounded-xl -m-2 p-2"
+          : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -186,35 +182,40 @@ function ShelfSection({
       {entries.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">{emptyMessage}</p>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {entries.map((entry, index) => (
-            <ShelfBookCard
-              key={entry.isbn}
-              entry={entry}
-              shelves={shelves}
-              staggerIndex={index}
-              onMove={(isbn, status) => moveMutation.mutate({ isbn, status })}
-              onRemove={(isbn) => removeMutation.mutate(isbn)}
-              onAddToShelf={(shelfId, isbn) => addToShelfMutation.mutate({ shelfId, isbn })}
-              onRemoveFromShelf={(shelfId, isbn) =>
-                removeFromShelfMutation.mutate({ shelfId, isbn })
-              }
-              isMoving={moveMutation.isPending && moveMutation.variables?.isbn === entry.isbn}
-              isRemoving={removeMutation.isPending && removeMutation.variables === entry.isbn}
-              isUpdatingShelves={
-                (addToShelfMutation.isPending || removeFromShelfMutation.isPending) &&
-                (addToShelfMutation.variables?.isbn === entry.isbn ||
-                  removeFromShelfMutation.variables?.isbn === entry.isbn)
-              }
-              error={
-                moveMutation.isError && moveMutation.variables?.isbn === entry.isbn
-                  ? "Couldn't move book — please try again."
-                  : removeMutation.isError && removeMutation.variables === entry.isbn
-                    ? "Couldn't remove book — please try again."
-                    : null
-              }
-            />
-          ))}
+        <div
+          className="overflow-x-auto -mx-6 px-6"
+          style={{ scrollbarWidth: "thin", scrollbarColor: "rgb(148 163 184 / 0.4) transparent" }}
+        >
+          <div className="flex gap-4 pb-3">
+            {entries.map((entry, index) => (
+              <ShelfBookCard
+                key={entry.isbn}
+                entry={entry}
+                shelves={shelves}
+                staggerIndex={index}
+                onMove={(isbn, status) => moveMutation.mutate({ isbn, status })}
+                onRemove={(isbn) => removeMutation.mutate(isbn)}
+                onAddToShelf={(shelfId, isbn) => addToShelfMutation.mutate({ shelfId, isbn })}
+                onRemoveFromShelf={(shelfId, isbn) =>
+                  removeFromShelfMutation.mutate({ shelfId, isbn })
+                }
+                isMoving={moveMutation.isPending && moveMutation.variables?.isbn === entry.isbn}
+                isRemoving={removeMutation.isPending && removeMutation.variables === entry.isbn}
+                isUpdatingShelves={
+                  (addToShelfMutation.isPending || removeFromShelfMutation.isPending) &&
+                  (addToShelfMutation.variables?.isbn === entry.isbn ||
+                    removeFromShelfMutation.variables?.isbn === entry.isbn)
+                }
+                error={
+                  moveMutation.isError && moveMutation.variables?.isbn === entry.isbn
+                    ? "Couldn't move book — please try again."
+                    : removeMutation.isError && removeMutation.variables === entry.isbn
+                      ? "Couldn't remove book — please try again."
+                      : null
+                }
+              />
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -322,7 +323,7 @@ export function ShelfPage() {
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
       <AppHeader />
 
-      <main className="max-w-4xl mx-auto px-6 py-10">
+      <main className="max-w-6xl mx-auto px-6 py-10">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold dark:text-white">My Library</h1>
           <div className="flex items-center gap-2">

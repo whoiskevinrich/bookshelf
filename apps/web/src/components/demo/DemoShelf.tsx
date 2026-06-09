@@ -78,7 +78,7 @@ const LEADERSHIP: DemoBook[] = [
     isbn: "9780241373668",
     title: "Leadership is Language",
     authors: ["L. David Marquet"],
-    coverUrl: null, // OpenLibrary has no cover for this 2020 title yet
+    coverUrl: "/demo-covers/leadership-is-language.jpg",
   },
   {
     isbn: "9780241250945",

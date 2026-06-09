@@ -357,8 +357,7 @@ export async function queryShelvesMeta(userId: string): Promise<ShelfMeta[]> {
   const shelves = (result.Items ?? []).map((i) => toShelfMeta(i as Record<string, unknown>));
   // Sort by sortOrder; fall back to createdAt epoch ms for legacy items without the field.
   return shelves.sort(
-    (a, b) =>
-      (a.sortOrder ?? Date.parse(a.createdAt)) - (b.sortOrder ?? Date.parse(b.createdAt)),
+    (a, b) => (a.sortOrder ?? Date.parse(a.createdAt)) - (b.sortOrder ?? Date.parse(b.createdAt)),
   );
 }
 
