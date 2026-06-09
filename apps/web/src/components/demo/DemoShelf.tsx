@@ -103,6 +103,7 @@ function BookGrid({ books, indexOffset = 0 }: { books: DemoBook[]; indexOffset?:
           }}
         >
           <BookCover
+            key={book.coverUrl}
             coverUrl={book.coverUrl}
             title={book.title}
             authors={book.authors}

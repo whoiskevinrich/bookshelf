@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface BookCoverProps {
   coverUrl: string | null;
@@ -9,10 +9,6 @@ interface BookCoverProps {
 
 export function BookCover({ coverUrl, title, authors, className = "" }: BookCoverProps) {
   const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [coverUrl]);
 
   if (!coverUrl || failed) {
     const authorLine = authors.length ? authors.join(", ") : null;

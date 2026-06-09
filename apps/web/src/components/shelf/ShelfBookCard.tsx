@@ -46,6 +46,7 @@ export function ShelfBookCard({
     >
       <div className="flex gap-3">
         <BookCover
+          key={book?.coverUrl ?? "no-cover"}
           coverUrl={book?.coverUrl ?? null}
           title={title}
           authors={authors}
