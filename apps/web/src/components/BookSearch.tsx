@@ -87,8 +87,10 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
             className="flex gap-3 items-start border border-slate-100 dark:border-slate-700 rounded-lg p-3"
           >
             <BookCover
+              key={book.coverUrl ?? "no-cover"}
               coverUrl={book.coverUrl}
               title={book.title}
+              authors={book.authors}
               className="w-10 h-14 flex-shrink-0 rounded"
             />
             <div className="flex-1 min-w-0">
