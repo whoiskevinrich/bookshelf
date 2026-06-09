@@ -31,10 +31,10 @@ Full ADR documents are in `docs/adrs/`.
 
 ## Data / Integration Decisions
 
-| Decision | Choice | Rationale | Date |
-| -------- | ------ | --------- | ---- |
+| Decision            | Choice                                                      | Rationale                                                                                                                                                                                                                                     | Date       |
+| ------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | Cover image sources | Google Books (primary) → OpenLibrary by cover ID (fallback) | Google Books is already the search provider; OpenLibrary ISBN endpoint silently returns a 43-byte GIF for missing covers — must check file size and fall back to cover ID lookup via search API — see `docs/runbooks/cover-image-sourcing.md` | 2026-06-08 |
-| Demo shelf covers | Bundled as static assets in `apps/web/public/demo-covers/` | External CDN URLs (OpenLibrary) are intermittently unavailable; landing page demo must always render correctly for new users | 2026-06-08 |
+| Demo shelf covers   | Bundled as static assets in `apps/web/public/demo-covers/`  | External CDN URLs (OpenLibrary) are intermittently unavailable; landing page demo must always render correctly for new users                                                                                                                  | 2026-06-08 |
 
 ## UI / Design System Decisions
 

@@ -56,8 +56,9 @@ curl -o cover.jpg "https://covers.openlibrary.org/b/id/8264706-L.jpg"
 ## Image size variants
 
 Both endpoints support `-S`, `-M`, `-L` suffixes on the filename:
+
 - `-S` — small (~80px wide)
-- `-M` — medium (~180px wide)  
+- `-M` — medium (~180px wide)
 - `-L` — large (~400px wide)
 
 Use `-L` when storing to cache; the frontend can resize via CSS.
