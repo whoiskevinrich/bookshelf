@@ -4,7 +4,7 @@ interface DemoBook {
   isbn: string;
   title: string;
   authors: string[];
-  coverUrl: string;
+  coverUrl: string | null;
 }
 
 const SCI_FI: DemoBook[] = [
@@ -21,7 +21,7 @@ const SCI_FI: DemoBook[] = [
     coverUrl: "/demo-covers/project-hail-mary.jpg",
   },
   {
-    isbn: "9780345461612",
+    isbn: "9780330518543",
     title: "Pandora's Star",
     authors: ["Peter F. Hamilton"],
     coverUrl: "/demo-covers/pandoras-star.jpg",
@@ -42,7 +42,7 @@ const SCI_FI: DemoBook[] = [
 
 const FANTASY: DemoBook[] = [
   {
-    isbn: "9780345300553",
+    isbn: "9780345458681",
     title: "The Elfstones of Shannara",
     authors: ["Terry Brooks"],
     coverUrl: "/demo-covers/elfstones-shannara.jpg",
@@ -66,7 +66,7 @@ const FANTASY: DemoBook[] = [
     coverUrl: "/demo-covers/dragonflight.jpg",
   },
   {
-    isbn: "9780345335487",
+    isbn: "9780345290540",
     title: "Pawn of Prophecy",
     authors: ["David Eddings"],
     coverUrl: "/demo-covers/pawn-of-prophecy.jpg",
@@ -75,34 +75,34 @@ const FANTASY: DemoBook[] = [
 
 const LEADERSHIP: DemoBook[] = [
   {
-    isbn: "9780062663986",
-    title: "Extreme Ownership",
-    authors: ["Jocko Willink", "Leif Babin"],
-    coverUrl: "/demo-covers/extreme-ownership.jpg",
+    isbn: "9780525543343",
+    title: "Leadership is Language",
+    authors: ["L. David Marquet"],
+    coverUrl: null, // OpenLibrary has no cover for this 2020 title yet
   },
   {
-    isbn: "9781501156700",
-    title: "Leaders Eat Last",
-    authors: ["Simon Sinek"],
-    coverUrl: "/demo-covers/leaders-eat-last.jpg",
+    isbn: "9781591846406",
+    title: "Turn the Ship Around!",
+    authors: ["L. David Marquet"],
+    coverUrl: "/demo-covers/turn-the-ship-around.jpg",
   },
   {
-    isbn: "9781591845379",
-    title: "Start with Why",
-    authors: ["Simon Sinek"],
-    coverUrl: "/demo-covers/start-with-why.jpg",
+    isbn: "9780999743904",
+    title: "Supportive Accountability",
+    authors: ["Sylvia Melena"],
+    coverUrl: "/demo-covers/supportive-accountability.jpg",
   },
   {
-    isbn: "9780062455628",
-    title: "The Hard Thing About Hard Things",
-    authors: ["Ben Horowitz"],
-    coverUrl: "/demo-covers/hard-thing.jpg",
+    isbn: "9781400224166",
+    title: "Serve Up, Coach Down",
+    authors: ["Nathan Jamail"],
+    coverUrl: "/demo-covers/serve-up-coach-down.jpg",
   },
   {
-    isbn: "9780062309471",
-    title: "The Effective Executive",
-    authors: ["Peter F. Drucker"],
-    coverUrl: "/demo-covers/effective-executive.jpg",
+    isbn: "9780201835953",
+    title: "The Mythical Man-Month",
+    authors: ["Frederick P. Brooks Jr."],
+    coverUrl: "/demo-covers/mythical-man-month.jpg",
   },
 ];
 
