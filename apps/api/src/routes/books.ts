@@ -8,7 +8,9 @@ export const booksRouter = new Hono();
 booksRouter.use("*", authMiddleware);
 
 const SEARCH_MAX_LENGTH = 200;
-// ASINs are 10 alphanumeric chars; allow up to 20 to accommodate ISBN-13 passed via this endpoint
+// Real ASINs are 10 alphanumeric chars; ceiling raised to 20 so callers can
+// also pass ISBN-13 (13 chars) to this endpoint — the provider tries an ISBN
+// lookup first before falling back to a keyword search.
 const ASIN_PATTERN = /^[A-Za-z0-9]{1,20}$/;
 
 booksRouter.get("/search", async (c) => {

@@ -8,14 +8,10 @@ vi.mock("../../src/middleware/auth.js", () => ({
   }),
 }));
 
-// Mock dynamo
-vi.mock("../../src/lib/dynamo.js", () => {
-  class InvalidCursorError extends Error {
-    constructor() {
-      super("Invalid pagination cursor");
-      this.name = "InvalidCursorError";
-    }
-  }
+// Mock dynamo — import InvalidCursorError and isValidStatus from the real module
+// so instanceof checks in route handlers work against the same class.
+vi.mock("../../src/lib/dynamo.js", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("../../src/lib/dynamo.js")>();
   return {
     queryShelf: vi.fn(),
     getShelfEntry: vi.fn(),
@@ -24,8 +20,8 @@ vi.mock("../../src/lib/dynamo.js", () => {
     updateShelfStatus: vi.fn(),
     updateShelfNotes: vi.fn(),
     putBookMetadata: vi.fn(),
-    isValidStatus: (s: unknown) => s === "owned" || s === "want",
-    InvalidCursorError,
+    isValidStatus: mod.isValidStatus,
+    InvalidCursorError: mod.InvalidCursorError,
   };
 });
 
@@ -210,6 +206,18 @@ describe("POST /v1/shelf", () => {
 });
 
 describe("PATCH /v1/shelf/:isbn/notes", () => {
+  it("accepts notes at exactly the max length (2000 chars)", async () => {
+    vi.mocked(getShelfEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateShelfNotes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: "a".repeat(2000) }),
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("returns 400 when notes exceeds max length", async () => {
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593/notes", {
@@ -246,6 +254,26 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { notes: string | null };
     expect(body.notes).toBeNull();
+  });
+
+  it("returns 400 for invalid ISBN in path", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/not-an-isbn/notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: "fine" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when notes is wrong type (number)", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: 42 }),
+    });
+    expect(res.status).toBe(400);
   });
 });
 

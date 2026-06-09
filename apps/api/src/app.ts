@@ -30,7 +30,10 @@ app.use(
   "*",
   bodyLimit({
     maxSize: 64 * 1024,
-    onError: (c) => c.json({ error: "Request body too large" }, 413),
+    onError: (c) => {
+      console.error("Request body exceeded 64 KB limit");
+      return c.json({ error: "Request body too large" }, 413);
+    },
   }),
 );
 

@@ -108,7 +108,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 ### Bookshelf Domain
 
 - ISBN input: validated (length 10 or 13, check digit correct)
-- ASIN input: opaque string (non-empty check only)
+- ASIN input: alphanumeric, 1–20 chars (`/^[A-Za-z0-9]{1,20}$/`) — see endpoint checklist for rationale
 - Book API calls: error boundary + fallback UI required
 - Wishlist vs. Owned: states are distinct, never conflated in the same data structure
 - Zero-books state: empty shelf handled in all list views
@@ -140,7 +140,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 - Use `isValidIsbn` / `normalizeIsbn` from `lib/isbn.ts` (checksum-validated) — never write a local digit-only ISBN check in a route file
 - ASIN format: `/^[A-Za-z0-9]{1,20}$/` — the provider falls back to keyword search so garbage strings waste quota and pollute logs
 - Pagination cursors must be validated to decode as a non-null, non-array JSON object; return **400** (not 500) on failure — catch `InvalidCursorError` from `lib/dynamo.ts`
-- Body size: the global `bodyLimit(64 KB)` middleware in `app.ts` covers all routes — do not remove it; if a specific route needs a tighter cap, add a per-route `bodyLimit` before the handler
+- Body size: a global `bodyLimit` middleware in the app entry point covers all routes — do not remove it; if a specific route needs a tighter cap, add a per-route `bodyLimit` before the handler
 
 **Auth**
 

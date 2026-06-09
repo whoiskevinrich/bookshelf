@@ -52,6 +52,13 @@ describe("GET /v1/books/search", () => {
     expect(res.status).toBe(400);
   });
 
+  it("accepts q at exactly the max length (200 chars)", async () => {
+    vi.mocked(searchBooks).mockResolvedValueOnce([]);
+    const app = makeApp();
+    const res = await app.request(`/v1/books/search?q=${"a".repeat(200)}`);
+    expect(res.status).toBe(200);
+  });
+
   it("returns results on valid query", async () => {
     vi.mocked(searchBooks).mockResolvedValueOnce([BOOK]);
     const app = makeApp();
@@ -107,6 +114,19 @@ describe("GET /v1/books/asin/:asin", () => {
     const app = makeApp();
     const res = await app.request("/v1/books/asin/%20");
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for ASIN exceeding max length (21 chars)", async () => {
+    const app = makeApp();
+    const res = await app.request(`/v1/books/asin/${"A".repeat(21)}`);
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts ASIN at exactly max length (20 chars)", async () => {
+    vi.mocked(getBookByAsin).mockResolvedValueOnce(BOOK);
+    const app = makeApp();
+    const res = await app.request(`/v1/books/asin/${"A".repeat(20)}`);
+    expect(res.status).toBe(200);
   });
 
   it("returns book on valid ASIN", async () => {
