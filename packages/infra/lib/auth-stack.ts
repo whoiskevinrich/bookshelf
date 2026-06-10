@@ -114,8 +114,12 @@ export class AuthStack extends cdk.Stack {
     });
 
     // CloudFormation must create the Google IdP before the app client references it
-    // in supportedIdentityProviders — CDK doesn't infer this ordering automatically.
-    appClient.node.addDependency(googleIdp);
+    // in supportedIdentityProviders. Use L1 resources directly — addDependency at
+    // the L2 level pulls in all construct descendants and creates a cycle through
+    // the shared UserPool.
+    const cfnAppClient = appClient.node.defaultChild as cognito.CfnUserPoolClient;
+    const cfnGoogleIdp = googleIdp.node.defaultChild as cognito.CfnUserPoolIdentityProvider;
+    cfnAppClient.addDependency(cfnGoogleIdp);
 
     // ── PreSignUp Lambda (allowlist + Google account linking) ─────────────
     //
