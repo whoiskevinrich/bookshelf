@@ -158,13 +158,24 @@ jobs:
           set -euo pipefail
           STACK_NAME="BookshelfAuth"
 
-          POOL_ID=$(aws cloudformation describe-stacks \
+          # Distinguish "stack does not exist" (safe to skip) from any other
+          # failure (bad credentials, throttling, access denied — fail loudly).
+          CF_OUTPUT=$(aws cloudformation describe-stacks \
             --stack-name "$STACK_NAME" \
             --query "Stacks[0].Outputs[?OutputKey=='UserPoolIdOutput'].OutputValue" \
-            --output text 2>/dev/null || echo "")
+            --output text 2>&1) || {
+            if echo "$CF_OUTPUT" | grep -q "does not exist"; then
+              echo "BookshelfAuth stack not found — nothing to reconcile."
+              exit 0
+            fi
+            echo "::error::Failed to describe stack $STACK_NAME: $CF_OUTPUT"
+            exit 1
+          }
 
-          if [ -z "$POOL_ID" ]; then
-            echo "BookshelfAuth stack not found — nothing to reconcile."
+          # Guard against a renamed/missing output returning the literal "None".
+          POOL_ID="$CF_OUTPUT"
+          if [ -z "$POOL_ID" ] || [ "$POOL_ID" = "None" ]; then
+            echo "BookshelfAuth stack found but UserPoolIdOutput is missing — nothing to reconcile."
             exit 0
           fi
 
@@ -181,14 +192,22 @@ jobs:
             exit 0
           fi
 
-          # IdP is not in the stack. Check if it exists in Cognito.
-          PROVIDER=$(aws cognito-idp describe-identity-provider \
+          # IdP is not in the stack. Check if it exists in Cognito, distinguishing
+          # "does not exist" (safe no-op) from any other failure (fail loudly).
+          IDP_OUTPUT=$(aws cognito-idp describe-identity-provider \
             --user-pool-id "$POOL_ID" \
             --provider-name Google \
             --query "IdentityProvider.ProviderName" \
-            --output text 2>/dev/null || echo "")
+            --output text 2>&1) || {
+            if echo "$IDP_OUTPUT" | grep -q "ResourceNotFoundException"; then
+              echo "No orphaned Google IdP — nothing to do."
+              exit 0
+            fi
+            echo "::error::Failed to describe Cognito IdP in pool $POOL_ID: $IDP_OUTPUT"
+            exit 1
+          }
 
-          if [ -n "$PROVIDER" ]; then
+          if [ -n "$IDP_OUTPUT" ] && [ "$IDP_OUTPUT" != "None" ]; then
             echo "Orphaned Google IdP found in pool $POOL_ID — removing so CDK can create and track it."
             aws cognito-idp delete-identity-provider \
               --user-pool-id "$POOL_ID" \
