@@ -5,11 +5,10 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as apigatewayv2Integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
-import * as ssm from "aws-cdk-lib/aws-ssm";
-import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
-import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
+import * as logs from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
+import { addApiGatewayCustomDomain } from "./api-gateway-domain";
 
 /**
  * Custom API hostname config (full prod only) — the canonical `api.<app>...`
@@ -21,15 +20,8 @@ export interface ApiCustomDomainConfig {
   apiHostname: string;
   /** Regional cert domain covering apiHostname, e.g. "*.bookshelf.whoiskevinrich.com". */
   certificateDomainName: string;
-  /** Optional extra SANs for the regional cert. */
-  certificateSans?: string[];
-  /**
-   * Route53 zone name for automated cert validation and alias record (ADR-013, Phase 2).
-   * E.g. "bookshelf.whoiskevinrich.com". When set, CDK validates the regional cert
-   * automatically via fromDns and creates an A-alias record for `apiHostname`.
-   * Omit to fall back to manual DNS validation (Phase 1).
-   */
-  hostedZoneName?: string;
+  /** Route53 zone name for cert validation and API Gateway A-alias record. */
+  hostedZoneName: string;
 }
 
 export interface ApiStackProps extends cdk.StackProps {
@@ -52,6 +44,8 @@ export class ApiStack extends cdk.Stack {
   readonly apiUrl: string;
   /** Bare execute-api hostname (no scheme/path) — used as the CloudFront `/api` origin */
   readonly executeApiDomain: string;
+  /** Regional ACM cert covering `certificateDomainName` — shared with McpStack. */
+  readonly regionalCertificate?: acm.Certificate;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -72,10 +66,6 @@ export class ApiStack extends cdk.Stack {
     });
 
     // ── Lambda function (Hono API handler) ────────────────────────────────
-    //
-    // The built bundle lives at apps/api/dist/index.js (produced by esbuild).
-    // Phase 1 placeholder: inline code returning 200 for all requests.
-    // Phase 2 switches this to lambda.Code.fromAsset('../apps/api/dist').
     const logGroup = new logs.LogGroup(this, "ApiLambdaLogGroup", {
       logGroupName: "/aws/lambda/bookshelf-api",
       retention: logs.RetentionDays.ONE_WEEK,
@@ -127,11 +117,9 @@ export class ApiStack extends cdk.Stack {
 
     // ── API Gateway HTTP API ───────────────────────────────────────────────
     //
-    // CORS: when `sameOrigin` (all deployed envs — dev, prod-interim, prod) the
-    // browser reaches the API same-origin via CloudFront `/api/*` and MCP is
-    // non-browser, so no CORS is configured. The fallback (sameOrigin false) keeps
-    // permissive CORS for a cross-origin SPA. Resolves the historical
-    // "tighten to CloudFront domain" TODO — see ADR-008.
+    // CORS: when `sameOrigin` (all deployed envs) the browser reaches the API
+    // same-origin via CloudFront `/api/*` — no CORS needed. The false path keeps
+    // permissive CORS for a cross-origin SPA (local dev only). See ADR-008.
     const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {
       apiName: "bookshelf-api",
       description: "Bookshelf REST API",
@@ -139,8 +127,6 @@ export class ApiStack extends cdk.Stack {
         ? {}
         : {
             corsPreflight: {
-              // Restrict to local dev origins — this path is only reached when
-              // sameOrigin is false, which no deployed environment sets.
               allowOrigins: ["http://localhost:3000", "http://localhost:5173"],
               allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
               allowHeaders: ["Authorization", "Content-Type"],
@@ -164,79 +150,41 @@ export class ApiStack extends cdk.Stack {
     // Bare execute-api host (no scheme/path) for use as the CloudFront `/api` origin.
     this.executeApiDomain = `${httpApi.apiId}.execute-api.${this.region}.amazonaws.com`;
 
-    // ── Custom domain (prod) — canonical API door for MCP / programmatic clients ─
+    // ── Custom domain (prod) ───────────────────────────────────────────────
     //
     // api.<app>.<root> → API Gateway, serving the same Hono /v1 routes with no
     // path rewrite (unlike the browser's CloudFront /api/* door). See ADR-008.
-    //
-    // Phase 2 (ADR-013, hostedZoneName set): regional cert validates automatically
-    // via fromDns and a Route53 A-alias record replaces the manual CNAME at the
-    // DNS provider. Phase 1 fallback: cert validates manually; CNAME added by hand.
+    // The regional cert is exposed as `regionalCertificate` so McpStack can share
+    // it rather than issuing a second identical wildcard cert.
     if (props.customDomain) {
-      // Look up the hosted zone for cert validation + alias record.
-      // Requires BookshelfDns to be deployed first (ADR-013 bootstrap sequence).
-      // Route53 is a global API — lookup succeeds from this us-west-2 stack.
-      // Result cached in cdk.context.json after first successful synth.
-      const certZone = props.customDomain.hostedZoneName
-        ? route53.HostedZone.fromLookup(this, "ApiCertHostedZone", {
-            domainName: props.customDomain.hostedZoneName,
-          })
-        : undefined;
+      const { apiHostname, certificateDomainName, hostedZoneName } = props.customDomain;
 
-      const apiCert = new acm.Certificate(this, "ApiCertificate", {
-        domainName: props.customDomain.certificateDomainName,
-        ...(props.customDomain.certificateSans
-          ? { subjectAlternativeNames: props.customDomain.certificateSans }
-          : {}),
-        // Phase 2: CDK adds the validation CNAME automatically.
-        // Phase 1: add the CNAME manually at the DNS provider (Cloudflare).
-        validation: certZone
-          ? acm.CertificateValidation.fromDns(certZone)
-          : acm.CertificateValidation.fromDns(),
+      const certZone = route53.HostedZone.fromLookup(this, "ApiCertZone", {
+        domainName: hostedZoneName,
       });
-
-      const apiDomainName = new apigatewayv2.DomainName(this, "ApiDomainName", {
-        domainName: props.customDomain.apiHostname,
-        certificate: apiCert,
+      const cert = new acm.Certificate(this, "ApiCertificate", {
+        domainName: certificateDomainName,
+        validation: acm.CertificateValidation.fromDns(certZone),
       });
+      this.regionalCertificate = cert;
 
-      new apigatewayv2.ApiMapping(this, "ApiMapping", {
+      const regionalDomain = addApiGatewayCustomDomain(this, "Api", {
         api: httpApi,
-        domainName: apiDomainName,
-        stage: httpApi.defaultStage,
+        hostname: apiHostname,
+        certificate: cert,
+        hostedZoneName,
       });
-
-      // Phase 2: A-alias record in Route53 replaces the manual CNAME at Cloudflare.
-      if (certZone) {
-        new route53.ARecord(this, "ApiAliasRecord", {
-          zone: certZone,
-          recordName: props.customDomain.apiHostname,
-          target: route53.RecordTarget.fromAlias(
-            new route53Targets.ApiGatewayv2DomainProperties(
-              apiDomainName.regionalDomainName,
-              apiDomainName.regionalHostedZoneId,
-            ),
-          ),
-        });
-      }
 
       new cdk.CfnOutput(this, "ApiCnameTargetOutput", {
         exportName: "BookshelfApiCnameTarget",
-        description: `API Gateway regional domain for ${props.customDomain.apiHostname}. Phase 1: create CNAME here at the DNS provider. Phase 2: managed by Route53 alias record.`,
-        value: apiDomainName.regionalDomainName,
+        description: `API Gateway regional domain for ${apiHostname}.`,
+        value: regionalDomain,
       });
       new cdk.CfnOutput(this, "ApiCustomUrlOutput", {
         exportName: "BookshelfApiCustomUrl",
-        value: `https://${props.customDomain.apiHostname}`,
+        value: `https://${apiHostname}`,
       });
     }
-
-    // ── SSM Parameters ─────────────────────────────────────────────────────
-    new ssm.StringParameter(this, "ApiUrlParam", {
-      parameterName: "/bookshelf/api/url",
-      stringValue: httpApi.apiEndpoint,
-      description: "Bookshelf API Gateway URL",
-    });
 
     // ── Outputs ────────────────────────────────────────────────────────────
     this.apiUrl = httpApi.apiEndpoint;

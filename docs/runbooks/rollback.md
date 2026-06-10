@@ -118,10 +118,11 @@ The `WebStack` deploys assets under a versioned S3 key prefix (`/v{version}/`). 
 2. Update the CloudFront distribution's origin path:
 
    ```bash
-   # Get the distribution ID from SSM
-   DIST_ID=$(aws ssm get-parameter \
-     --name /bookshelf/web/distribution-id \
-     --query Parameter.Value --output text)
+   # Get the distribution ID from the BookshelfWeb CloudFormation stack output
+   DIST_ID=$(aws cloudformation describe-stacks \
+     --stack-name BookshelfWeb \
+     --query "Stacks[0].Outputs[?OutputKey=='DistributionIdOutput'].OutputValue" \
+     --output text)
 
    # Get current config + ETag
    aws cloudfront get-distribution-config --id "$DIST_ID" > dist-config.json
@@ -172,16 +173,25 @@ If an App Client configuration change caused a regression (e.g. wrong OAuth scop
 
 ---
 
-## SSM Parameter Verification
+## Stack Output Verification
 
-After any rollback, confirm SSM params match the deployed stack:
+After any rollback, confirm CloudFormation outputs match the deployed version.
+Auth, API, and MCP values are CFN exports; the active web version is in SSM.
 
 ```bash
-aws ssm get-parameters-by-path \
-  --path /bookshelf/ \
-  --recursive \
-  --query 'Parameters[*].{Name:Name,Value:Value}' \
-  --output table
+# Check outputs from all four stacks
+for STACK in BookshelfAuth BookshelfApi BookshelfMcp BookshelfWeb; do
+  echo "=== $STACK ==="
+  aws cloudformation describe-stacks \
+    --stack-name "$STACK" \
+    --query 'Stacks[0].Outputs[*].{Key:OutputKey,Value:OutputValue}' \
+    --output table
+done
+
+# Active web version (SSM — updated on each WebStack deploy)
+aws ssm get-parameter \
+  --name /bookshelf/web/active-version \
+  --query Parameter.Value --output text
 ```
 
 ---

@@ -22,13 +22,8 @@ export interface WebCustomDomainConfig {
   certificate: acm.ICertificate;
   /** SPA hostname, e.g. "bookshelf.whoiskevinrich.com". */
   webHostname: string;
-  /**
-   * Route53 zone name for the A-alias record (ADR-013, Phase 2).
-   * E.g. "bookshelf.whoiskevinrich.com". When set, CDK creates an A-alias record
-   * pointing `webHostname` at the CloudFront distribution. Omit to keep the manual
-   * CNAME approach (Phase 1).
-   */
-  hostedZoneName?: string;
+  /** Route53 zone name for the A-alias record pointing webHostname at CloudFront. */
+  hostedZoneName: string;
 }
 
 export interface WebStackProps extends cdk.StackProps {
@@ -241,26 +236,19 @@ export class WebStack extends cdk.Stack {
       description: "Currently active web build version — update to roll back",
     });
 
-    // ── Route53 alias record + CNAME output (prod) ────────────────────────
-    // Phase 2 (ADR-013, hostedZoneName set): CDK creates an A-alias record in
-    // Route53 pointing `webHostname` at this distribution — no manual DNS step.
-    // Route53 is a global API; fromLookup succeeds from this us-west-2 stack.
-    // Phase 1 (no zone): add the CNAME output value manually at the DNS provider.
+    // ── Route53 alias record (prod) ───────────────────────────────────────
     if (props.customDomain) {
-      if (props.customDomain.hostedZoneName) {
-        const zone = route53.HostedZone.fromLookup(this, "HostedZone", {
-          domainName: props.customDomain.hostedZoneName,
-        });
-        new route53.ARecord(this, "WebAliasRecord", {
-          zone,
-          recordName: props.customDomain.webHostname,
-          target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
-        });
-      }
+      const zone = route53.HostedZone.fromLookup(this, "HostedZone", {
+        domainName: props.customDomain.hostedZoneName,
+      });
+      new route53.ARecord(this, "WebAliasRecord", {
+        zone,
+        recordName: props.customDomain.webHostname,
+        target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
+      });
 
       new cdk.CfnOutput(this, "WebCnameTargetOutput", {
         exportName: "BookshelfWebCnameTarget",
-        description: `CloudFront domain for ${props.customDomain.webHostname}. Phase 1: create CNAME here at the DNS provider. Phase 2: managed by Route53 A-alias record.`,
         value: distribution.distributionDomainName,
       });
     }
@@ -271,6 +259,10 @@ export class WebStack extends cdk.Stack {
     new cdk.CfnOutput(this, "DistributionUrlOutput", {
       exportName: "BookshelfDistributionUrl",
       value: this.distributionUrl,
+    });
+    new cdk.CfnOutput(this, "DistributionIdOutput", {
+      exportName: "BookshelfDistributionId",
+      value: distribution.distributionId,
     });
 
     if (props.customDomain) {

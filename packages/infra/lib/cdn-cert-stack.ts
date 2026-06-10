@@ -9,16 +9,12 @@ export interface CdnCertStackProps extends cdk.StackProps {
   /** Extra SANs, e.g. ["*.bookshelf.whoiskevinrich.com"]. */
   subjectAlternativeNames?: string[];
   /**
-   * Route53 hosted zone for automated DNS validation (ADR-013, Phase 2).
-   *
-   * When provided, CDK writes the ACM validation CNAME to the zone automatically
-   * and `cdk deploy` no longer blocks. Pass `DnsStack.hostedZone` — both stacks
-   * are in us-east-1, so this is a plain same-region cross-stack reference.
-   *
-   * When omitted, the cert falls back to **manual** DNS validation (Phase 1):
-   * `cdk deploy` blocks until the validation CNAME is added at the DNS provider.
+   * Route53 hosted zone for automated DNS validation (ADR-013).
+   * Pass `DnsStack.hostedZone` — both stacks are in us-east-1, so this is a
+   * plain same-region cross-stack reference. CDK writes the ACM validation
+   * CNAME to the zone automatically; `cdk deploy` no longer blocks.
    */
-  hostedZone?: route53.IHostedZone;
+  hostedZone: route53.IHostedZone;
 }
 
 /**
@@ -26,10 +22,6 @@ export interface CdnCertStackProps extends cdk.StackProps {
  *
  * MUST be in us-east-1 — CloudFront only accepts certs from that region, even
  * though the app's other stacks deploy to us-west-2.
- *
- * Phase 2 (hostedZone set): automated cert validation via fromDns — deploy is
- * hands-free.  Phase 1 (no hostedZone): manual validation — add the CNAME at
- * the DNS provider.  See ADR-012 / ADR-013.
  */
 export class CdnCertStack extends cdk.Stack {
   /** Certificate consumed cross-region by WebStack (CloudFront, us-west-2 stack). */
@@ -43,11 +35,7 @@ export class CdnCertStack extends cdk.Stack {
       ...(props.subjectAlternativeNames
         ? { subjectAlternativeNames: props.subjectAlternativeNames }
         : {}),
-      // Phase 2: CDK adds the validation CNAME to Route53 automatically.
-      // Phase 1: add the CNAME manually at the DNS provider (Cloudflare).
-      validation: props.hostedZone
-        ? acm.CertificateValidation.fromDns(props.hostedZone)
-        : acm.CertificateValidation.fromDns(),
+      validation: acm.CertificateValidation.fromDns(props.hostedZone),
     });
 
     new cdk.CfnOutput(this, "CertificateArnOutput", {

@@ -1,6 +1,7 @@
 import * as path from "path";
 import { describe, it } from "vitest";
 import * as cdk from "aws-cdk-lib";
+import * as route53 from "aws-cdk-lib/aws-route53";
 import { Template, Match } from "aws-cdk-lib/assertions";
 import { AuthStack } from "../lib/auth-stack";
 import { ApiStack } from "../lib/api-stack";
@@ -72,9 +73,9 @@ describe("AuthStack", () => {
     });
   });
 
-  it("stores User Pool ID in SSM", () => {
-    template.hasResourceProperties("AWS::SSM::Parameter", {
-      Name: "/bookshelf/cognito/user-pool-id",
+  it("exports User Pool ID as a CloudFormation output", () => {
+    template.hasOutput("UserPoolIdOutput", {
+      Export: { Name: "BookshelfUserPoolId" },
     });
   });
 });
@@ -136,9 +137,9 @@ describe("ApiStack", () => {
     template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
   });
 
-  it("stores API URL in SSM", () => {
-    template.hasResourceProperties("AWS::SSM::Parameter", {
-      Name: "/bookshelf/api/url",
+  it("exports API URL as a CloudFormation output", () => {
+    template.hasOutput("ApiUrlOutput", {
+      Export: { Name: "BookshelfApiUrl" },
     });
   });
 });
@@ -198,21 +199,28 @@ describe("WebStack", () => {
 
 // ── Custom-domain topology (prod, `-c env=prod`) ─────────────────────────────
 //
-// DNS lives at the registrar (Hover), not Route53: certs use manual DNS
-// validation and the public hostnames are CNAMEs → the CloudFront / API custom-
-// domain names (output by the stacks). So there are NO Route53 resources here.
+// Route53 manages cert validation CNAMEs and hostname A records automatically.
 // All stacks share one region so the test exercises the domain code paths without
 // cross-region reference machinery (a deploy concern); in real prod CdnCertStack
 // is us-east-1 and Api/Web are us-west-2, wired with crossRegionReferences in bin.
+// Zone lookups return placeholder IDs in tests (no live Route53 in unit tests).
 describe("Custom-domain topology", () => {
   const zoneName = "bookshelf.example.com";
   const dApp = new cdk.App();
   const dEnv = { account: "123456789012", region: "us-east-1" };
 
+  // Provide a non-placeholder hosted zone for CdnCertStack so the cert
+  // validation CNAME construct synthesizes with a real zone reference.
+  const mockZone = route53.HostedZone.fromHostedZoneAttributes(dApp, "MockZone", {
+    hostedZoneId: "Z123MOCKZONE",
+    zoneName,
+  });
+
   const cdnCert = new CdnCertStack(dApp, "DTestCdnCert", {
     env: dEnv,
     domainName: zoneName,
     subjectAlternativeNames: [`*.${zoneName}`],
+    hostedZone: mockZone,
   });
   const dAuth = new AuthStack(dApp, "DTestAuth", { env: dEnv });
   const dApi = new ApiStack(dApp, "DTestApi", {
@@ -224,6 +232,7 @@ describe("Custom-domain topology", () => {
     customDomain: {
       apiHostname: `api.${zoneName}`,
       certificateDomainName: `*.${zoneName}`,
+      hostedZoneName: zoneName,
     },
   });
   const dWeb = new WebStack(dApp, "DTestWeb", {
@@ -234,6 +243,7 @@ describe("Custom-domain topology", () => {
     customDomain: {
       certificate: cdnCert.certificate,
       webHostname: zoneName,
+      hostedZoneName: zoneName,
     },
     runtimeConfig: testRuntimeConfig,
   });
@@ -256,8 +266,12 @@ describe("Custom-domain topology", () => {
       template.resourceCountIs("AWS::ApiGatewayV2::ApiMapping", 1);
     });
 
-    it("creates NO Route53 records (DNS is at the registrar)", () => {
-      template.resourceCountIs("AWS::Route53::RecordSet", 0);
+    it("creates a Route53 A alias record for the API domain", () => {
+      // CDK embeds the hosted zone ID in Certificate DomainValidationOptions;
+      // CloudFormation handles the validation CNAME internally — only the A
+      // alias record for the API hostname appears as an explicit resource.
+      template.resourceCountIs("AWS::Route53::RecordSet", 1);
+      template.hasResourceProperties("AWS::Route53::RecordSet", { Type: "A" });
     });
 
     it("drops CORS when a custom domain is configured (same-origin / MCP)", () => {
@@ -290,8 +304,8 @@ describe("Custom-domain topology", () => {
       });
     });
 
-    it("creates NO Route53 records (DNS is at the registrar)", () => {
-      template.resourceCountIs("AWS::Route53::RecordSet", 0);
+    it("creates a Route53 A record for the web hostname", () => {
+      template.resourceCountIs("AWS::Route53::RecordSet", 1);
     });
   });
 });
