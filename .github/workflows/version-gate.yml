@@ -1,0 +1,46 @@
+name: Version Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: version-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  version-gate:
+    name: Unique Version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-tags: true
+          ref: ${{ github.head_ref }}
+
+      - name: Ensure version is unique (auto-bump if already tagged)
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "Current version: v$VERSION"
+
+          if ! git tag --list "v$VERSION" | grep -q "v$VERSION"; then
+            echo "Version v$VERSION is unique — no bump needed."
+            exit 0
+          fi
+
+          echo "Tag v$VERSION already exists — auto-bumping..."
+          while git tag --list "v$VERSION" | grep -q "v$VERSION"; do
+            npm version patch --no-git-tag-version
+            VERSION=$(jq -r .version package.json)
+          done
+          echo "Bumped to v$VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: bump version to v$VERSION"
+          git push origin HEAD:${{ github.head_ref }}
+          echo "::notice::Version auto-bumped to v$VERSION. Re-run CI on this PR to update check status."
