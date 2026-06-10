@@ -148,6 +148,56 @@ jobs:
             "$CTX_FILE" > /tmp/cdk.context.json \
             && mv /tmp/cdk.context.json "$CTX_FILE"
 
+      - name: Reconcile orphaned Cognito identity providers
+        # If a Google IdP was manually created (or left behind by a rolled-back
+        # deploy) it won't be tracked in the BookshelfAuth CloudFormation stack.
+        # CloudFormation's early-validation rejects the change set when CDK tries
+        # to CREATE a resource that already exists in the service. This step detects
+        # that case and deletes the orphan so CDK can create and track it cleanly.
+        run: |
+          set -euo pipefail
+          STACK_NAME="BookshelfAuth"
+
+          POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolIdOutput'].OutputValue" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$POOL_ID" ]; then
+            echo "BookshelfAuth stack not found — nothing to reconcile."
+            exit 0
+          fi
+
+          echo "User pool: $POOL_ID"
+
+          # Check if Google IdP is already tracked in the stack.
+          TRACKED=$(aws cloudformation list-stack-resources \
+            --stack-name "$STACK_NAME" \
+            --query "StackResourceSummaries[?ResourceType=='AWS::Cognito::UserPoolIdentityProvider'].PhysicalResourceId" \
+            --output text)
+
+          if [ -n "$TRACKED" ]; then
+            echo "Google IdP already tracked in CloudFormation ($TRACKED) — nothing to do."
+            exit 0
+          fi
+
+          # IdP is not in the stack. Check if it exists in Cognito.
+          PROVIDER=$(aws cognito-idp describe-identity-provider \
+            --user-pool-id "$POOL_ID" \
+            --provider-name Google \
+            --query "IdentityProvider.ProviderName" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$PROVIDER" ]; then
+            echo "Orphaned Google IdP found in pool $POOL_ID — removing so CDK can create and track it."
+            aws cognito-idp delete-identity-provider \
+              --user-pool-id "$POOL_ID" \
+              --provider-name Google
+            echo "Orphaned Google IdP removed."
+          else
+            echo "No orphaned Google IdP — nothing to do."
+          fi
+
       - name: Deploy cert, Auth, API, and MCP stacks
         # `-c env=prod` applies the full prod topology atomically (ADR-009).
         # BookshelfDns is included as a dependency and is either already deployed
