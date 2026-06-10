@@ -105,6 +105,21 @@ jobs:
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
             --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }}
 
+      - name: Register CloudFront domain in Auth callbacks
+        # Auth deployed before Web (no CloudFront URL yet). Now that WebStack is up,
+        # pass the distribution domain as CDK context so Cognito's app client gets
+        # the CloudFront callback URL registered. No-op on subsequent deploys if the
+        # URL is already registered.
+        run: |
+          CF_URL=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfWeb \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionUrlOutput'].OutputValue" \
+            --output text)
+          CF_DOMAIN="${CF_URL#https://}"
+          pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth \
+            --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }} \
+            -c cloudfront-domain="${CF_DOMAIN}"
+
       - name: Smoke tests
         id: smoke
         continue-on-error: true

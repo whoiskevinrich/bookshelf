@@ -92,9 +92,19 @@ const usEast1Env: cdk.Environment = account
   ? { account, region: "us-east-1" }
   : { region: "us-east-1" };
 
-// Derive OAuth callback/logout URLs from the custom domain when present
-const oauthCallbackUrls = config.domain ? [`https://${config.domain}/auth/callback`] : [];
-const oauthLogoutUrls = config.domain ? [`https://${config.domain}`] : [];
+// `cloudfront-domain` is injected by CI after WebStack deploys (just the hostname,
+// no scheme). Environments with a custom `domain` don't need it — their callback
+// URL is derived from the domain name below.
+const cloudfrontDomain = app.node.tryGetContext("cloudfront-domain") as string | undefined;
+
+const oauthCallbackUrls = [
+  ...(config.domain ? [`https://${config.domain}/auth/callback`] : []),
+  ...(cloudfrontDomain ? [`https://${cloudfrontDomain}/auth/callback`] : []),
+];
+const oauthLogoutUrls = [
+  ...(config.domain ? [`https://${config.domain}`] : []),
+  ...(cloudfrontDomain ? [`https://${cloudfrontDomain}`] : []),
+];
 
 const auth = new AuthStack(app, "BookshelfAuth", {
   env,
