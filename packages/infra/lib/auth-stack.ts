@@ -36,7 +36,6 @@ export interface AuthStackProps extends cdk.StackProps {
 export class AuthStack extends cdk.Stack {
   /** Cognito User Pool ID — consumed by ApiStack and WebStack */
   readonly userPoolId: string;
-  readonly userPoolArn: string;
   /** App Client ID — passed to the SPA as a public identifier */
   readonly userPoolClientId: string;
   /** MCP OAuth app client ID — used by McpStack for token audience validation */
@@ -239,43 +238,15 @@ export class AuthStack extends cdk.Stack {
     });
     userPool.addTrigger(cognito.UserPoolOperation.CUSTOM_MESSAGE, customMessageFn);
 
-    // ── SSM Parameters (read by CDK outputs + CI deploy scripts) ──────────
-    new ssm.StringParameter(this, "UserPoolIdParam", {
-      parameterName: "/bookshelf/cognito/user-pool-id",
-      stringValue: userPool.userPoolId,
-      description: "Bookshelf Cognito User Pool ID",
-    });
-    new ssm.StringParameter(this, "UserPoolClientIdParam", {
-      parameterName: "/bookshelf/cognito/client-id",
-      stringValue: appClient.userPoolClientId,
-      description: "Bookshelf Cognito SPA App Client ID",
-    });
-    new ssm.StringParameter(this, "McpClientIdParam", {
-      parameterName: "/bookshelf/cognito/mcp-client-id",
-      stringValue: mcpClient.userPoolClientId,
-      description: "Bookshelf Cognito MCP App Client ID",
-    });
-    new ssm.StringParameter(this, "HostedUiBaseUrlParam", {
-      parameterName: "/bookshelf/cognito/hosted-ui-base-url",
-      stringValue: userPoolDomain.baseUrl(),
-      description: "Cognito Hosted UI base URL for OAuth discovery",
-    });
-
     // FQDN without scheme — used by Amplify's loginWith.oauth.domain config
     const hostedUiDomain = cognitoCustomDomain
       ? cognitoCustomDomain.domainName
       : `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
-    new ssm.StringParameter(this, "HostedUiDomainParam", {
-      parameterName: "/bookshelf/cognito/hosted-ui-domain",
-      stringValue: hostedUiDomain,
-      description: "Cognito Hosted UI domain FQDN (no scheme) — used by Amplify oauth config",
-    });
 
     // ── CloudFormation outputs ─────────────────────────────────────────────
     const issuer = `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`;
 
     this.userPoolId = userPool.userPoolId;
-    this.userPoolArn = userPool.userPoolArn;
     this.userPoolClientId = appClient.userPoolClientId;
     this.mcpClientId = mcpClient.userPoolClientId;
     this.hostedUiBaseUrl = userPoolDomain.baseUrl();
@@ -297,6 +268,11 @@ export class AuthStack extends cdk.Stack {
     new cdk.CfnOutput(this, "HostedUiBaseUrlOutput", {
       exportName: "BookshelfHostedUiBaseUrl",
       value: userPoolDomain.baseUrl(),
+    });
+    new cdk.CfnOutput(this, "HostedUiDomainOutput", {
+      exportName: "BookshelfHostedUiDomain",
+      value: hostedUiDomain,
+      description: "Cognito Hosted UI FQDN (no scheme) — used by Amplify oauth.domain config",
     });
     new cdk.CfnOutput(this, "UserPoolIssuerOutput", {
       exportName: "BookshelfUserPoolIssuer",

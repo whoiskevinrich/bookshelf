@@ -111,14 +111,10 @@ const oauthLogoutUrls = [
 // Note: ApiStack and WebStack call HostedZone.fromLookup at synth time (Route53
 // is a global API; no regional affinity). The zone must exist before the first
 // cdk synth of those stacks. Result cached in cdk.context.json — commit this file.
-//
-// DNS/cert stacks are created before AuthStack so the wildcard cert can be passed
-// to AuthStack for the custom Cognito Hosted UI domain (auth.<domain>).
 let dns: DnsStack | undefined;
 let cdnCert: CdnCertStack | undefined;
 let webCustomDomain: WebCustomDomainConfig | undefined;
 let apiCustomDomain: ApiCustomDomainConfig | undefined;
-let mcpCustomDomain: McpCustomDomainConfig | undefined;
 if (config.domain) {
   const wildcard = `*.${config.domain}`; // covers auth. api. mcp. and future subdomains
 
@@ -138,16 +134,11 @@ if (config.domain) {
   webCustomDomain = {
     certificate: cdnCert.certificate,
     webHostname: config.domain,
-    hostedZoneName: config.domain, // Route53 A-alias record for CloudFront
+    hostedZoneName: config.domain,
   };
   apiCustomDomain = {
     apiHostname: `api.${config.domain}`,
     certificateDomainName: wildcard,
-    hostedZoneName: config.domain, // automated cert validation + API Gateway alias
-  };
-  mcpCustomDomain = {
-    mcpHostname: `mcp.${config.domain}`,
-    certificateDomainName: wildcard, // same wildcard cert covers mcp.
     hostedZoneName: config.domain,
   };
 }
@@ -180,6 +171,16 @@ const api = new ApiStack(app, "BookshelfApi", {
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
 });
 
+// mcpCustomDomain references api.regionalCertificate (the wildcard regional cert
+// created by ApiStack), so it must be defined after api is instantiated.
+const mcpCustomDomain: McpCustomDomainConfig | undefined = config.domain
+  ? {
+      mcpHostname: `mcp.${config.domain}`,
+      certificate: api.regionalCertificate!,
+      hostedZoneName: config.domain,
+    }
+  : undefined;
+
 const mcp = new McpStack(app, "BookshelfMcp", {
   env,
   userPoolId: auth.userPoolId,
@@ -189,8 +190,6 @@ const mcp = new McpStack(app, "BookshelfMcp", {
   apiUrl: api.apiUrl,
   ...(mcpCustomDomain ? { customDomain: mcpCustomDomain } : {}),
 });
-mcp.addDependency(auth);
-mcp.addDependency(api);
 if (dns) mcp.addDependency(dns);
 
 const web = new WebStack(app, "BookshelfWeb", {
@@ -210,12 +209,6 @@ const web = new WebStack(app, "BookshelfWeb", {
   },
 });
 
-// Web must deploy after Auth (the web build bakes Cognito IDs) and, when the API
-// is fronted via CloudFront, after the API (token ref also implies this).
-web.addDependency(auth);
-if (config.apiThroughCloudFront) {
-  web.addDependency(api);
-}
 // Ensure BookshelfDns is deployed before ApiStack/WebStack so their
 // HostedZone.fromLookup synth-time queries find the zone.
 if (dns) {
