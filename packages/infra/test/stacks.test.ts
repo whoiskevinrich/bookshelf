@@ -211,11 +211,10 @@ describe("Custom-domain topology", () => {
 
   // Provide a non-placeholder hosted zone for CdnCertStack so the cert
   // validation CNAME construct synthesizes with a real zone reference.
-  const mockZone = route53.HostedZone.fromHostedZoneAttributes(
-    dApp,
-    "MockZone",
-    { hostedZoneId: "Z123MOCKZONE", zoneName },
-  );
+  const mockZone = route53.HostedZone.fromHostedZoneAttributes(dApp, "MockZone", {
+    hostedZoneId: "Z123MOCKZONE",
+    zoneName,
+  });
 
   const cdnCert = new CdnCertStack(dApp, "DTestCdnCert", {
     env: dEnv,
