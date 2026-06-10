@@ -110,8 +110,7 @@ export async function getSessionData(): Promise<{ idToken: string | null; isGoog
     const session = await fetchAuthSession();
     const idToken = session.tokens?.idToken?.toString() ?? null;
     const identities = session.tokens?.idToken?.payload?.["identities"];
-    const parsed: unknown =
-      typeof identities === "string" ? JSON.parse(identities) : identities;
+    const parsed: unknown = typeof identities === "string" ? JSON.parse(identities) : identities;
     const isGoogle =
       Array.isArray(parsed) &&
       parsed.some(

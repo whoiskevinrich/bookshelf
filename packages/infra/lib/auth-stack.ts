@@ -139,12 +139,16 @@ export class AuthStack extends cdk.Stack {
       },
     });
 
-    // Allow the Lambda to list users and link identities in this pool
+    // Scope to all user pools in this account+region rather than referencing the specific
+    // pool ARN. Using userPool.userPoolArn (Fn::GetAtt) here would create a CloudFormation
+    // cycle: UserPool → PreSignUpFn → IAMPolicy → UserPool.
     preSignUpFn.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["cognito-idp:ListUsers", "cognito-idp:AdminLinkProviderForUser"],
-        resources: [userPool.userPoolArn],
+        resources: [
+          `arn:${cdk.Aws.PARTITION}:cognito-idp:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:userpool/*`,
+        ],
       }),
     );
 

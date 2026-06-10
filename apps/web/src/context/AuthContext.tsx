@@ -1,10 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import {
-  getCurrentUser,
-  getSessionData,
-  signOut as authSignOut,
-  type AuthUser,
-} from "../lib/auth";
+import { getCurrentUser, getSessionData, signOut as authSignOut, type AuthUser } from "../lib/auth";
 
 interface AuthState {
   user: AuthUser | null;
