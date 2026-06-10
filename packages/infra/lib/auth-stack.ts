@@ -3,6 +3,7 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as path from "path";
@@ -156,6 +157,15 @@ export class AuthStack extends cdk.Stack {
       environment: {
         EMAIL_ALLOWLIST: googleEmailAllowlist ?? "",
       },
+      // Explicit log group with a CDK-generated name. With
+      // `@aws-cdk/aws-lambda:useCdkManagedLogGroup`, the default managed group is
+      // named `/aws/lambda/<functionName>` — colliding with the one this Lambda
+      // auto-created before the flag (an environment that deployed pre-flag rejects
+      // the change set: "LogGroup already exists"). A dedicated group avoids it.
+      logGroup: new logs.LogGroup(this, "PreSignUpFnLogGroup", {
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
     });
 
     // Scope to all user pools in this account+region rather than referencing the specific
@@ -235,6 +245,13 @@ export class AuthStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(5),
       description:
         "Cognito custom message trigger — HTML email templates for verification, password reset, and invitations",
+      // Explicit log group (see PreSignUpFn) to avoid the
+      // `/aws/lambda/bookshelf-custom-message` managed-group name collision in
+      // environments that deployed before useCdkManagedLogGroup was enabled.
+      logGroup: new logs.LogGroup(this, "CustomMessageFnLogGroup", {
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
     });
     userPool.addTrigger(cognito.UserPoolOperation.CUSTOM_MESSAGE, customMessageFn);
 
