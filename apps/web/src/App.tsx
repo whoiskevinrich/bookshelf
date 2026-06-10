@@ -3,6 +3,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthRoute } from "./components/AuthRoute";
+import { Footer } from "./components/Footer";
 import { LandingPage } from "./pages/LandingPage";
 import { AboutPage } from "./pages/AboutPage";
 import { ShelfPage } from "./pages/ShelfPage";
@@ -101,6 +102,7 @@ export function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <Footer />
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
