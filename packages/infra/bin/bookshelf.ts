@@ -19,16 +19,14 @@ import { DnsStack } from "../lib/dns-stack";
  * assumed credentials (one AWS account per environment), keeping account IDs out
  * of source. `region` and the behavioural flags are environment traits.
  *
- * Three environments — all same-origin (`/api/*` via CloudFront, no CORS):
- *   - `dev`          — domainless, invite-only. Mirrors prod's request topology on
- *                      `*.cloudfront.net` (separate dev account).
- *   - `prod-interim` — domainless, invite-only. Live on `*.cloudfront.net` while the
- *                      custom domain is blocked at the registrar (ADR-010). No certs.
- *   - `prod`         — self-signup on + custom domain `bookshelf.whoiskevinrich.com`.
+ * Two environments — all same-origin (`/api/*` via CloudFront, no CORS):
+ *   - `dev`  — domainless, invite-only. Mirrors prod's request topology on
+ *              `*.cloudfront.net` (separate dev account).
+ *   - `prod` — self-signup on + custom domain `bookshelf.whoiskevinrich.com`.
  */
 interface EnvConfig {
   region: string;
-  /** Cognito self-signup — off for dev/interim (invite-only), on for full prod. */
+  /** Cognito self-signup — off for dev (invite-only), on for full prod. */
   allowSelfSignUp: boolean;
   /**
    * Route the API through CloudFront `/api/*` (same-origin → no CORS). True for all
@@ -53,12 +51,6 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     apiThroughCloudFront: true,
     googleEmailAllowlist: "whoiskevinrich@gmail.com",
   },
-  "prod-interim": {
-    region: "us-west-2",
-    allowSelfSignUp: false,
-    apiThroughCloudFront: true,
-    googleEmailAllowlist: "whoiskevinrich@gmail.com",
-  },
   prod: {
     region: "us-west-2",
     allowSelfSignUp: true,
@@ -70,7 +62,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
 const app = new cdk.App();
 
 // ── Environment selection ─────────────────────────────────────────────────
-// -c env=dev|prod-interim|prod (default dev). Drives the entire topology.
+// -c env=dev|prod (default dev). Drives the entire topology.
 const envName = (app.node.tryGetContext("env") as string | undefined) ?? "dev";
 const config = ENVIRONMENTS[envName];
 if (!config) {
@@ -106,14 +98,6 @@ const oauthLogoutUrls = [
   ...(cloudfrontDomain ? [`https://${cloudfrontDomain}`] : []),
 ];
 
-const auth = new AuthStack(app, "BookshelfAuth", {
-  env,
-  allowSelfSignUp: config.allowSelfSignUp,
-  googleEmailAllowlist: config.googleEmailAllowlist,
-  oauthCallbackUrls,
-  oauthLogoutUrls,
-});
-
 // ── Custom domain (full prod only) ──────────────────────────────────────────
 // Two-tier DNS (ADR-012 + ADR-013): Cloudflare owns the apex zone and holds a
 // single NS delegation record pointing the bookshelf subtree at DnsStack's
@@ -127,19 +111,23 @@ const auth = new AuthStack(app, "BookshelfAuth", {
 // Note: ApiStack and WebStack call HostedZone.fromLookup at synth time (Route53
 // is a global API; no regional affinity). The zone must exist before the first
 // cdk synth of those stacks. Result cached in cdk.context.json — commit this file.
+//
+// DNS/cert stacks are created before AuthStack so the wildcard cert can be passed
+// to AuthStack for the custom Cognito Hosted UI domain (auth.<domain>).
 let dns: DnsStack | undefined;
+let cdnCert: CdnCertStack | undefined;
 let webCustomDomain: WebCustomDomainConfig | undefined;
 let apiCustomDomain: ApiCustomDomainConfig | undefined;
 let mcpCustomDomain: McpCustomDomainConfig | undefined;
 if (config.domain) {
-  const wildcard = `*.${config.domain}`; // covers api. mcp. and future subdomains
+  const wildcard = `*.${config.domain}`; // covers auth. api. mcp. and future subdomains
 
   dns = new DnsStack(app, "BookshelfDns", {
     env: usEast1Env,
     appSubdomain: config.domain,
   });
 
-  const cdnCert = new CdnCertStack(app, "BookshelfCdnCert", {
+  cdnCert = new CdnCertStack(app, "BookshelfCdnCert", {
     env: usEast1Env,
     domainName: config.domain,
     subjectAlternativeNames: [wildcard],
@@ -163,6 +151,25 @@ if (config.domain) {
     hostedZoneName: config.domain,
   };
 }
+
+const auth = new AuthStack(app, "BookshelfAuth", {
+  env,
+  // crossRegionReferences required when consuming the us-east-1 CdnCertStack cert
+  ...(cdnCert ? { crossRegionReferences: true } : {}),
+  allowSelfSignUp: config.allowSelfSignUp,
+  googleEmailAllowlist: config.googleEmailAllowlist,
+  oauthCallbackUrls,
+  oauthLogoutUrls,
+  ...(config.domain && cdnCert
+    ? {
+        cognitoCustomDomain: {
+          domainName: `auth.${config.domain}`,
+          certificate: cdnCert.certificate,
+          hostedZoneName: config.domain,
+        },
+      }
+    : {}),
+});
 
 const api = new ApiStack(app, "BookshelfApi", {
   env,

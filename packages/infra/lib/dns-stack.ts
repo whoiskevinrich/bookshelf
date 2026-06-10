@@ -44,7 +44,7 @@ export class DnsStack extends cdk.Stack {
     // Copy these four NS values into a Cloudflare NS record to delegate the
     // subdomain from Cloudflare to Route53 (one-time manual step).
     new cdk.CfnOutput(this, "NameServers", {
-      value: cdk.Fn.join(", ", zone.hostedZoneNameServers),
+      value: cdk.Fn.join(", ", zone.hostedZoneNameServers!),
       description:
         "Route53 nameservers — add as NS record at Cloudflare to delegate the subdomain (one-time bootstrap)",
     });
