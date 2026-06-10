@@ -59,6 +59,8 @@ export interface WebStackProps extends cdk.StackProps {
     cognitoUserPoolId: string;
     cognitoUserPoolClientId: string;
     cognitoRegion: string;
+    /** Hosted UI FQDN (no scheme) — used as Amplify oauth.domain. */
+    cognitoOauthDomain: string;
     /** "/api" (same-origin) or the absolute execute-api URL (dev). */
     apiBaseUrl: string;
   };
@@ -214,6 +216,7 @@ export class WebStack extends cdk.Stack {
             userPoolId: props.runtimeConfig.cognitoUserPoolId,
             userPoolClientId: props.runtimeConfig.cognitoUserPoolClientId,
             region: props.runtimeConfig.cognitoRegion,
+            oauthDomain: props.runtimeConfig.cognitoOauthDomain,
           },
           apiBaseUrl: props.runtimeConfig.apiBaseUrl,
         }),

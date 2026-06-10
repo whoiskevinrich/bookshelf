@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as path from "path";
@@ -8,6 +9,15 @@ import { Construct } from "constructs";
 export interface AuthStackProps extends cdk.StackProps {
   /** Allow visitors to self-register. Set to true for prod; leave false (default) for dev. */
   allowSelfSignUp?: boolean;
+  /**
+   * Comma-separated email allowlist enforced by the PreSignUp Lambda. When set,
+   * only these emails can sign in (native or Google). Omit for open enrollment (prod).
+   */
+  googleEmailAllowlist?: string;
+  /** Additional OAuth callback URLs registered on the SPA client (e.g. prod domain). */
+  oauthCallbackUrls?: string[];
+  /** Additional OAuth logout URLs registered on the SPA client (e.g. prod domain). */
+  oauthLogoutUrls?: string[];
 }
 
 export class AuthStack extends cdk.Stack {
@@ -22,10 +32,21 @@ export class AuthStack extends cdk.Stack {
   readonly hostedUiBaseUrl: string;
   /** JWKS issuer URL — used by Lambda JWT verification and ApiStack env vars */
   readonly userPoolIssuer: string;
+  /**
+   * Cognito Hosted UI domain FQDN (no scheme), e.g.
+   * "bookshelf-123456789012.auth.us-west-2.amazoncognito.com".
+   * Passed to the SPA as the Amplify oauth.domain config value.
+   */
+  readonly hostedUiDomain: string;
 
   constructor(scope: Construct, id: string, props: AuthStackProps = {}) {
     super(scope, id, props);
-    const { allowSelfSignUp = false } = props;
+    const {
+      allowSelfSignUp = false,
+      googleEmailAllowlist,
+      oauthCallbackUrls,
+      oauthLogoutUrls,
+    } = props;
 
     // ── User Pool ──────────────────────────────────────────────────────────
     const userPool = new cognito.UserPool(this, "UserPool", {
@@ -47,6 +68,32 @@ export class AuthStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN, // never accidentally delete user accounts
     });
 
+    // ── Google identity provider ──────────────────────────────────────────
+    //
+    // Credentials are resolved at deploy time (never in source):
+    //   /bookshelf/google/client-id      — SSM String  (public OAuth client ID)
+    //   /bookshelf/google/client-secret  — Secrets Manager (OAuth client secret)
+    //
+    // CloudFormation does not support SSM SecureString dynamic references in
+    // AWS::Cognito::UserPoolIdentityProvider, so the secret must live in
+    // Secrets Manager instead of SSM SecureString.
+    //
+    // Create these before the first `cdk deploy`:
+    //   aws ssm put-parameter --name /bookshelf/google/client-id --value <id> --type String
+    //   aws secretsmanager create-secret --name /bookshelf/google/client-secret --secret-string <secret>
+    const googleIdp = new cognito.UserPoolIdentityProviderGoogle(this, "GoogleIdp", {
+      userPool,
+      clientId: ssm.StringParameter.valueForStringParameter(this, "/bookshelf/google/client-id"),
+      clientSecretValue: cdk.SecretValue.secretsManager("/bookshelf/google/client-secret"),
+      scopes: ["email", "openid", "profile"],
+      attributeMapping: {
+        // Maps Google's email to the Cognito email attribute.
+        // Cognito skips immutable attribute updates on subsequent sign-ins,
+        // so mutable:false on the pool's email attribute is safe here.
+        email: cognito.ProviderAttribute.GOOGLE_EMAIL,
+      },
+    });
+
     // ── App Client (SPA — public, no client secret) ────────────────────────
     const appClient = userPool.addClient("SpaClient", {
       userPoolClientName: "bookshelf-spa",
@@ -55,15 +102,63 @@ export class AuthStack extends cdk.Stack {
         userSrp: true, // standard SRP auth for the Amplify Auth SDK
         userPassword: true, // enabled for server-side password re-auth (DELETE /v1/users/me)
       },
+      supportedIdentityProviders: [
+        cognito.UserPoolClientIdentityProvider.COGNITO,
+        cognito.UserPoolClientIdentityProvider.GOOGLE,
+      ],
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.EMAIL, cognito.OAuthScope.OPENID, cognito.OAuthScope.PROFILE],
+        // localhost:5173 is Vite's default dev port; additional prod URLs come from props
+        callbackUrls: ["http://localhost:5173/auth/callback", ...(oauthCallbackUrls ?? [])],
+        logoutUrls: ["http://localhost:5173", ...(oauthLogoutUrls ?? [])],
       },
       preventUserExistenceErrors: true,
       accessTokenValidity: cdk.Duration.hours(1),
       idTokenValidity: cdk.Duration.hours(1),
       refreshTokenValidity: cdk.Duration.days(30),
     });
+
+    // CloudFormation must create the Google IdP before the app client references it
+    // in supportedIdentityProviders. Use L1 resources directly — addDependency at
+    // the L2 level pulls in all construct descendants and creates a cycle through
+    // the shared UserPool.
+    const cfnAppClient = appClient.node.defaultChild as cognito.CfnUserPoolClient;
+    const cfnGoogleIdp = googleIdp.node.defaultChild as cognito.CfnUserPoolIdentityProvider;
+    cfnAppClient.addDependency(cfnGoogleIdp);
+
+    // ── PreSignUp Lambda (allowlist + Google account linking) ─────────────
+    //
+    // Runs before Cognito creates a new user. Does two things:
+    //   1. Rejects sign-ins from emails not in EMAIL_ALLOWLIST (dev only)
+    //   2. Links a new Google sign-in to an existing native account with the
+    //      same email, preserving the user's sub and all their shelf data.
+    const preSignUpFn = new lambda.Function(this, "PreSignUpFn", {
+      functionName: "bookshelf-pre-signup",
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambda", "pre-signup")),
+      timeout: cdk.Duration.seconds(5),
+      description: "Cognito PreSignUp trigger — email allowlist + Google account linking",
+      environment: {
+        EMAIL_ALLOWLIST: googleEmailAllowlist ?? "",
+      },
+    });
+
+    // Scope to all user pools in this account+region rather than referencing the specific
+    // pool ARN. Using userPool.userPoolArn (Fn::GetAtt) here would create a CloudFormation
+    // cycle: UserPool → PreSignUpFn → IAMPolicy → UserPool.
+    preSignUpFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["cognito-idp:ListUsers", "cognito-idp:AdminLinkProviderForUser"],
+        resources: [
+          `arn:${cdk.Aws.PARTITION}:cognito-idp:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:userpool/*`,
+        ],
+      }),
+    );
+
+    userPool.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, preSignUpFn);
 
     // ── Hosted UI domain (required for MCP OAuth authorization code flow) ────
     //
@@ -133,6 +228,14 @@ export class AuthStack extends cdk.Stack {
       description: "Cognito Hosted UI base URL for OAuth discovery",
     });
 
+    // FQDN without scheme — used by Amplify's loginWith.oauth.domain config
+    const hostedUiDomain = `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
+    new ssm.StringParameter(this, "HostedUiDomainParam", {
+      parameterName: "/bookshelf/cognito/hosted-ui-domain",
+      stringValue: hostedUiDomain,
+      description: "Cognito Hosted UI domain FQDN (no scheme) — used by Amplify oauth config",
+    });
+
     // ── CloudFormation outputs ─────────────────────────────────────────────
     const issuer = `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`;
 
@@ -142,6 +245,7 @@ export class AuthStack extends cdk.Stack {
     this.mcpClientId = mcpClient.userPoolClientId;
     this.hostedUiBaseUrl = userPoolDomain.baseUrl();
     this.userPoolIssuer = issuer;
+    this.hostedUiDomain = hostedUiDomain;
 
     new cdk.CfnOutput(this, "UserPoolIdOutput", {
       exportName: "BookshelfUserPoolId",

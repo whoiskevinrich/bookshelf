@@ -33,6 +33,16 @@ async function bootstrap(): Promise<void> {
       Cognito: {
         userPoolId: runtimeConfig.cognito.userPoolId,
         userPoolClientId: runtimeConfig.cognito.userPoolClientId,
+        loginWith: {
+          oauth: {
+            domain: runtimeConfig.cognito.oauthDomain,
+            scopes: ["email", "openid", "profile"],
+            // window.location.origin auto-adapts: prod domain in prod, localhost in dev
+            redirectSignIn: [`${window.location.origin}/auth/callback`],
+            redirectSignOut: [`${window.location.origin}/`],
+            responseType: "code",
+          },
+        },
       },
     },
   });

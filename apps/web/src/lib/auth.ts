@@ -3,6 +3,7 @@ import {
   confirmSignUp as amplifyConfirmSignUp,
   resendSignUpCode as amplifyResendCode,
   signIn as amplifySignIn,
+  signInWithRedirect,
   signOut as amplifySignOut,
   updatePassword as amplifyUpdatePassword,
   fetchAuthSession,
@@ -103,6 +104,27 @@ export async function getSession(): Promise<string | null> {
   }
 }
 
+/** Fetches the session once and derives both the ID token and Google-provider status. */
+export async function getSessionData(): Promise<{ idToken: string | null; isGoogleUser: boolean }> {
+  try {
+    const session = await fetchAuthSession();
+    const idToken = session.tokens?.idToken?.toString() ?? null;
+    const identities = session.tokens?.idToken?.payload?.["identities"];
+    const parsed: unknown = typeof identities === "string" ? JSON.parse(identities) : identities;
+    const isGoogle =
+      Array.isArray(parsed) &&
+      parsed.some(
+        (id) =>
+          typeof id === "object" &&
+          id !== null &&
+          (id as Record<string, unknown>)["providerType"] === "Google",
+      );
+    return { idToken, isGoogleUser: isGoogle };
+  } catch {
+    return { idToken: null, isGoogleUser: false };
+  }
+}
+
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     const user = await amplifyGetCurrentUser();
@@ -131,6 +153,55 @@ export async function confirmResetPassword(
     await amplifyConfirmResetPassword({ username: email, confirmationCode: code, newPassword });
   } catch (err) {
     throw new Error(mapCognitoError(err), { cause: err });
+  }
+}
+
+/**
+ * Validates a post-login redirect destination against the current origin.
+ * Returns the path unchanged if it is same-origin and relative; falls back
+ * to /shelf for anything absolute, cross-origin, or empty.
+ */
+export function safeNext(raw: string | null | undefined): string {
+  if (!raw) return "/shelf";
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin !== window.location.origin) return "/shelf";
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return "/shelf";
+  }
+}
+
+/**
+ * Initiates the Google OAuth redirect flow.
+ * Saves the post-login destination to sessionStorage so the callback page
+ * can restore it after the round-trip through Cognito and Google.
+ */
+export async function signInWithGoogle(next?: string): Promise<void> {
+  sessionStorage.setItem("oauth_next", safeNext(next));
+  await signInWithRedirect({ provider: "Google" });
+}
+
+/**
+ * Returns true if the current session was established via Google OAuth.
+ * Checks the `identities` claim in the Cognito ID token, which Cognito
+ * populates for all federated sign-ins (including linked accounts).
+ */
+export async function isGoogleUser(): Promise<boolean> {
+  try {
+    const session = await fetchAuthSession();
+    const identities = session.tokens?.idToken?.payload?.["identities"];
+    if (!identities) return false;
+    const parsed: unknown = typeof identities === "string" ? JSON.parse(identities) : identities;
+    if (!Array.isArray(parsed)) return false;
+    return parsed.some(
+      (id) =>
+        typeof id === "object" &&
+        id !== null &&
+        (id as Record<string, unknown>)["providerType"] === "Google",
+    );
+  } catch {
+    return false;
   }
 }
 

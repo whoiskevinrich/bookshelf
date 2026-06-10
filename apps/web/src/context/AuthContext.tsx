@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { getCurrentUser, getSession, signOut as authSignOut, type AuthUser } from "../lib/auth";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { getCurrentUser, getSessionData, signOut as authSignOut, type AuthUser } from "../lib/auth";
 
 interface AuthState {
   user: AuthUser | null;
   idToken: string | null;
   loading: boolean;
+  isGoogleUser: boolean;
 }
 
 interface AuthContextValue extends AuthState {
@@ -14,25 +15,35 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, idToken: null, loading: true });
+const SIGNED_OUT: AuthState = { user: null, idToken: null, loading: false, isGoogleUser: false };
 
-  async function loadSession() {
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    idToken: null,
+    loading: true,
+    isGoogleUser: false,
+  });
+
+  const loadSession = useCallback(async () => {
     try {
-      const [user, idToken] = await Promise.all([getCurrentUser(), getSession()]);
-      setState({ user, idToken, loading: false });
+      const [user, { idToken, isGoogleUser }] = await Promise.all([
+        getCurrentUser(),
+        getSessionData(),
+      ]);
+      setState({ user, idToken, loading: false, isGoogleUser });
     } catch {
-      setState({ user: null, idToken: null, loading: false });
+      setState(SIGNED_OUT);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadSession();
-  }, []);
+  }, [loadSession]);
 
   async function signOut() {
     await authSignOut();
-    setState({ user: null, idToken: null, loading: false });
+    setState(SIGNED_OUT);
   }
 
   return (
