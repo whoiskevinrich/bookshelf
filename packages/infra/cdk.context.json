@@ -1,3 +1,9 @@
 {
-  "acknowledged-issue-numbers": [37949]
+  "acknowledged-issue-numbers": [
+    37949
+  ],
+  "hosted-zone:account=071526660165:domainName=bookshelf.whoiskevinrich.com:region=us-west-2": {
+    "Id": "/hostedzone/Z00617489ZABLRR80QR1",
+    "Name": "bookshelf.whoiskevinrich.com."
+  }
 }

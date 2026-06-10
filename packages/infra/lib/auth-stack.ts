@@ -188,29 +188,54 @@ export class AuthStack extends cdk.Stack {
     // Prod uses a custom domain (auth.bookshelf.whoiskevinrich.com) so Google's
     // account chooser shows the branded domain instead of the Cognito-managed one.
     // Dev falls back to a Cognito-managed domain (bookshelf-<account>.auth…).
-    const userPoolDomain = cognitoCustomDomain
-      ? userPool.addDomain("HostedUiDomain", {
+    // A Cognito custom domain (prod) can only be created once its parent apex
+    // (e.g. bookshelf.whoiskevinrich.com) resolves to a DNS A record — which is the
+    // WebStack's CloudFront alias. Since WebStack depends on this stack's outputs,
+    // the very first prod bring-up is a chicken-and-egg: gate the UserPoolDomain
+    // resource on the `authCustomDomain` context flag (default true) so it can be
+    // bootstrapped in order:
+    //   1. deploy Auth with `-c authCustomDomain=false` (no domain resource yet)
+    //   2. deploy Web (creates the apex A record)
+    //   3. deploy Auth with the default (creates the custom domain — apex A now resolves)
+    // Steady-state deploys use the default: the apex A record persists, so the domain
+    // creates/updates cleanly. The hosted-UI domain string is deterministic, so the
+    // exported hostedUiDomain/BaseUrl are always literals for the custom-domain case
+    // and never depend on the resource existing (decoupling MCP/Web from deploy order).
+    const createCustomDomain =
+      !!cognitoCustomDomain && this.node.tryGetContext("authCustomDomain") !== "false";
+
+    let hostedUiDomain: string;
+    let hostedUiBaseUrl: string;
+
+    if (cognitoCustomDomain) {
+      hostedUiDomain = cognitoCustomDomain.domainName;
+      hostedUiBaseUrl = `https://${cognitoCustomDomain.domainName}`;
+
+      if (createCustomDomain) {
+        const userPoolDomain = userPool.addDomain("HostedUiDomain", {
           customDomain: {
             domainName: cognitoCustomDomain.domainName,
             certificate: cognitoCustomDomain.certificate,
           },
-        })
-      : userPool.addDomain("HostedUiDomain", {
-          cognitoDomain: {
-            domainPrefix: `bookshelf-${cdk.Aws.ACCOUNT_ID}`,
-          },
         });
-
-    if (cognitoCustomDomain) {
-      const hostedZone = route53.HostedZone.fromLookup(this, "CognitoAuthZone", {
-        domainName: cognitoCustomDomain.hostedZoneName,
+        const hostedZone = route53.HostedZone.fromLookup(this, "CognitoAuthZone", {
+          domainName: cognitoCustomDomain.hostedZoneName,
+        });
+        new route53.CnameRecord(this, "CognitoAuthCname", {
+          zone: hostedZone,
+          recordName: cognitoCustomDomain.domainName,
+          domainName: userPoolDomain.cloudFrontDomainName,
+          ttl: cdk.Duration.minutes(5),
+        });
+      }
+    } else {
+      const userPoolDomain = userPool.addDomain("HostedUiDomain", {
+        cognitoDomain: {
+          domainPrefix: `bookshelf-${cdk.Aws.ACCOUNT_ID}`,
+        },
       });
-      new route53.CnameRecord(this, "CognitoAuthCname", {
-        zone: hostedZone,
-        recordName: cognitoCustomDomain.domainName,
-        domainName: userPoolDomain.cloudFrontDomainName,
-        ttl: cdk.Duration.minutes(5),
-      });
+      hostedUiDomain = `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
+      hostedUiBaseUrl = userPoolDomain.baseUrl();
     }
 
     // ── MCP app client (OAuth authorization code + PKCE) ─────────────────────
@@ -255,18 +280,13 @@ export class AuthStack extends cdk.Stack {
     });
     userPool.addTrigger(cognito.UserPoolOperation.CUSTOM_MESSAGE, customMessageFn);
 
-    // FQDN without scheme — used by Amplify's loginWith.oauth.domain config
-    const hostedUiDomain = cognitoCustomDomain
-      ? cognitoCustomDomain.domainName
-      : `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
-
     // ── CloudFormation outputs ─────────────────────────────────────────────
     const issuer = `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`;
 
     this.userPoolId = userPool.userPoolId;
     this.userPoolClientId = appClient.userPoolClientId;
     this.mcpClientId = mcpClient.userPoolClientId;
-    this.hostedUiBaseUrl = userPoolDomain.baseUrl();
+    this.hostedUiBaseUrl = hostedUiBaseUrl;
     this.userPoolIssuer = issuer;
     this.hostedUiDomain = hostedUiDomain;
 
@@ -284,7 +304,7 @@ export class AuthStack extends cdk.Stack {
     });
     new cdk.CfnOutput(this, "HostedUiBaseUrlOutput", {
       exportName: "BookshelfHostedUiBaseUrl",
-      value: userPoolDomain.baseUrl(),
+      value: hostedUiBaseUrl,
     });
     new cdk.CfnOutput(this, "HostedUiDomainOutput", {
       exportName: "BookshelfHostedUiDomain",
