@@ -6,6 +6,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as cloudfrontOrigins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as ssm from "aws-cdk-lib/aws-ssm";
@@ -201,7 +202,20 @@ export class WebStack extends cdk.Stack {
     // Uploads the built SPA to the versioned S3 prefix and invalidates
     // CloudFront — replacing the manual `aws s3 sync` + `create-invalidation`
     // CI steps. prune: false preserves previous prefixes for rollback.
+    //
+    // Give the BucketDeployment handler an explicit log group rather than the
+    // CDK-managed default. With `@aws-cdk/aws-lambda:useCdkManagedLogGroup` on,
+    // the default managed group is named `/aws/lambda/<functionName>` — the same
+    // name the handler Lambda auto-created on its first run before the flag was
+    // enabled, so CloudFormation rejects the change set ("LogGroup already
+    // exists"). A dedicated group sidesteps the name collision entirely.
+    const deployLogGroup = new logs.LogGroup(this, "DeployWebLogGroup", {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     new s3deploy.BucketDeployment(this, "DeployWeb", {
+      logGroup: deployLogGroup,
       sources: [
         s3deploy.Source.asset(webDistPath),
         // Deploy-time runtime config the SPA fetches at boot (lib/runtime-config.ts).
