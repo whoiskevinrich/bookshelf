@@ -1,7 +1,9 @@
 import * as cdk from "aws-cdk-lib";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as route53 from "aws-cdk-lib/aws-route53";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as path from "path";
 import { Construct } from "constructs";
@@ -18,6 +20,17 @@ export interface AuthStackProps extends cdk.StackProps {
   oauthCallbackUrls?: string[];
   /** Additional OAuth logout URLs registered on the SPA client (e.g. prod domain). */
   oauthLogoutUrls?: string[];
+  /**
+   * Custom domain for the Cognito Hosted UI (e.g. "auth.bookshelf.whoiskevinrich.com").
+   * Requires a cert in us-east-1 covering the domain and crossRegionReferences on this stack.
+   * When omitted, falls back to a Cognito-managed domain (bookshelf-<account>.auth…).
+   */
+  cognitoCustomDomain?: {
+    domainName: string;
+    certificate: acm.ICertificate;
+    /** Route53 hosted zone name used to add the CNAME record (e.g. "bookshelf.whoiskevinrich.com"). */
+    hostedZoneName: string;
+  };
 }
 
 export class AuthStack extends cdk.Stack {
@@ -46,6 +59,7 @@ export class AuthStack extends cdk.Stack {
       googleEmailAllowlist,
       oauthCallbackUrls,
       oauthLogoutUrls,
+      cognitoCustomDomain,
     } = props;
 
     // ── User Pool ──────────────────────────────────────────────────────────
@@ -162,14 +176,33 @@ export class AuthStack extends cdk.Stack {
 
     // ── Hosted UI domain (required for MCP OAuth authorization code flow) ────
     //
-    // Uses a Cognito-managed domain (free). The prefix is unique per account so
-    // dev and prod don't collide. MCP clients (Claude Desktop) redirect the user
-    // here for login and receive an authorization code via PKCE callback.
-    const userPoolDomain = userPool.addDomain("HostedUiDomain", {
-      cognitoDomain: {
-        domainPrefix: `bookshelf-${cdk.Aws.ACCOUNT_ID}`,
-      },
-    });
+    // Prod uses a custom domain (auth.bookshelf.whoiskevinrich.com) so Google's
+    // account chooser shows the branded domain instead of the Cognito-managed one.
+    // Dev falls back to a Cognito-managed domain (bookshelf-<account>.auth…).
+    const userPoolDomain = cognitoCustomDomain
+      ? userPool.addDomain("HostedUiDomain", {
+          customDomain: {
+            domainName: cognitoCustomDomain.domainName,
+            certificate: cognitoCustomDomain.certificate,
+          },
+        })
+      : userPool.addDomain("HostedUiDomain", {
+          cognitoDomain: {
+            domainPrefix: `bookshelf-${cdk.Aws.ACCOUNT_ID}`,
+          },
+        });
+
+    if (cognitoCustomDomain) {
+      const hostedZone = route53.HostedZone.fromLookup(this, "CognitoAuthZone", {
+        domainName: cognitoCustomDomain.hostedZoneName,
+      });
+      new route53.CnameRecord(this, "CognitoAuthCname", {
+        zone: hostedZone,
+        recordName: cognitoCustomDomain.domainName,
+        domainName: userPoolDomain.cloudFrontDomainName,
+        ttl: cdk.Duration.minutes(5),
+      });
+    }
 
     // ── MCP app client (OAuth authorization code + PKCE) ─────────────────────
     //
@@ -229,7 +262,9 @@ export class AuthStack extends cdk.Stack {
     });
 
     // FQDN without scheme — used by Amplify's loginWith.oauth.domain config
-    const hostedUiDomain = `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
+    const hostedUiDomain = cognitoCustomDomain
+      ? cognitoCustomDomain.domainName
+      : `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
     new ssm.StringParameter(this, "HostedUiDomainParam", {
       parameterName: "/bookshelf/cognito/hosted-ui-domain",
       stringValue: hostedUiDomain,
