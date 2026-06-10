@@ -70,15 +70,21 @@ export class AuthStack extends cdk.Stack {
 
     // ── Google identity provider ──────────────────────────────────────────
     //
-    // Credentials are stored in SSM (never in source) and resolved at deploy time:
-    //   /bookshelf/google/client-id      — String (OAuth client ID is public)
-    //   /bookshelf/google/client-secret  — SecureString (OAuth client secret)
+    // Credentials are resolved at deploy time (never in source):
+    //   /bookshelf/google/client-id      — SSM String  (public OAuth client ID)
+    //   /bookshelf/google/client-secret  — Secrets Manager (OAuth client secret)
     //
-    // Create these parameters manually before the first `cdk deploy`.
+    // CloudFormation does not support SSM SecureString dynamic references in
+    // AWS::Cognito::UserPoolIdentityProvider, so the secret must live in
+    // Secrets Manager instead of SSM SecureString.
+    //
+    // Create these before the first `cdk deploy`:
+    //   aws ssm put-parameter --name /bookshelf/google/client-id --value <id> --type String
+    //   aws secretsmanager create-secret --name /bookshelf/google/client-secret --secret-string <secret>
     const googleIdp = new cognito.UserPoolIdentityProviderGoogle(this, "GoogleIdp", {
       userPool,
       clientId: ssm.StringParameter.valueForStringParameter(this, "/bookshelf/google/client-id"),
-      clientSecretValue: cdk.SecretValue.ssmSecure("/bookshelf/google/client-secret"),
+      clientSecretValue: cdk.SecretValue.secretsManager("/bookshelf/google/client-secret"),
       scopes: ["email", "openid", "profile"],
       attributeMapping: {
         // Maps Google's email to the Cognito email attribute.
