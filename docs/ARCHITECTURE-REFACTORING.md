@@ -9,6 +9,7 @@ This document explains the recent refactoring of `packages/infra` to reduce dupl
 **Problem**: CloudFront + S3 + BucketDeployment logic was duplicated and tightly coupled to WebStack.
 
 **Solution**: Extracted into a reusable `WebHosting` construct that encapsulates:
+
 - S3 bucket with origin access control (OAC)
 - CloudFront distribution with SPA routing (404 → index.html)
 - CloudFront Function for same-origin `/api/*` rewriting (if apiOrigin is set)
@@ -24,12 +25,14 @@ This document explains the recent refactoring of `packages/infra` to reduce dupl
 **Problem**: Custom domain orchestration (DnsStack → CdnCertStack → AssetsStack → config objects) was duplicated across `bin/bookshelf.ts` and future pipeline code.
 
 **Solution**: Created `setupCustomDomain()` function that:
+
 - Creates DnsStack (Route53 hosted zone for the app subdomain)
 - Creates CdnCertStack (ACM cert in us-east-1 for CloudFront)
 - Creates AssetsStack (S3 bucket for web asset versioning in prod)
 - Returns optional configs for Api/Web stacks to consume
 
 **Usage in bin/bookshelf.ts**: Replaced ~28 lines of nested conditionals with a single function call:
+
 ```typescript
 const { dns, cdnCert, assets, webCustomDomain, apiCustomDomain } = setupCustomDomain(
   app,
@@ -44,6 +47,7 @@ const { dns, cdnCert, assets, webCustomDomain, apiCustomDomain } = setupCustomDo
 **Problem**: GitHub Actions workflows required manual GitHub OIDC setup and are not self-documenting through code.
 
 **Solution**: Added optional CDK Pipeline for AWS-native deployment orchestration:
+
 - Source: GitHub main branch (and release tags for prod)
 - Build: `pnpm build` + `cdk synth`
 - Dev Stage: automatic deployment
@@ -60,11 +64,13 @@ const { dns, cdnCert, assets, webCustomDomain, apiCustomDomain } = setupCustomDo
 **Problem**: `deploy.yml` and `promote.yml` workflows duplicated 6 deployment steps each (Build API/MCP, create web dist stub, deploy Auth/API/MCP, resolve outputs, build web, deploy Web).
 
 **Solution**: Created `deploy-env.js` Node.js script that orchestrates the entire sequence:
+
 - Single source of truth for deployment logic
 - Reusable from both GitHub Actions and CDK Pipelines
 - Eliminates workflow duplication
 
 **Usage in CI**:
+
 ```bash
 pnpm --filter @bookshelf/infra run deploy:env -- --env=dev --version=v1.2.3
 ```

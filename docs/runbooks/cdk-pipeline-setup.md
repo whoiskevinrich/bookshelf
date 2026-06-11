@@ -7,12 +7,14 @@ The Bookshelf CDK app can optionally use AWS CDK Pipelines to manage multi-stage
 > Repository decision: GitHub Actions is the primary, recommended pipeline. The CDK Pipeline remains available as an optional migration path for teams that prefer an AWS-native pipeline. If you enable the CDK Pipeline, disable the GitHub `deploy.yml` and `promote.yml` workflows to avoid conflicting deploys.
 
 **When to use CDK Pipelines:**
+
 - You prefer to manage deployment pipelines through AWS Console rather than GitHub
 - You want integrated rollback and deployment history tracking in AWS
 - You want automated pipeline self-updates (any changes to PipelineStack auto-deploy)
 - You're using multiple AWS accounts and want tight CDK/CloudFormation coupling
 
 **When to use GitHub Actions (recommended):**
+
 - Your team is GitHub-first (PRs, reviews, audit in GitHub)
 - You prefer CI/CD logs and history in GitHub Actions
 - You want to control deployments from the repo itself
