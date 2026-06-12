@@ -31,6 +31,7 @@ const apiStack = new ApiStack(app, "TestApi", {
   userPoolId: authStack.userPoolId,
   userPoolIssuer: authStack.userPoolIssuer,
   userPoolClientId: authStack.userPoolClientId,
+  mcpClientId: authStack.mcpClientId,
 });
 const webStack = new WebStack(app, "TestWeb", {
   env,
@@ -228,6 +229,7 @@ describe("Custom-domain topology", () => {
     userPoolId: dAuth.userPoolId,
     userPoolIssuer: dAuth.userPoolIssuer,
     userPoolClientId: dAuth.userPoolClientId,
+    mcpClientId: dAuth.mcpClientId,
     sameOrigin: true,
     customDomain: {
       apiHostname: `api.${zoneName}`,
@@ -325,6 +327,7 @@ describe("Interim topology (same-origin, no custom domain)", () => {
     userPoolId: iAuth.userPoolId,
     userPoolIssuer: iAuth.userPoolIssuer,
     userPoolClientId: iAuth.userPoolClientId,
+    mcpClientId: iAuth.mcpClientId,
     sameOrigin: true, // no customDomain
   });
   const iWeb = new WebStack(iApp, "ITestWeb", {
@@ -383,6 +386,7 @@ describe("API CORS fallback (sameOrigin=false)", () => {
     userPoolId: cAuth.userPoolId,
     userPoolIssuer: cAuth.userPoolIssuer,
     userPoolClientId: cAuth.userPoolClientId,
+    mcpClientId: cAuth.mcpClientId,
     // no sameOrigin, no customDomain
   });
 

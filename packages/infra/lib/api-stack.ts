@@ -28,6 +28,9 @@ export interface ApiStackProps extends cdk.StackProps {
   userPoolId: string;
   userPoolIssuer: string;
   userPoolClientId: string;
+  /** MCP app client id — the API trusts this audience too so the MCP server can
+   * proxy on behalf of the user (see apps/api/src/middleware/auth.ts). */
+  mcpClientId: string;
   /**
    * When true, the browser reaches the API same-origin via CloudFront `/api/*`
    * (and MCP is non-browser), so **no CORS** is configured. When false/omitted
@@ -84,6 +87,7 @@ export class ApiStack extends cdk.Stack {
         DYNAMODB_TABLE_NAME: table.tableName,
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
+        COGNITO_MCP_CLIENT_ID: props.mcpClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
         // Resolved in lambda
         GOOGLE_BOOKS_API_KEY_SSM_NAME: "/bookshelf/google-books-api-key",

@@ -52,10 +52,17 @@ export async function authMiddleware(c: Context, next: Next): Promise<Response |
   const token = authHeader.slice(7);
   try {
     const issuer = process.env["COGNITO_ISSUER"];
-    const audience = process.env["COGNITO_CLIENT_ID"];
+    // The API is a shared resource server: it trusts both the web SPA client and
+    // the MCP app client. jose accepts an audience array — a token is valid if its
+    // `aud` matches any entry. The clients stay separate so MCP access can be
+    // revoked independently of the web app.
+    const audience = [
+      process.env["COGNITO_CLIENT_ID"],
+      process.env["COGNITO_MCP_CLIENT_ID"],
+    ].filter((a): a is string => !!a);
     const { payload } = await jwtVerify(token, getJwks(), {
       ...(issuer ? { issuer } : {}),
-      ...(audience ? { audience } : {}),
+      ...(audience.length > 0 ? { audience } : {}),
     });
 
     // Reject access tokens — only Cognito ID tokens are accepted here.
