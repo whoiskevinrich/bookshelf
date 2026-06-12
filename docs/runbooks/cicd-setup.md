@@ -174,6 +174,47 @@ Configure via **Settings → Branches → Add branch ruleset** for `main`:
 
 ---
 
+## Deployment Orchestration
+
+The `packages/infra/scripts/deploy-env.js` script orchestrates the multi-step build + deploy sequence,
+eliminating duplication between `deploy.yml` and `promote.yml` workflows.
+
+### What It Does
+
+1. **Builds API bundle** — `esbuild` for Lambda
+2. **Builds MCP bundle** — `esbuild` for Lambda
+3. **Ensures web/dist exists** — Vite already built by `pnpm run build` in CI
+4. **Deploys Auth + API + MCP stacks** — `cdk deploy` (skips WebStack)
+5. **Builds web app** — Vite production build with runtime config from deployed stacks
+6. **Deploys WebStack** — CloudFront + S3 with versioned assets
+7. **Queries CloudFront domain** — if custom domain not set, inject domainless CF domain into context for Auth re-deploy
+8. **Re-deploys Auth** — with CloudFront domain registered as Cognito OAuth callback URL
+
+### Usage in CI
+
+```bash
+node packages/infra/scripts/deploy-env.js --env=dev --version=v1.2.3
+node packages/infra/scripts/deploy-env.js --env=prod --version=v1.2.3
+```
+
+Or via npm script:
+
+```bash
+pnpm --filter @bookshelf/infra run deploy:env -- --env=dev --version=v1.2.3
+```
+
+### Alternative: CDK Pipelines
+
+For AWS-native deployment management, see `docs/runbooks/cdk-pipeline-setup.md`.
+
+## Decision: Primary Pipeline
+
+- **Primary**: GitHub Actions (retain `deploy.yml` + `promote.yml`).
+- **Why**: the repository already has a working, auditable, and GitHub-native release flow that centralises build/test/deploy logic via `packages/infra/scripts/deploy-env.js`. It minimizes new AWS infrastructure and keeps PRs, reviews, and deployment history inside GitHub.
+- **CDK Pipeline**: supported as an optional alternative (see `cdk-pipeline-setup.md`) but should be treated as a migration target — do not run both concurrently. If you enable the CDK Pipeline, disable or remove the GitHub deploy workflows to avoid conflicting deploys and context injection issues.
+
+---
+
 ## Troubleshooting
 
 | Symptom                                                          | Likely cause                                                                         |
