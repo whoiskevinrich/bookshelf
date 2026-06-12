@@ -1,7 +1,8 @@
 # worktree-setup.ps1
 # Copies .env.local files from the main worktree into the current worktree.
 # Run once after creating a new worktree for full-stack (real API + Cognito) development.
-# For frontend-only dev, use: pnpm --filter @bookshelf/web dev:mock
+# If the main worktree has no .env.local files yet, populate them from SSM —
+# see docs/runbooks/local-dev.md ("New worktree setup").
 
 param(
   [string]$MainWorktree = "G:\source\bookshelf"
@@ -32,8 +33,11 @@ foreach ($pair in $pairs) {
 }
 
 if ($copied -eq 0) {
-  Write-Host "`nNothing to copy. For frontend-only dev without .env.local, run:"
-  Write-Host "  pnpm --filter @bookshelf/web dev:mock"
+  Write-Host "`nNothing copied. If the files already exist you're set."
+  Write-Host "If the main worktree has no .env.local files yet, populate them from SSM —"
+  Write-Host "see docs/runbooks/local-dev.md (`"New worktree setup`"):"
+  Write-Host "  assume Sandbox/AWSPowerUserAccess"
+  Write-Host "  aws ssm get-parameter --name /bookshelf/api/url --query Parameter.Value --output text"
 } else {
   Write-Host "`nDone. Start the stack with:"
   Write-Host "  docker compose up -d   # DynamoDB Local"

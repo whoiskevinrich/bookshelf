@@ -167,6 +167,7 @@ const api = new ApiStack(app, "BookshelfApi", {
   userPoolId: auth.userPoolId,
   userPoolIssuer: auth.userPoolIssuer,
   userPoolClientId: auth.userPoolClientId,
+  mcpClientId: auth.mcpClientId,
   sameOrigin: config.apiThroughCloudFront,
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
 });

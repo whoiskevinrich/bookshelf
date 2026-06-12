@@ -113,3 +113,33 @@ describe("authMiddleware", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("authMiddleware audience configuration", () => {
+  function captureAudience(): unknown {
+    const call = vi.mocked(jwtVerify).mock.calls.at(-1);
+    return (call?.[2] as { audience?: unknown })?.audience;
+  }
+
+  it("trusts both the SPA and MCP client audiences when both are set", async () => {
+    vi.stubEnv("COGNITO_MCP_CLIENT_ID", "mcp-client-id");
+    vi.mocked(jwtVerify).mockResolvedValueOnce({
+      payload: { sub: "user-123", "cognito:username": "u@example.com", token_use: "id" },
+      protectedHeader: {} as never,
+    });
+    const app = makeApp();
+    await app.request("/protected", { headers: { Authorization: "Bearer t" } });
+    // jose accepts an audience array — a token is valid if its `aud` matches any entry.
+    expect(captureAudience()).toEqual(["test-client-id", "mcp-client-id"]);
+    vi.stubEnv("COGNITO_MCP_CLIENT_ID", "");
+  });
+
+  it("falls back to the SPA client only when the MCP client id is unset", async () => {
+    vi.mocked(jwtVerify).mockResolvedValueOnce({
+      payload: { sub: "user-123", "cognito:username": "u@example.com", token_use: "id" },
+      protectedHeader: {} as never,
+    });
+    const app = makeApp();
+    await app.request("/protected", { headers: { Authorization: "Bearer t" } });
+    expect(captureAudience()).toEqual(["test-client-id"]);
+  });
+});

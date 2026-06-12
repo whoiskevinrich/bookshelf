@@ -1,13 +1,18 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
+import type { AddressInfo } from "node:net";
+import { serve } from "@hono/node-server";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 config({ path: join(__dirname, "../.env.local"), override: true });
 
-import type { AddressInfo } from "node:net";
-import { serve } from "@hono/node-server";
-import { app } from "./app.js";
+// Import app AFTER dotenv runs. app.ts validates required env vars at module load
+// (requireEnv); a static `import` is hoisted above the config() call, so it would
+// evaluate app.ts before .env.local is loaded and throw "API_BASE_URL is not set".
+// A dynamic import defers evaluation until process.env is populated.
+const { app } = await import("./app.js");
 
 const PORT = 3002;
 
