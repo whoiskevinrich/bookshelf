@@ -21,6 +21,22 @@ export function OAuthCallbackPage() {
       navigate(next, { replace: true });
     }
 
+    // Error path: the Hosted UI redirects back with ?error=...&error_description=...
+    // when the IdP/OAuth exchange fails (e.g. Cognito "Attribute cannot be updated").
+    // Without this, there is no `code` to exchange and no Hub success event ever
+    // fires, leaving the spinner running forever. Surface the failure instead.
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = params.get("error");
+    if (oauthError) {
+      handled.current = true;
+      // Detail is useful for diagnosis but not safe/clear to show users verbatim.
+      console.error("OAuth callback error:", oauthError, params.get("error_description"));
+      setError(
+        "We couldn't complete sign-in. Please try again, or sign in with your email and password.",
+      );
+      return;
+    }
+
     // Slow path: listen for Amplify's Hub event fired when PKCE exchange completes
     const unsubscribe = Hub.listen("auth", ({ payload }) => {
       if (payload.event === "signInWithRedirect") {
