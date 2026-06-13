@@ -69,7 +69,12 @@ export class AuthStack extends cdk.Stack {
       signInAliases: { email: true },
       autoVerify: { email: true },
       standardAttributes: {
-        email: { required: true, mutable: false },
+        // email MUST be mutable: Cognito re-syncs IdP-mapped attributes on every
+        // federated sign-in, so an immutable email throws "user.email: Attribute
+        // cannot be updated." on the second Google login (or first linked login).
+        // Changing this on an existing pool forces a UserPool replacement — see
+        // docs/runbooks/cognito-email-mutable-migration.md before deploying.
+        email: { required: true, mutable: true },
       },
       passwordPolicy: {
         minLength: 8,
@@ -101,9 +106,10 @@ export class AuthStack extends cdk.Stack {
       clientSecretValue: cdk.SecretValue.secretsManager("/bookshelf/google/client-secret"),
       scopes: ["email", "openid", "profile"],
       attributeMapping: {
-        // Maps Google's email to the Cognito email attribute.
-        // Cognito skips immutable attribute updates on subsequent sign-ins,
-        // so mutable:false on the pool's email attribute is safe here.
+        // Maps Google's email to the Cognito email attribute. Cognito re-applies
+        // this mapping on every federated sign-in, so the pool's email attribute
+        // must be mutable (see standardAttributes above) — otherwise the second
+        // sign-in fails with "user.email: Attribute cannot be updated."
         email: cognito.ProviderAttribute.GOOGLE_EMAIL,
       },
     });

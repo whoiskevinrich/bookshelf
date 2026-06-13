@@ -55,6 +55,14 @@ describe("AuthStack", () => {
     });
   });
 
+  it("keeps email mutable so Google IdP attribute re-sync doesn't fail", () => {
+    // Regression guard: an immutable email throws "user.email: Attribute cannot be
+    // updated." on the second federated sign-in. See cognito-email-mutable-migration.md.
+    template.hasResourceProperties("AWS::Cognito::UserPool", {
+      Schema: Match.arrayWith([Match.objectLike({ Name: "email", Required: true, Mutable: true })]),
+    });
+  });
+
   it("disables self sign-up by default (invitation-only)", () => {
     template.hasResourceProperties("AWS::Cognito::UserPool", {
       AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
