@@ -31,7 +31,9 @@ export function OAuthCallbackPage() {
       handled.current = true;
       // Detail is useful for diagnosis but not safe/clear to show users verbatim.
       console.error("OAuth callback error:", oauthError, params.get("error_description"));
-      setError("We couldn't complete sign-in. Please try again, or sign in with your email and password.");
+      setError(
+        "We couldn't complete sign-in. Please try again, or sign in with your email and password.",
+      );
       return;
     }
 
