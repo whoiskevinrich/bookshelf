@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
-import { AuthStack } from "../lib/auth-stack";
+import { AuthStack, AuthPoolPhase } from "../lib/auth-stack";
 import { ApiStack, ApiCustomDomainConfig } from "../lib/api-stack";
 import { McpStack, McpCustomDomainConfig } from "../lib/mcp-stack";
 import { WebStack, WebCustomDomainConfig } from "../lib/web-stack";
@@ -82,6 +82,14 @@ if (!config) {
 // Version is a per-deploy input (the active S3 prefix), not an environment trait.
 const version = (app.node.tryGetContext("version") as string | undefined) ?? "local";
 
+// Blue/green Cognito pool phase (ADR-015). Per-deploy input, not an environment trait — the
+// same environment moves legacy → cutover → green across the migration window.
+const authPool = (app.node.tryGetContext("authPool") as string | undefined) ?? "legacy";
+if (authPool !== "legacy" && authPool !== "cutover" && authPool !== "green") {
+  throw new Error(`Invalid -c authPool="${authPool}". Valid values: legacy, cutover, green`);
+}
+const poolPhase = authPool as AuthPoolPhase;
+
 // Account stays ambient (from the assumed role); region comes from env config.
 const account = process.env["CDK_DEFAULT_ACCOUNT"] ?? process.env["AWS_ACCOUNT_ID"];
 const env: cdk.Environment = account
@@ -159,6 +167,7 @@ const auth = new AuthStack(app, "BookshelfAuth", {
   googleEmailAllowlist: config.googleEmailAllowlist,
   oauthCallbackUrls,
   oauthLogoutUrls,
+  poolPhase,
   ...(config.domain && cdnCert
     ? {
         cognitoCustomDomain: {
@@ -176,6 +185,10 @@ const api = new ApiStack(app, "BookshelfApi", {
   userPoolIssuer: auth.userPoolIssuer,
   userPoolClientId: auth.userPoolClientId,
   mcpClientId: auth.mcpClientId,
+  // During an ADR-015 cutover, also trust the legacy (gen1) pool so sessions minted before
+  // the cutover keep working until they expire (≤1h). Undefined in legacy/green phases.
+  secondaryIssuer: auth.legacyUserPoolIssuer,
+  secondaryClientId: auth.legacyUserPoolClientId,
   sameOrigin: config.apiThroughCloudFront,
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
 });

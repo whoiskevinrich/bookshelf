@@ -65,6 +65,12 @@ interface PoolGeneration {
   hostedUiDomain: string;
   /** Hosted UI base URL (with scheme) — used by MCP OAuth discovery. */
   hostedUiBaseUrl: string;
+  /**
+   * Raw CloudFormation token for the managed Hosted-UI domain name (the value other stacks
+   * import). Used to pin gen1's export during a cutover (see exportValue below). Undefined for
+   * a custom domain, whose Hosted-UI value is a literal string (not a cross-stack export).
+   */
+  hostedUiDomainRef?: string;
 }
 
 export class AuthStack extends cdk.Stack {
@@ -202,10 +208,19 @@ export class AuthStack extends cdk.Stack {
     this.hostedUiDomain = active.hostedUiDomain;
 
     // During cutover expose gen1 as the secondary issuer/audience so pre-cutover sessions keep
-    // working AND gen1 stays referenced cross-stack (prevents in-use-export removal mid-cutover).
+    // working AND gen1's UserPool + SpaClient exports stay referenced cross-stack.
     if (poolPhase === "cutover" && gen1) {
       this.legacyUserPoolIssuer = gen1.issuer;
       this.legacyUserPoolClientId = gen1.spaClientId;
+
+      // The consumer stacks drop their gen1 McpClient/HostedUiDomain imports during cutover, but
+      // CloudFormation refuses to delete an export while it is still imported by a not-yet-updated
+      // stack mid-deploy. Pin those two exports here (exportValue reproduces their existing
+      // auto-generated names) so they persist through the cutover; they fall away cleanly in the
+      // green phase, when no stack imports them anymore. (UserPool + SpaClient are kept alive by
+      // the secondary-issuer wiring above, so they must NOT be re-pinned — that would duplicate.)
+      this.exportValue(gen1.mcpClientId);
+      if (gen1.hostedUiDomainRef) this.exportValue(gen1.hostedUiDomainRef);
     }
 
     // ── CloudFormation outputs (named exports — for humans/CI, not imported by other stacks) ──
@@ -381,6 +396,7 @@ export class AuthStack extends cdk.Stack {
 
     let hostedUiDomain: string;
     let hostedUiBaseUrl: string;
+    let hostedUiDomainRef: string | undefined;
 
     if (cognitoCustomDomain) {
       // gen2 uses an `auth2.` host so it can stand up alongside gen1's `auth.` host. After
@@ -414,6 +430,7 @@ export class AuthStack extends cdk.Stack {
       });
       hostedUiDomain = `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
       hostedUiBaseUrl = userPoolDomain.baseUrl();
+      hostedUiDomainRef = userPoolDomain.domainName;
     }
 
     return {
@@ -423,6 +440,7 @@ export class AuthStack extends cdk.Stack {
       issuer: `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
       hostedUiDomain,
       hostedUiBaseUrl,
+      hostedUiDomainRef,
     };
   }
 }
