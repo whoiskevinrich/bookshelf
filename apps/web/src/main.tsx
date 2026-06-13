@@ -35,9 +35,13 @@ async function bootstrap(): Promise<void> {
           oauth: {
             domain: runtimeConfig.cognito.oauthDomain,
             scopes: ["email", "openid", "profile"],
-            // window.location.origin auto-adapts: prod domain in prod, localhost in dev
+            // window.location.origin auto-adapts: prod domain in prod, localhost in dev.
+            // No trailing slash on redirectSignOut — Cognito requires the logout_uri to match an
+            // allowed sign-out URL exactly, and the pool client allowlists the bare origin (CDK
+            // auth-stack logoutUrls). A stray "/" makes Cognito reject it ("Required String
+            // parameter 'redirect_uri' is not present").
             redirectSignIn: [`${window.location.origin}/auth/callback`],
-            redirectSignOut: [`${window.location.origin}/`],
+            redirectSignOut: [window.location.origin],
             responseType: "code",
           },
         },
