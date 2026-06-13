@@ -1,5 +1,5 @@
 import * as path from "path";
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
 import * as cdk from "aws-cdk-lib";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import { Template, Match } from "aws-cdk-lib/assertions";
@@ -26,6 +26,9 @@ const env = { account: "123456789012", region: "us-east-1" };
 const app = new cdk.App();
 
 const authStack = new AuthStack(app, "TestAuth", { env });
+// Blue/green phases (ADR-015) — separate stacks so each phase can be asserted independently.
+const authStackCutover = new AuthStack(app, "TestAuthCutover", { env, poolPhase: "cutover" });
+const authStackGreen = new AuthStack(app, "TestAuthGreen", { env, poolPhase: "green" });
 const apiStack = new ApiStack(app, "TestApi", {
   env,
   userPoolId: authStack.userPoolId,
@@ -55,11 +58,13 @@ describe("AuthStack", () => {
     });
   });
 
-  it("keeps email mutable so Google IdP attribute re-sync doesn't fail", () => {
-    // Regression guard: an immutable email throws "user.email: Attribute cannot be
-    // updated." on the second federated sign-in. See cognito-email-mutable-migration.md.
+  it("keeps the legacy (gen1) pool's email immutable so the live pool is never replaced", () => {
+    // gen1 must stay exactly as deployed; flipping its mutability would replace the pool —
+    // the very thing ADR-015's blue/green avoids. Mutability lives on the green pool instead.
     template.hasResourceProperties("AWS::Cognito::UserPool", {
-      Schema: Match.arrayWith([Match.objectLike({ Name: "email", Required: true, Mutable: true })]),
+      Schema: Match.arrayWith([
+        Match.objectLike({ Name: "email", Required: true, Mutable: false }),
+      ]),
     });
   });
 
@@ -86,6 +91,37 @@ describe("AuthStack", () => {
     template.hasOutput("UserPoolIdOutput", {
       Export: { Name: "BookshelfUserPoolId" },
     });
+  });
+});
+
+// ── AuthStack blue/green phases (ADR-015) ───────────────────────────────────
+describe("AuthStack blue/green phases", () => {
+  const cutover = Template.fromStack(authStackCutover);
+  const green = Template.fromStack(authStackGreen);
+
+  it("cutover declares BOTH pools (gen1 + green)", () => {
+    cutover.resourceCountIs("AWS::Cognito::UserPool", 2);
+  });
+
+  it("cutover gives each pool a distinct managed domain prefix", () => {
+    // Distinct prefixes are what make the two pools coexist — gen1 keeps bookshelf-<acct>,
+    // green gets the -g2 suffix. Two identical prefixes would fail to deploy.
+    const domains = cutover.findResources("AWS::Cognito::UserPoolDomain");
+    // Domain is a CloudFormation token (Fn::Join with the account Ref), so compare serialized.
+    const prefixes = Object.values(domains).map((d) => JSON.stringify(d.Properties.Domain));
+    expect(new Set(prefixes).size).toBe(prefixes.length);
+    expect(prefixes.some((p) => p.includes("-g2"))).toBe(true);
+  });
+
+  it("green is a single pool with mutable email", () => {
+    green.resourceCountIs("AWS::Cognito::UserPool", 1);
+    green.hasResourceProperties("AWS::Cognito::UserPool", {
+      Schema: Match.arrayWith([Match.objectLike({ Name: "email", Required: true, Mutable: true })]),
+    });
+  });
+
+  it("green keeps RETAIN so a botched cutover never deletes accounts", () => {
+    green.hasResource("AWS::Cognito::UserPool", { DeletionPolicy: "Retain" });
   });
 });
 
