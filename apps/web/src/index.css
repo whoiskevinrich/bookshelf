@@ -28,6 +28,38 @@
   animation: fadeUp 0.3s ease-out both;
 }
 
+@keyframes scanSweep {
+  0%,
+  100% {
+    transform: translateY(-70px);
+  }
+  50% {
+    transform: translateY(70px);
+  }
+}
+
+/* Sweeping line inside the scanner reticle (see ScanModal). */
+.animate-scan-line {
+  animation: scanSweep 2.4s ease-in-out infinite;
+}
+
+@keyframes successFlash {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* One-shot green flash on a successful continuous-scan add (see ScanModal). */
+.animate-success-flash {
+  animation: successFlash 0.7s ease-out both;
+}
+
 .shimmer {
   background: linear-gradient(
     90deg,
@@ -53,6 +85,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up {
+    animation: none;
+  }
+
+  .animate-scan-line {
+    animation: none;
+  }
+
+  .animate-success-flash {
     animation: none;
   }
 
