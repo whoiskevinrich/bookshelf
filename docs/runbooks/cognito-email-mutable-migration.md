@@ -98,18 +98,52 @@ Confirm the backup reaches `AVAILABLE` before continuing.
 
 ## Step 3 — Deploy the pool replacement
 
-Merge the `email: mutable: true` change and deploy this environment. The old pool is **retained**
-(removal policy RETAIN); a new empty pool is created and the app stacks rewire to it via CfnOutputs.
+> 🛑 **A naive `cdk deploy` of the `mutable: true` change FAILS.** This was proven during the dev
+> rehearsal (2026-06-13). Replacing the UserPool in place is blocked by **two** structural issues —
+> read this whole section before deploying. The old simplistic instruction ("just deploy, stacks
+> rewire via CfnOutputs") was wrong.
 
-```powershell
-pnpm --filter @bookshelf/infra build
-cdk deploy AuthStack-<env> --require-approval never   # then Api/Mcp/Web pick up new exports
-$NEW_POOL = "<new UserPoolId from outputs>"
-$NEW_CLIENT = "<new SpaClient id from outputs>"
-```
+### Blocker 1 — Cognito Hosted-UI domain prefix conflict
 
-After deploy, update the two local env files for local dev (`apps/api/.env.local`,
+The pool owns a Hosted-UI domain (dev: managed prefix `bookshelf-<account>`; prod: custom domain
+`auth.bookshelf.whoiskevinrich.com`). The UserPool has `removalPolicy: RETAIN`, so on replacement the
+**old pool keeps owning the domain**. CloudFormation creates the new pool's domain _before_ deleting
+the old one → the prefix is still taken → `Domain already exists` → rollback.
+
+### Blocker 2 — In-use cross-stack exports
+
+`bin/bookshelf.ts` passes `auth.userPoolId` / SpaClient / McpClient / hostedUiDomain straight into
+ApiStack, McpStack, and WebStack. CDK turns those into auto-exports that the consumer stacks import
+(verified — `BookshelfAuth:ExportsOutputRefUserPool…` is imported by **BookshelfApi, BookshelfMcp,
+BookshelfWeb**). CloudFormation **forbids changing an export value while it is imported**, and a pool
+replacement changes all four values → `Export … cannot be updated as it is in use` → rollback.
+
+### Required strategy: blue/green (parallel pool), not in-place replacement
+
+Because the pool identity is woven into three other stacks **and** the domain, the only safe path is a
+**blue/green** cutover. Outline (to be finalized as its own change — do NOT hand-run a `cdk deploy`
+until the CDK app implements this):
+
+1. **Add a second, mutable-email UserPool** in `BookshelfAuth` alongside the old one, with a
+   **distinct** Hosted-UI domain (new prefix in dev; a temporary `auth2.` host in prod). New pool →
+   new export names, so no in-use-export conflict.
+2. **Re-point ApiStack / McpStack / WebStack** consumers at the new pool's outputs and deploy them.
+   The audience-validation list in `apps/api/src/middleware/auth.ts` already accepts multiple client
+   IDs, so it can trust both pools during the cutover.
+3. **Migrate** users + data into the new pool (Steps 4–6).
+4. **Verify**, then **remove the old pool** (and free its domain; reclaim the original prefix/host on
+   the new pool only if desired) in a final deploy.
+
+Rollback at any point before step 4 is trivial: the old pool is still live and still wired up.
+
+After cutover, update the two local env files for local dev (`apps/api/.env.local`,
 `apps/web/.env.local`) with the new pool/client IDs (these are not managed by CDK).
+
+> **Dev rehearsal status (2026-06-13):** pre-flight complete — old pool `us-west-2_QxAqa8b1Q`
+> (2 accounts, both `whoiskevinrich@gmail.com`: one native CONFIRMED with 75 shelf items, one Google
+> EXTERNAL_PROVIDER with 0; **unlinked**, confirming the linking failed on the immutable-email error).
+> DynamoDB backup `pre-cognito-migration-dev-…` is `AVAILABLE`. Deploy **not** attempted — blocked as
+> above; needs the blue/green CDK change first.
 
 ## Step 4 — Pre-provision NATIVE users into the new pool (deterministic re-key)
 
