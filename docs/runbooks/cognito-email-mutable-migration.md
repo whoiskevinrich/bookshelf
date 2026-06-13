@@ -138,15 +138,29 @@ $NEW_POOL = "<green UserPoolId>"; $NEW_CLIENT = "<green SpaClient id>"
 Then run Steps 4–6 (pre-provision native users, re-key DynamoDB by email, lazy-rekey Google users)
 **against `$NEW_POOL`**.
 
-**Deploy 2 — green** (retires gen1 after verification):
+**Deploy 2 — green** (retires gen1 after verification). ⚠️ **Order matters — deploy consumers
+BEFORE Auth.** Removing gen1 changes the Auth template to delete gen1's exports, but `cdk deploy
+--all` updates Auth (the producer) first, while the consumer stacks still import gen1's SpaClient/
+issuer → `Cannot delete export … as it is in use by BookshelfApi` → rollback. Deploy the consumers
+first so they drop those imports, then Auth:
 
 ```powershell
-pnpm --filter @bookshelf/infra exec cdk deploy --all --require-approval never -c authPool=green $ctx
+# 1. Consumers drop the gen1 (secondary-issuer) imports
+pnpm --filter @bookshelf/infra exec cdk deploy --exclusively BookshelfApi BookshelfMcp BookshelfWeb `
+  --require-approval never -c authPool=green $ctx
+# 2. Auth removes gen1 (RETAIN keeps the orphaned pool shell; gen1 domain is freed)
+pnpm --filter @bookshelf/infra exec cdk deploy --exclusively BookshelfAuth --require-approval never `
+  -c authPool=green $ctx
 ```
 
 Rollback before Deploy 2 is trivial: redeploy `-c authPool=legacy` — gen1 never stopped serving and
 its data is untouched. After cutover, update the local `apps/{api,web}/.env.local` with the green
 pool/client ids (not CDK-managed).
+
+> **Dev rehearsal result (2026-06-13): SUCCESS.** Executed cutover → migrate → green end-to-end
+> against dev. Green pool `us-west-2_NxOrdblYM` (email **Mutable=true**) is live; the SPA `config.json`
+> points to it; the native account's 75 shelf items were re-keyed to the new sub. Two findings folded
+> in above/below: (1) the green deploy must be consumers-first; (2) see the linker note in Step 6.
 
 > **Dev rehearsal status (2026-06-13):** pre-flight complete — old pool `us-west-2_QxAqa8b1Q`
 > (2 accounts, both `whoiskevinrich@gmail.com`: one native CONFIRMED with 75 shelf items, one Google
@@ -242,6 +256,15 @@ the same target items. Leave old `USER#<oldSub>` items in place until verificati
 Google users cannot be pre-provisioned (an `AdminCreateUser` shell is `FORCE_CHANGE_PASSWORD`, and the
 PreSignUp linker only links to `CONFIRMED` natives — so the Google login would create a _different_
 sub and re-orphan the data). Instead, re-key them **after** they sign in to the new pool:
+
+> ⚠️ **Linker finding (dev rehearsal 2026-06-13):** the PreSignUp linker matches
+> `u.Username === email` (`packages/infra/lambda/pre-signup/index.js`). But in an email-alias pool,
+> `AdminCreateUser` gives the pre-provisioned native account a **UUID username** (email is only an
+> alias) and `FORCE_CHANGE_PASSWORD` status — so even after the native user resets their password and
+> becomes `CONFIRMED`, the linker's `Username === email` check never matches a pre-provisioned account,
+> and a returning Google user gets a brand-new sub instead of linking. **Before the prod cutover, fix
+> the linker to match on the `email` attribute (via `ListUsers` filter) rather than `Username`.** In
+> dev this was harmless (the Google account had 0 shelf items).
 
 1. After cutover, periodically list the new pool's Google users and build `submap-google.json` by
    matching email back to `users-old.json` (`oldSub`):
