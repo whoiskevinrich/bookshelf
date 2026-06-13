@@ -24,7 +24,7 @@ This increments the patch version in root `package.json` (e.g. `0.1.4` → `0.1.
 pnpm preflight
 ```
 
-Runs `format → lint → test → synth` in sequence — a local dry-run of all CI checks. Fix any failures before pushing.
+Runs `format → lint → test → qa:guards → synth` in sequence — a local dry-run of all CI checks. Fix any failures before pushing.
 
 ### 3. Push and open the PR
 
@@ -37,13 +37,14 @@ gh pr create
 
 ## CI Checks Reference
 
-| Check              | What it validates                        | How to fix if red                  |
-| ------------------ | ---------------------------------------- | ---------------------------------- |
-| **Unique Version** | `package.json` version is not yet tagged | `pnpm version:bump` then push      |
-| **Format**         | All files pass `prettier --check .`      | `pnpm format` then commit          |
-| **Lint**           | ESLint passes across all packages        | Fix lint errors, then commit       |
-| **Unit Tests**     | All Vitest suites pass                   | Fix failing tests, then commit     |
-| **CDK Synth**      | Infrastructure can be synthesised        | Fix CDK/config errors, then commit |
+| Check              | What it validates                                                                                                                                                               | How to fix if red                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Unique Version** | `package.json` version is not yet tagged                                                                                                                                        | `pnpm version:bump` then push                                                                         |
+| **Format**         | All files pass `prettier --check .`                                                                                                                                             | `pnpm format` then commit                                                                             |
+| **Lint**           | ESLint passes across all packages                                                                                                                                               | Fix lint errors, then commit                                                                          |
+| **Unit Tests**     | All Vitest suites pass                                                                                                                                                          | Fix failing tests, then commit                                                                        |
+| **CDK Synth**      | Infrastructure can be synthesised                                                                                                                                               | Fix CDK/config errors, then commit                                                                    |
+| **QA Guards**      | `scripts/qa-guards.mjs` finds no `[auto]` violations (auth coverage, body limit, no auth bypass, no committed env, ISBN via `lib/isbn.ts`, banned UI classes, no `console.log`) | Run `pnpm qa:guards`, fix the reported `file:line`, then commit — see `docs/runbooks/qa-checklist.md` |
 
 ---
 
