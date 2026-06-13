@@ -119,3 +119,18 @@ jobs:
 
       - name: CDK synth
         run: pnpm synth
+
+  qa-guards:
+    name: QA Guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      # Dependency-free script — no pnpm install needed. Reads `git ls-files`,
+      # so the full checkout history is unnecessary but the repo must be present.
+      - name: QA guards
+        run: node scripts/qa-guards.mjs
