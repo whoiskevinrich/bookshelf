@@ -138,6 +138,20 @@ $NEW_POOL = "<green UserPoolId>"; $NEW_CLIENT = "<green SpaClient id>"
 Then run Steps 4–6 (pre-provision native users, re-key DynamoDB by email, lazy-rekey Google users)
 **against `$NEW_POOL`**.
 
+> ⚠️ **Google OAuth redirect URI — REQUIRED, or Google sign-in fails with `Error 400:
+redirect_uri_mismatch` (caught in the dev rehearsal).** The green pool has a _new_ Hosted-UI
+> domain (dev: `bookshelf-<account>-g2.auth.<region>.amazoncognito.com`; prod: `auth2.bookshelf…`),
+> and Cognito federates to Google with `https://<that-domain>/oauth2/idpresponse`. That URI is **not**
+> in the Google OAuth client's allowlist until you add it. CDK does **not** manage this — do it
+> manually in **Google Cloud Console → APIs & Services → Credentials →** the OAuth 2.0 Client whose
+> id is in SSM `/bookshelf/google/client-id` → **Authorized redirect URIs**:
+>
+> ```
+> https://<green-hosted-ui-domain>/oauth2/idpresponse
+> ```
+>
+> Keep the old domain's URI too (harmless; aids rollback). Allow a minute for Google to propagate.
+
 **Deploy 2 — green** (retires gen1 after verification). ⚠️ **Order matters — deploy consumers
 BEFORE Auth.** Removing gen1 changes the Auth template to delete gen1's exports, but `cdk deploy
 --all` updates Auth (the producer) first, while the consumer stacks still import gen1's SpaClient/
