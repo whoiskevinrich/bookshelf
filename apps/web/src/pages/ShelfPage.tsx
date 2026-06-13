@@ -22,6 +22,9 @@ import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
 import { BookSearch } from "../components/BookSearch";
 import { Button } from "../components/ui/Button";
+import { ScanModal } from "../components/scanner/ScanModal";
+import { supportsCameraScan } from "../lib/device";
+import { getRuntimeConfig } from "../lib/runtime-config";
 import type { ShelfEntry, ShelfStatus, BookSearchResult, Shelf } from "../lib/api-client";
 
 // ── Section header ─────────────────────────────────────────────────────────
@@ -249,7 +252,12 @@ function ShelfSection({
 export function ShelfPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [showCreateShelf, setShowCreateShelf] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const searchPanelRef = useRef<HTMLDivElement>(null);
+
+  // Show the Scan button only where it makes sense: the feature is enabled for
+  // this environment AND the device has a touch screen + camera.
+  const canScan = useMemo(() => getRuntimeConfig().features.scanner && supportsCameraScan(), []);
 
   const shelfQuery = useShelf();
   const shelvesQuery = useShelves();
@@ -386,6 +394,18 @@ export function ShelfPage() {
             >
               {showCreateShelf ? "Cancel" : "+ New shelf"}
             </Button>
+            {canScan && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowScanner(true);
+                  setShowSearch(false);
+                  setShowCreateShelf(false);
+                }}
+              >
+                Scan
+              </Button>
+            )}
             <Button
               variant="app"
               onClick={() => {
@@ -397,6 +417,8 @@ export function ShelfPage() {
             </Button>
           </div>
         </div>
+
+        {showScanner && <ScanModal onClose={() => setShowScanner(false)} />}
 
         {showCreateShelf && (
           <div className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">

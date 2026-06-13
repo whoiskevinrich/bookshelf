@@ -59,6 +59,11 @@ export interface WebStackProps extends cdk.StackProps {
     cognitoOauthDomain: string;
     /** "/api" (same-origin) or the absolute execute-api URL (dev). */
     apiBaseUrl: string;
+    /**
+     * Mobile camera ISBN scanner feature flag, written to `config.json` as
+     * `features.scanner`. Omitted → false, so the feature ships dark by default.
+     */
+    featureScanner?: boolean;
   };
 }
 
@@ -228,6 +233,9 @@ export class WebStack extends cdk.Stack {
             oauthDomain: props.runtimeConfig.cognitoOauthDomain,
           },
           apiBaseUrl: props.runtimeConfig.apiBaseUrl,
+          features: {
+            scanner: props.runtimeConfig.featureScanner ?? false,
+          },
         }),
       ],
       destinationBucket: bucket,

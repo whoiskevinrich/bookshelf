@@ -20,6 +20,15 @@ export interface RuntimeConfig {
   };
   /** "/api" (same-origin via CloudFront) or an absolute execute-api URL (dev). */
   apiBaseUrl: string;
+  /**
+   * Deploy-time feature flags. Absent flags default off — so an older `config.json`
+   * (deployed before a flag existed) safely reads as disabled. Lets a feature ship
+   * "dark" in one environment while another keeps it hidden, no rebuild required.
+   */
+  features: {
+    /** Mobile camera ISBN barcode scanner (per-env; see `bin/bookshelf.ts`). */
+    scanner: boolean;
+  };
 }
 
 let cached: RuntimeConfig | undefined;
@@ -45,6 +54,9 @@ function fromEnv(): RuntimeConfig {
       oauthDomain: (import.meta.env.VITE_COGNITO_OAUTH_DOMAIN as string | undefined) ?? "",
     },
     apiBaseUrl: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "",
+    features: {
+      scanner: import.meta.env.VITE_FEATURE_SCANNER === "true",
+    },
   };
 }
 
@@ -60,7 +72,8 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       const data = (await res.json()) as RuntimeConfig;
       // Guard against a dev server returning index.html for a missing file.
       if (data?.cognito?.userPoolId) {
-        cached = data;
+        // Normalize flags so a config.json predating a flag reads as disabled.
+        cached = { ...data, features: { scanner: data.features?.scanner ?? false } };
         return cached;
       }
     }

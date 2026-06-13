@@ -1,10 +1,15 @@
 import { Link } from "react-router-dom";
 import { AppHeader } from "../../components/AppHeader";
 import { Button } from "../../components/ui/Button";
+import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { useAuth } from "../../context/AuthContext";
+import { useScannerPreferences } from "../../context/ScannerPreferencesContext";
+import { getRuntimeConfig } from "../../lib/runtime-config";
 
 export function AccountSettingsPage() {
   const { user, isGoogleUser } = useAuth();
+  const scannerEnabled = getRuntimeConfig().features.scanner;
+  const { postScanBehavior, scanMode, setPostScanBehavior, setScanMode } = useScannerPreferences();
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
@@ -30,6 +35,50 @@ export function AccountSettingsPage() {
             >
               Change password
             </Link>
+          </section>
+        )}
+
+        {scannerEnabled && (
+          <section className="mb-8">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+              Scanner
+            </h2>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm text-slate-900 dark:text-white">After scanning</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Confirm each book, or add straight to your shelf.
+                  </p>
+                </div>
+                <SegmentedControl
+                  label="After scanning"
+                  value={postScanBehavior}
+                  onChange={setPostScanBehavior}
+                  options={[
+                    { value: "confirm", label: "Confirm" },
+                    { value: "autoAddOwned", label: "Auto-add" },
+                  ]}
+                />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm text-slate-900 dark:text-white">Scan mode</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    One book at a time, or keep scanning a whole shelf.
+                  </p>
+                </div>
+                <SegmentedControl
+                  label="Scan mode"
+                  value={scanMode}
+                  onChange={setScanMode}
+                  options={[
+                    { value: "single", label: "Single" },
+                    { value: "continuous", label: "Continuous" },
+                  ]}
+                />
+              </div>
+            </div>
           </section>
         )}
 

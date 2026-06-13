@@ -37,6 +37,12 @@ interface EnvConfig {
   /** Custom domain subtree, e.g. "bookshelf.whoiskevinrich.com" (full prod only). */
   domain?: string;
   /**
+   * Mobile camera ISBN scanner. On in dev so it can be verified on a real phone
+   * against the dev CloudFront URL; off in prod until that verification passes
+   * (ship dark) — flip to true and redeploy to release.
+   */
+  scannerEnabled: boolean;
+  /**
    * Comma-separated email allowlist for the Cognito PreSignUp Lambda.
    * When set, only these emails can register or sign in (native or Google).
    * Omit for open enrollment.
@@ -50,12 +56,14 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     allowSelfSignUp: false,
     apiThroughCloudFront: true,
     googleEmailAllowlist: "whoiskevinrich@gmail.com",
+    scannerEnabled: true,
   },
   prod: {
     region: "us-west-2",
     allowSelfSignUp: true,
     apiThroughCloudFront: true,
     domain: "bookshelf.whoiskevinrich.com",
+    scannerEnabled: false,
   },
 };
 
@@ -207,6 +215,7 @@ const web = new WebStack(app, "BookshelfWeb", {
     cognitoRegion: config.region,
     cognitoOauthDomain: auth.hostedUiDomain,
     apiBaseUrl: config.apiThroughCloudFront ? "/api" : api.apiUrl,
+    featureScanner: config.scannerEnabled,
   },
 });
 
