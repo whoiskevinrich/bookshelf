@@ -48,6 +48,14 @@ interface EnvConfig {
    * Omit for open enrollment.
    */
   googleEmailAllowlist?: string;
+  /**
+   * Steady-state Cognito pool phase for this environment (ADR-015). dev has completed the
+   * blue/green migration so its steady state is `green`; prod has not, so it stays `legacy`
+   * until its own cutover. A transient cutover is driven by overriding `-c authPool=cutover`
+   * (and the consumers-first `green` deploy) during the maintenance window — the override wins
+   * over this default, so routine CI deploys land on the correct phase without a flag.
+   */
+  authPool: AuthPoolPhase;
 }
 
 const ENVIRONMENTS: Record<string, EnvConfig> = {
@@ -57,6 +65,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     apiThroughCloudFront: true,
     googleEmailAllowlist: "whoiskevinrich@gmail.com",
     scannerEnabled: true,
+    authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
   prod: {
     region: "us-west-2",
@@ -64,6 +73,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     apiThroughCloudFront: true,
     domain: "bookshelf.whoiskevinrich.com",
     scannerEnabled: false,
+    authPool: "legacy", // not yet migrated — flip to green after the prod cutover
   },
 };
 
@@ -82,9 +92,11 @@ if (!config) {
 // Version is a per-deploy input (the active S3 prefix), not an environment trait.
 const version = (app.node.tryGetContext("version") as string | undefined) ?? "local";
 
-// Blue/green Cognito pool phase (ADR-015). Per-deploy input, not an environment trait — the
-// same environment moves legacy → cutover → green across the migration window.
-const authPool = (app.node.tryGetContext("authPool") as string | undefined) ?? "legacy";
+// Blue/green Cognito pool phase (ADR-015). Steady state comes from the env config; a maintenance
+// window overrides it with `-c authPool=cutover|green`. The override wins so routine CI deploys
+// (no flag) land on each environment's correct steady-state phase.
+const authPoolOverride = app.node.tryGetContext("authPool") as string | undefined;
+const authPool = authPoolOverride ?? config.authPool;
 if (authPool !== "legacy" && authPool !== "cutover" && authPool !== "green") {
   throw new Error(`Invalid -c authPool="${authPool}". Valid values: legacy, cutover, green`);
 }
