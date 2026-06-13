@@ -1,4 +1,4 @@
-name: Deploy to Sandbox
+name: Deploy to dev
 
 on:
   push:
@@ -104,6 +104,21 @@ jobs:
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
             --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }}
+
+      - name: Post CloudFront URL to run summary
+        run: |
+          CF_URL=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfWeb \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionUrlOutput'].OutputValue" \
+            --output text)
+          {
+            echo "## 🚀 Deployed to dev"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| **CloudFront URL** | [$CF_URL]($CF_URL) |"
+            echo "| **Version** | \`${{ steps.version.outputs.tag }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Register CloudFront domain in Auth callbacks
         # Auth deployed before Web (no CloudFront URL yet). Now that WebStack is up,
