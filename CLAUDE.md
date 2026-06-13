@@ -11,6 +11,12 @@ Deployment target: AWS (CDK) — dev environment live; see `docs/runbooks/cicd-s
 Always begin every session with `/productivity:start`.
 No implementation work begins before running this skill.
 
+## Task List (Single Source of Truth)
+
+The **only** task list is `todo/TASKS.md` in the **main worktree** (`G:\source\bookshelf\todo\TASKS.md`) — gitignored, so branch switches never touch it, and shared by every session. **There is no `docs/TASKS.md`.**
+
+All `/productivity:*` skills (`start`, `task-management`, `update`) must read and write **this** file. When a session runs inside a `.claude/worktrees/` worktree, still target the **main worktree's** `todo/TASKS.md` — never create a per-worktree copy — so tasks never fork across worktrees.
+
 ## Worktree Setup (new worktrees only)
 
 When opening a session inside a git worktree (path contains `.claude/worktrees/`), run the setup script before any dev work.
@@ -48,6 +54,8 @@ This skill checks for active AWS credentials, acquires them via
 
 ## Workflow: Idea to Production
 
+> **Installed-skill caveat:** `/engineering:*` and `/vercel:*` are **not installed** in this environment and will fail if invoked. This project deploys via **AWS CDK + GitHub Actions**, not Vercel — use the CDK/manual equivalent wherever a phase below references those skills.
+
 ### Phase 0 — Session Start
 
 - `/productivity:start` — always first
@@ -83,8 +91,8 @@ This skill checks for active AWS credentials, acquires them via
 ### Phase 5 — Merge and Deploy
 
 1. `gh pr create` — hook auto-fires PR review + productivity update
-2. `/vercel:deploy` — preview deployment first (enable Vercel plugin before this)
-3. `/vercel:deploy prod` — production (requires explicit confirmation)
+2. Merge to `main` → GitHub Actions auto-deploys to **dev** and tags the version (`docs/runbooks/cicd-setup.md`)
+3. Promote to **prod** via the **Promote** workflow (`.github/workflows/promote.yml`) by version tag, or `cdk deploy --all -c env=prod` (`docs/runbooks/prod-domain-setup.md`)
 4. `/productivity:update` — mark tasks Done
 
 ### Phase 6 — Post-Ship
@@ -176,7 +184,7 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 Full details in `docs/` — read on demand, not every session:
 
 - `docs/decisions.md` — all architecture, design, and implementation decisions (canonical reference)
-- `docs/TASKS.md` — Active, Backlog, Done
+- `todo/TASKS.md` — Active, Backlog, Done (the single task list — see "Task List" above)
 - `docs/specs/` — feature specifications
 - `docs/adrs/` — full ADR documents
 - `docs/runbooks/` — operational guides
