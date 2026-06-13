@@ -20,8 +20,6 @@ const queryClient = new QueryClient({
   },
 });
 
-const MOCK_MODE = import.meta.env.VITE_MOCK_API === "true";
-
 // Async bootstrap (no module-level top-level await — unsupported by the build
 // target). Loads deploy-time runtime config (/config.json), then configures
 // Amplify and renders. Config must resolve before any API call.
@@ -46,11 +44,6 @@ async function bootstrap(): Promise<void> {
       },
     },
   });
-
-  if (MOCK_MODE) {
-    const { worker } = await import("./mocks/browser");
-    await worker.start({ onUnhandledRequest: "bypass" });
-  }
 
   const root = document.getElementById("root");
   if (!root) throw new Error("Root element not found");

@@ -68,28 +68,30 @@ This skill checks for active AWS credentials, acquires them via
 
 1. `/feature-dev:feature-dev` Phase 5
 2. `/frontend-design:frontend-design` for UI components
-3. `/simplify` fires automatically via Stop hook at end of each session turn
+3. Run `/simplify` manually before wrapping up (not a hook — see Active Hooks below)
 
 ### Phase 4 — Pre-merge Review (REQUIRED before gh pr create)
 
 1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm version:bump`, then `pnpm preflight`
-2. Document as appropriate (hook will remind you):
+   (`preflight` now includes `pnpm qa:guards` — the same QA Guards check CI runs)
+2. Document as appropriate (the Pre-PR docs gate hook will remind you):
    - Technical decisions → `docs/adrs/<slug>.md` + row in `docs/decisions.md`
    - Spec changes → `docs/specs/<slug>.md`
    - System operations (scripts, infra, env setup) → `docs/runbooks/<slug>.md`
 3. `/pr-review-toolkit:review-pr all` — address all Critical issues first
-4. `/engineering:deploy-checklist`
+4. Work through `docs/runbooks/qa-checklist.md` — the PR template prefills the `[attest]`
+   items; the `[auto]` items are enforced by the QA Guards CI check (`pnpm qa:guards`)
 
 ### Phase 5 — Merge and Deploy
 
-1. `gh pr create` — hook auto-fires PR review + productivity update
+1. `gh pr create` — then run `/pr-review-toolkit:review-pr all` and `/productivity:update` manually
 2. `/vercel:deploy` — preview deployment first (enable Vercel plugin before this)
 3. `/vercel:deploy prod` — production (requires explicit confirmation)
 4. `/productivity:update` — mark tasks Done
 
 ### Phase 6 — Post-Ship
 
-- Stop hook fires `/productivity:update` automatically
+- Run `/productivity:update` to mark tasks done
 - `/engineering:tech-debt` — monthly
 - `/engineering:documentation` — when public behavior changes
 - `/product-management:roadmap-update` — after each feature ships
@@ -97,6 +99,11 @@ This skill checks for active AWS credentials, acquires them via
 ## Code Review Checklist
 
 The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read this section.
+
+The canonical, PR-facing version lives in `docs/runbooks/qa-checklist.md` and is mirrored as
+checkboxes in `.github/pull_request_template.md`. Items marked `[auto]` there are enforced
+mechanically by `pnpm qa:guards` (`scripts/qa-guards.mjs`) via the **QA Guards** CI check, which
+blocks merge — so the list below is the rationale; the gate is in CI. Keep the three in sync.
 
 ### General
 
@@ -158,18 +165,23 @@ The code-reviewer subagents (used by feature-dev and pr-review-toolkit) read thi
 
 ## Active Hooks
 
-| Hook               | Event                  | Trigger                      | Action                             | Async |
-| ------------------ | ---------------------- | ---------------------------- | ---------------------------------- | ----- |
-| Productivity start | SessionStart (project) | New session (`startup`)      | `claude /productivity:start`       | yes   |
-| /simplify          | Stop (project)         | End of session turn          | `claude --print /simplify`         | yes   |
-| Pre-PR docs gate   | PreToolUse (project)   | `gh pr create`               | echo docs checklist                | no    |
-| PR review          | PostToolUse (project)  | `gh pr create`               | `/pr-review-toolkit:review-pr all` | yes   |
-| Productivity (PR)  | PostToolUse (project)  | `gh pr create`               | `/productivity:update`             | yes   |
-| Docs reminder      | PostToolUse (project)  | Edit/Write                   | echo docs-check                    | no    |
-| Session end        | Stop (project)         | Always                       | `/productivity:update`             | yes   |
-| Sensitive files    | hookify                | .env/secrets edits           | warn                               | no    |
-| ISBN reminder      | hookify                | "isbn" in new text           | warn                               | no    |
-| Hardcoded data     | hookify                | ISBN/ASIN literals in source | warn                               | no    |
+These are the hooks **actually configured** in `.claude/settings.json` and via hookify rules
+(`.claude/hookify.*.local.md`):
+
+| Hook              | Source / Event               | Trigger                      | Action                                               |
+| ----------------- | ---------------------------- | ---------------------------- | ---------------------------------------------------- |
+| Worktree env copy | settings.json / SessionStart | New session (`startup`)      | Copy `.env.local` into worktree, then `pnpm install` |
+| Pre-PR docs gate  | settings.json / PreToolUse   | `gh pr create`               | Echo docs-update reminder (non-blocking)             |
+| Sensitive files   | hookify                      | `.env`/secret edits          | Warn                                                 |
+| No env in source  | hookify                      | env values written to source | Warn                                                 |
+| ISBN reminder     | hookify                      | "isbn" in new text           | Warn                                                 |
+| Hardcoded data    | hookify                      | ISBN/ASIN literals in source | Warn                                                 |
+
+The `/productivity:*`, `/simplify`, and `/pr-review-toolkit:review-pr` steps in the workflow above
+are run **manually** as slash commands — they are intentionally **not** wired as hooks. Per the
+global hook-safety rule, a hook command must never start with `claude` (it would re-enter Claude
+Code and fork-bomb). QA enforcement that must be automatic lives in **CI** (the QA Guards check),
+not in a Stop/PostToolUse hook.
 
 ## Documentation Index
 
