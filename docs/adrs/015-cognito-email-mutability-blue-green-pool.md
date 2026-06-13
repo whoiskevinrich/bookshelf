@@ -1,6 +1,6 @@
 # ADR-015: Cognito email-mutability fix via blue/green parallel pool
 
-**Status**: Proposed (implementation pending)
+**Status**: Accepted — implemented and `cdk diff`-validated (legacy no-op; cutover clean). Live cutover pending.
 **Date**: 2026-06-13
 
 ## Context

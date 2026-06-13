@@ -118,32 +118,42 @@ ApiStack, McpStack, and WebStack. CDK turns those into auto-exports that the con
 BookshelfWeb**). CloudFormation **forbids changing an export value while it is imported**, and a pool
 replacement changes all four values → `Export … cannot be updated as it is in use` → rollback.
 
-### Required strategy: blue/green (parallel pool), not in-place replacement
+### Strategy: blue/green (parallel pool), driven by `-c authPool=…` (ADR-015)
 
-Because the pool identity is woven into three other stacks **and** the domain, the only safe path is a
-**blue/green** cutover. Outline (to be finalized as its own change — do NOT hand-run a `cdk deploy`
-until the CDK app implements this):
+The CDK app now implements the blue/green cutover (ADR-015). `AuthStack` builds a pool _generation_
+selected by `-c authPool=legacy|cutover|green`; gen2 (green) has `email: mutable: true` and a distinct
+Hosted-UI domain, so it stands up beside gen1 with no domain or in-use-export conflict. The API trusts
+both issuers during the window. Validated against dev with `cdk diff`: legacy is a no-op, cutover adds
+green + repoints consumers with **no** in-use-export removals.
 
-1. **Add a second, mutable-email UserPool** in `BookshelfAuth` alongside the old one, with a
-   **distinct** Hosted-UI domain (new prefix in dev; a temporary `auth2.` host in prod). New pool →
-   new export names, so no in-use-export conflict.
-2. **Re-point ApiStack / McpStack / WebStack** consumers at the new pool's outputs and deploy them.
-   The audience-validation list in `apps/api/src/middleware/auth.ts` already accepts multiple client
-   IDs, so it can trust both pools during the cutover.
-3. **Migrate** users + data into the new pool (Steps 4–6).
-4. **Verify**, then **remove the old pool** (and free its domain; reclaim the original prefix/host on
-   the new pool only if desired) in a final deploy.
+**Deploy 1 — cutover** (creates green, repoints consumers, keeps gen1 live):
 
-Rollback at any point before step 4 is trivial: the old pool is still live and still wired up.
+```powershell
+$ctx = "-c env=dev -c version=$VERSION -c cloudfront-domain=$CLOUDFRONT_HOST"
+pnpm --filter @bookshelf/infra exec cdk deploy --all --require-approval never -c authPool=cutover $ctx
+# Capture the GREEN pool/client ids from the BookshelfAuth outputs (UserPoolIdOutput, etc.)
+$NEW_POOL = "<green UserPoolId>"; $NEW_CLIENT = "<green SpaClient id>"
+```
 
-After cutover, update the two local env files for local dev (`apps/api/.env.local`,
-`apps/web/.env.local`) with the new pool/client IDs (these are not managed by CDK).
+Then run Steps 4–6 (pre-provision native users, re-key DynamoDB by email, lazy-rekey Google users)
+**against `$NEW_POOL`**.
+
+**Deploy 2 — green** (retires gen1 after verification):
+
+```powershell
+pnpm --filter @bookshelf/infra exec cdk deploy --all --require-approval never -c authPool=green $ctx
+```
+
+Rollback before Deploy 2 is trivial: redeploy `-c authPool=legacy` — gen1 never stopped serving and
+its data is untouched. After cutover, update the local `apps/{api,web}/.env.local` with the green
+pool/client ids (not CDK-managed).
 
 > **Dev rehearsal status (2026-06-13):** pre-flight complete — old pool `us-west-2_QxAqa8b1Q`
 > (2 accounts, both `whoiskevinrich@gmail.com`: one native CONFIRMED with 75 shelf items, one Google
 > EXTERNAL_PROVIDER with 0; **unlinked**, confirming the linking failed on the immutable-email error).
-> DynamoDB backup `pre-cognito-migration-dev-…` is `AVAILABLE`. Deploy **not** attempted — blocked as
-> above; needs the blue/green CDK change first.
+> DynamoDB backup `pre-cognito-migration-dev-…` is `AVAILABLE`. The blue/green CDK change (ADR-015) is
+> implemented and `cdk diff`-validated (legacy no-op; cutover clean). Live cutover deploy is the next
+> step.
 
 ## Step 4 — Pre-provision NATIVE users into the new pool (deterministic re-key)
 
