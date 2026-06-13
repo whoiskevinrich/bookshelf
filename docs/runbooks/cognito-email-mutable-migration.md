@@ -1,6 +1,6 @@
 # Runbook: Cognito email-mutability migration (User Pool replacement)
 
-**Status:** Ready to execute in a maintenance window
+**Status:** BLOCKED — in-place replacement is not viable; needs the blue/green CDK change in Step 3 first (dev rehearsal 2026-06-13)
 **Severity origin:** SEV1 — prod Google sign-in broken with `user.email: Attribute cannot be updated.`
 **Owner:** Kevin Rich
 
