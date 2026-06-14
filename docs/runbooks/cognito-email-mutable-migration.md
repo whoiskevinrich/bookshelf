@@ -126,6 +126,11 @@ Hosted-UI domain, so it stands up beside gen1 with no domain or in-use-export co
 both issuers during the window. Validated against dev with `cdk diff`: legacy is a no-op, cutover adds
 green + repoints consumers with **no** in-use-export removals.
 
+> **Cutover caveat — MCP sessions:** the dual-issuer window adds only gen1's _SpaClient_ to the API
+> audience, not gen1's _McpClient_. So existing MCP (Claude Desktop) tokens from the old pool stop
+> validating at cutover and must re-authenticate against the green pool. Web sessions are unaffected.
+> If MCP continuity matters, also thread the legacy McpClient id into ApiStack's audience for the window.
+
 **Deploy 1 — cutover** (creates green, repoints consumers, keeps gen1 live):
 
 ```powershell
