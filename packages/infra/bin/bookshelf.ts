@@ -37,9 +37,8 @@ interface EnvConfig {
   /** Custom domain subtree, e.g. "bookshelf.whoiskevinrich.com" (full prod only). */
   domain?: string;
   /**
-   * Mobile camera ISBN scanner. On in dev so it can be verified on a real phone
-   * against the dev CloudFront URL; off in prod until that verification passes
-   * (ship dark) — flip to true and redeploy to release.
+   * Mobile camera ISBN scanner. Verified on a real phone against the dev
+   * CloudFront URL (2026-06-13), then released to prod. On in both environments.
    */
   scannerEnabled: boolean;
   /**
@@ -72,7 +71,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     allowSelfSignUp: true,
     apiThroughCloudFront: true,
     domain: "bookshelf.whoiskevinrich.com",
-    scannerEnabled: false,
+    scannerEnabled: true,
     authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
 };

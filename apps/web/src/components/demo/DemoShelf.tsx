@@ -142,7 +142,7 @@ function BookGrid({ books, indexOffset = 0 }: { books: DemoBook[]; indexOffset?:
             coverUrl={book.coverUrl}
             title={book.title}
             authors={book.authors}
-            className="w-full aspect-[2/3] rounded shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all duration-200 ease-out"
+            className="h-44 sm:h-52 md:h-60 w-auto mx-auto rounded shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all duration-200 ease-out"
           />
           <div>
             <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>

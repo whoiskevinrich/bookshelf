@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { isValidIsbn } from "../../lib/isbn";
+import { toIsbn13 } from "../../lib/isbn";
 import { getBookByIsbn, type BookSearchResult, type ShelfStatus } from "../../lib/api-client";
 import { useAddToShelf, useRemoveFromShelf } from "../../hooks/useShelf";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner";
@@ -25,11 +25,6 @@ const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 // How long the continuous-scan success pill stays up.
 const FLASH_MS = 2600;
-
-/** Strip separators so a scanned or typed ISBN is bare digits (+ trailing X). */
-function normalizeIsbn(raw: string): string {
-  return raw.replace(/[-\s]/g, "");
-}
 
 function buildAddedItem(
   isbn: string,
@@ -149,8 +144,8 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
   // Called by the decode loop for every recognized barcode.
   function handleDecode(raw: string) {
     if (processing.current) return; // a decode is already being handled
-    const isbn = normalizeIsbn(raw);
-    if (!isValidIsbn(isbn)) return; // ignore misreads
+    const isbn = toIsbn13(raw); // normalize ISBN-10 → ISBN-13; null on misread
+    if (!isbn) return; // ignore misreads / non-ISBN barcodes (e.g. a UPC that isn't a book)
     if (scanMode === "continuous" && addedIsbns.current.has(isbn)) return; // already added
     processing.current = true;
     const job = postScanBehavior === "autoAddOwned" ? autoAdd(isbn) : beginLookup(isbn);
@@ -160,8 +155,8 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
   }
 
   function manualLookup(value: string) {
-    const isbn = normalizeIsbn(value);
-    if (!isValidIsbn(isbn)) {
+    const isbn = toIsbn13(value); // accept ISBN-10 or ISBN-13; store/look up as ISBN-13
+    if (!isbn) {
       setError("Enter a valid 10- or 13-digit ISBN.");
       return;
     }

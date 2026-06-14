@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/Button";
 import { ThemeToggle } from "../components/icons/ThemeIcons";
+import { MobileMenu, mobileMenuRowClass } from "./MobileMenu";
 
 const activeLinkClass = "text-sm font-medium text-slate-900 dark:text-white";
 const inactiveLinkClass =
@@ -9,6 +10,9 @@ const inactiveLinkClass =
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   isActive ? activeLinkClass : inactiveLinkClass;
+
+const panelLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `${mobileMenuRowClass}${isActive ? " font-medium text-slate-900 dark:text-white" : ""}`;
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
@@ -20,9 +24,11 @@ export function AppHeader() {
   }
 
   return (
-    <header className="border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between bg-white dark:bg-slate-900 transition-colors">
+    <header className="relative border-b border-slate-100 dark:border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between bg-white dark:bg-slate-900 transition-colors">
       <span className="font-semibold text-lg tracking-tight dark:text-white">Bookshelf</span>
-      <nav className="flex items-center gap-4">
+
+      {/* Inline nav — sm and up */}
+      <nav className="hidden sm:flex items-center gap-4">
         <NavLink to="/shelf" className={navLinkClass}>
           My Library
         </NavLink>
@@ -44,6 +50,36 @@ export function AppHeader() {
         )}
         <ThemeToggle />
       </nav>
+
+      {/* Mobile cluster — below sm. ThemeToggle stays visible; links collapse into the menu. */}
+      <div className="flex items-center gap-1 sm:hidden">
+        <ThemeToggle />
+        <MobileMenu>
+          <NavLink to="/shelf" className={panelLinkClass}>
+            My Library
+          </NavLink>
+          <NavLink to="/wishlist" className={panelLinkClass}>
+            Wishlist
+          </NavLink>
+          <NavLink to="/about" className={panelLinkClass}>
+            About
+          </NavLink>
+          {user && (
+            <>
+              <NavLink to="/account/settings" className={panelLinkClass}>
+                Account
+              </NavLink>
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                className={`${mobileMenuRowClass} border-t border-slate-100 dark:border-slate-800`}
+              >
+                Sign out
+              </button>
+            </>
+          )}
+        </MobileMenu>
+      </div>
     </header>
   );
 }

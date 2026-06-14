@@ -208,7 +208,7 @@ function ShelfSection({
       ) : (
         <div
           ref={scrollRef}
-          className="overflow-x-auto -mx-6 px-6"
+          className="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6"
           style={{ scrollbarWidth: "thin", scrollbarColor: "rgb(148 163 184 / 0.4) transparent" }}
         >
           <div className="flex gap-4 pb-3">
@@ -240,6 +240,9 @@ function ShelfSection({
                 }
               />
             ))}
+            {/* Trailing gutter — flex padding-right collapses at scroll-end, so a
+                real spacer guarantees the last card isn't clipped flush to the edge. */}
+            <div aria-hidden="true" className="shrink-0 w-2" />
           </div>
         </div>
       )}
@@ -381,7 +384,7 @@ export function ShelfPage() {
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
       <AppHeader />
 
-      <main className="max-w-6xl mx-auto px-6 py-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold dark:text-white">My Library</h1>
           <div className="flex items-center gap-2">

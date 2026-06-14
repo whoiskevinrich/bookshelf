@@ -36,18 +36,26 @@ interface BarcodeDetectorConstructor {
   getSupportedFormats?(): Promise<string[]>;
 }
 
+// EAN-13 is the standard book barcode (the ISBN-13). UPC-A/UPC-E cover older US
+// printings whose only barcode predates Bookland EAN. Every decode is still
+// checksum-gated by toIsbn13 downstream, so a non-ISBN UPC is harmlessly ignored.
+const NATIVE_FORMATS = ["ean_13", "upc_a", "upc_e"];
+
 async function createNativeScanner(): Promise<BarcodeScanner | null> {
   const Ctor = (globalThis as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
   if (!Ctor) return null;
+  let formats: string[];
   try {
-    // Only use the native path if it actually supports EAN-13.
+    // Only use the native path if it actually supports EAN-13; request just the
+    // formats this device reports so the constructor doesn't reject an unknown one.
     const supported = (await Ctor.getSupportedFormats?.()) ?? ["ean_13"];
     if (!supported.includes("ean_13")) return null;
+    formats = NATIVE_FORMATS.filter((f) => supported.includes(f));
   } catch {
     return null;
   }
 
-  const detector = new Ctor({ formats: ["ean_13"] });
+  const detector = new Ctor({ formats });
   return {
     async scan(video) {
       try {
@@ -90,7 +98,7 @@ async function createWasmScanner(): Promise<BarcodeScanner> {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const results = await reader.readBarcodes(image, {
-        formats: ["EAN-13"],
+        formats: ["EAN-13", "UPC-A", "UPC-E"],
         tryHarder: true,
       });
       const hit = results.find((r) => r.isValid && r.text);
