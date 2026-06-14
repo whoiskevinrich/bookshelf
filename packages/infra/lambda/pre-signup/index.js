@@ -17,6 +17,10 @@ const {
 
 const client = new CognitoIdentityProviderClient({});
 
+// An email can resolve to a native account plus one or more federated (Google_*) entries.
+// Fetch enough rows to find the native account even when a federated entry sorts first.
+const MAX_LINK_CANDIDATES = 10;
+
 exports.handler = async (event) => {
   const { triggerSource, request, userName, userPoolId } = event;
   const email = (request.userAttributes.email ?? "").toLowerCase();
@@ -41,14 +45,26 @@ exports.handler = async (event) => {
       new ListUsersCommand({
         UserPoolId: userPoolId,
         Filter: `email = "${email}"`,
-        Limit: 1,
+        Limit: MAX_LINK_CANDIDATES,
       }),
     );
 
-    // A native Cognito user created via Amplify signUp has email as their Username.
-    // Only link to confirmed accounts — an unconfirmed account has no password set
-    // and linking to it would leave the user unable to complete email verification.
-    const nativeUser = Users.find((u) => u.Username === email && u.UserStatus === "CONFIRMED");
+    // Find the existing NATIVE (Cognito) account to link this Google identity to. Match on the
+    // email attribute, NOT Username: an account created via AdminCreateUser in an email-alias pool
+    // gets a UUID Username (email is only an alias), so a `Username === email` check misses it.
+    // (This is the migration pre-provision case — ADR-015. A self-signup native user happens to
+    // have email as Username, which also passes the checks below.) Exclude Google-federated
+    // entries (Username `Google_*` or an `identities` attribute). Link to CONFIRMED accounts
+    // (normal native signups) and FORCE_CHANGE_PASSWORD accounts (migration pre-provisioned) — but
+    // never UNCONFIRMED self-signups, which have no password yet and must finish their own email
+    // verification first.
+    const linkableStatuses = new Set(["CONFIRMED", "FORCE_CHANGE_PASSWORD"]);
+    const nativeUser = Users.find(
+      (u) =>
+        !u.Username.startsWith("Google_") &&
+        !(u.Attributes ?? []).some((a) => a.Name === "identities" && a.Value) &&
+        linkableStatuses.has(u.UserStatus),
+    );
 
     if (nativeUser) {
       const googleUserId = userName.replace(/^Google_/, "");

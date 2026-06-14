@@ -9,6 +9,23 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as path from "path";
 import { Construct } from "constructs";
 
+/**
+ * Blue/green pool cutover phase (ADR-015). Selected via `-c authPool=…` in bin/bookshelf.ts.
+ *
+ *  - `legacy`  — only the original pool (gen1, immutable email). Steady state / pre-migration.
+ *  - `cutover` — both pools exist; outputs expose the GREEN pool (gen2, mutable email) so the
+ *                consumer stacks repoint to it, while gen1 stays live for rollback.
+ *  - `green`   — only the green pool (gen2). Post-migration steady state; gen1 is dropped
+ *                (its RETAINed pool shell is orphaned, freeing the gen1 Hosted-UI domain).
+ *
+ * email mutability MUST differ by generation: gen1 stays immutable (changing it would replace
+ * the live pool — the very thing we are avoiding), gen2 is mutable so Cognito's per-sign-in IdP
+ * attribute re-sync no longer throws "user.email: Attribute cannot be updated."
+ * See docs/runbooks/cognito-email-mutable-migration.md and docs/adrs/015-*.md.
+ */
+export const AUTH_POOL_PHASES = ["legacy", "cutover", "green"] as const;
+export type AuthPoolPhase = (typeof AUTH_POOL_PHASES)[number];
+
 export interface AuthStackProps extends cdk.StackProps {
   /** Allow visitors to self-register. Set to true for prod; leave false (default) for dev. */
   allowSelfSignUp?: boolean;
@@ -32,25 +49,57 @@ export interface AuthStackProps extends cdk.StackProps {
     /** Route53 hosted zone name used to add the CNAME record (e.g. "bookshelf.whoiskevinrich.com"). */
     hostedZoneName: string;
   };
+  /**
+   * Blue/green migration phase (ADR-015). Defaults to `legacy` (the original single pool).
+   */
+  poolPhase?: AuthPoolPhase;
+}
+
+/** Identifiers a single pool generation exposes to the rest of the app. */
+interface PoolGeneration {
+  userPoolId: string;
+  spaClientId: string;
+  mcpClientId: string;
+  /** JWKS issuer URL for this pool's tokens. */
+  issuer: string;
+  /** Hosted UI FQDN (no scheme) — used as the Amplify oauth.domain value. */
+  hostedUiDomain: string;
+  /** Hosted UI base URL (with scheme) — used by MCP OAuth discovery. */
+  hostedUiBaseUrl: string;
+  /**
+   * Raw CloudFormation token for the managed Hosted-UI domain name (the value other stacks
+   * import). Used to pin gen1's export during a cutover (see exportValue below). Undefined for
+   * a custom domain, whose Hosted-UI value is a literal string (not a cross-stack export).
+   */
+  hostedUiDomainRef?: string;
 }
 
 export class AuthStack extends cdk.Stack {
-  /** Cognito User Pool ID — consumed by ApiStack and WebStack */
+  /** Cognito User Pool ID — consumed by ApiStack and WebStack (active generation) */
   readonly userPoolId: string;
-  /** App Client ID — passed to the SPA as a public identifier */
+  /** App Client ID — passed to the SPA as a public identifier (active generation) */
   readonly userPoolClientId: string;
-  /** MCP OAuth app client ID — used by McpStack for token audience validation */
+  /** MCP OAuth app client ID — used by McpStack for token audience validation (active generation) */
   readonly mcpClientId: string;
-  /** Cognito Hosted UI base URL — used by McpStack for OAuth discovery documents */
+  /** Cognito Hosted UI base URL — used by McpStack for OAuth discovery documents (active generation) */
   readonly hostedUiBaseUrl: string;
-  /** JWKS issuer URL — used by Lambda JWT verification and ApiStack env vars */
+  /** JWKS issuer URL — used by Lambda JWT verification and ApiStack env vars (active generation) */
   readonly userPoolIssuer: string;
   /**
    * Cognito Hosted UI domain FQDN (no scheme), e.g.
-   * "bookshelf-123456789012.auth.us-west-2.amazoncognito.com".
+   * "bookshelf-123456789012.auth.us-west-2.amazoncognito.com" (active generation).
    * Passed to the SPA as the Amplify oauth.domain config value.
    */
   readonly hostedUiDomain: string;
+  /**
+   * The LEGACY (gen1) issuer during a `cutover`, else undefined. ApiStack adds this as a
+   * secondary trusted issuer so sessions minted before the cutover keep working for their
+   * remaining lifetime (≤1h). Keeping gen1 referenced cross-stack here also prevents CDK from
+   * removing the in-use gen1 export mid-cutover (ADR-015).
+   */
+  readonly legacyUserPoolIssuer?: string;
+  /** The LEGACY (gen1) SPA client id during a `cutover`, else undefined — secondary audience. */
+  readonly legacyUserPoolClientId?: string;
 
   constructor(scope: Construct, id: string, props: AuthStackProps = {}) {
     super(scope, id, props);
@@ -60,16 +109,189 @@ export class AuthStack extends cdk.Stack {
       oauthCallbackUrls,
       oauthLogoutUrls,
       cognitoCustomDomain,
+      poolPhase = "legacy",
     } = props;
 
+    // ── Shared Cognito-trigger Lambdas ─────────────────────────────────────
+    //
+    // Created ONCE and attached as triggers to every pool generation. They are
+    // pool-agnostic at runtime (PreSignUp reads event.userPoolId; IAM is scoped to
+    // userpool/* in this account+region), so one Lambda safely serves both pools
+    // during a cutover — and keeping a single functionName avoids name collisions.
+
+    // PreSignUp — allowlist + Google account linking.
+    //   1. Rejects sign-ins from emails not in EMAIL_ALLOWLIST (dev only)
+    //   2. Links a new Google sign-in to an existing native account with the same
+    //      email, preserving the user's sub and all their shelf data.
+    const preSignUpFn = new lambda.Function(this, "PreSignUpFn", {
+      functionName: "bookshelf-pre-signup",
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambda", "pre-signup")),
+      timeout: cdk.Duration.seconds(5),
+      description: "Cognito PreSignUp trigger — email allowlist + Google account linking",
+      environment: {
+        EMAIL_ALLOWLIST: googleEmailAllowlist ?? "",
+      },
+      // Explicit log group with a CDK-generated name. With
+      // `@aws-cdk/aws-lambda:useCdkManagedLogGroup`, the default managed group is
+      // named `/aws/lambda/<functionName>` — colliding with the one this Lambda
+      // auto-created before the flag (an environment that deployed pre-flag rejects
+      // the change set: "LogGroup already exists"). A dedicated group avoids it.
+      logGroup: new logs.LogGroup(this, "PreSignUpFnLogGroup", {
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // Scope to all user pools in this account+region rather than referencing the specific
+    // pool ARN. Using userPool.userPoolArn (Fn::GetAtt) here would create a CloudFormation
+    // cycle: UserPool → PreSignUpFn → IAMPolicy → UserPool.
+    preSignUpFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["cognito-idp:ListUsers", "cognito-idp:AdminLinkProviderForUser"],
+        resources: [
+          `arn:${cdk.Aws.PARTITION}:cognito-idp:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:userpool/*`,
+        ],
+      }),
+    );
+
+    // Custom message — HTML email templates for Cognito-triggered emails.
+    const customMessageFn = new lambda.Function(this, "CustomMessageFn", {
+      functionName: "bookshelf-custom-message",
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambda", "custom-message")),
+      timeout: cdk.Duration.seconds(5),
+      description:
+        "Cognito custom message trigger — HTML email templates for verification, password reset, and invitations",
+      // Explicit log group (see PreSignUpFn) to avoid the
+      // `/aws/lambda/bookshelf-custom-message` managed-group name collision in
+      // environments that deployed before useCdkManagedLogGroup was enabled.
+      logGroup: new logs.LogGroup(this, "CustomMessageFnLogGroup", {
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // ── Pool generations ───────────────────────────────────────────────────
+    // legacy → gen1 only; cutover → gen1 + gen2 (expose gen2); green → gen2 only.
+    const sharedTriggers = { preSignUpFn, customMessageFn };
+    const commonGenProps = {
+      allowSelfSignUp,
+      oauthCallbackUrls,
+      oauthLogoutUrls,
+      cognitoCustomDomain,
+      ...sharedTriggers,
+    };
+
+    const needGen1 = poolPhase === "legacy" || poolPhase === "cutover";
+    const needGen2 = poolPhase === "cutover" || poolPhase === "green";
+
+    // gen1 keeps the EXACT original construct IDs (idSuffix "") and immutable email, so existing
+    // deployed resources are never replaced. gen2 is suffixed, mutable, on a distinct domain.
+    const gen1 = needGen1
+      ? this.createPoolGeneration({ ...commonGenProps, idSuffix: "", mutableEmail: false })
+      : undefined;
+    const gen2 = needGen2
+      ? this.createPoolGeneration({ ...commonGenProps, idSuffix: "Green", mutableEmail: true })
+      : undefined;
+
+    // Active generation drives this stack's outputs (gen2 once it exists).
+    const active = (gen2 ?? gen1)!;
+
+    this.userPoolId = active.userPoolId;
+    this.userPoolClientId = active.spaClientId;
+    this.mcpClientId = active.mcpClientId;
+    this.hostedUiBaseUrl = active.hostedUiBaseUrl;
+    this.userPoolIssuer = active.issuer;
+    this.hostedUiDomain = active.hostedUiDomain;
+
+    // During cutover expose gen1 as the secondary issuer/audience so pre-cutover sessions keep
+    // working AND gen1's UserPool + SpaClient exports stay referenced cross-stack.
+    if (poolPhase === "cutover" && gen1) {
+      this.legacyUserPoolIssuer = gen1.issuer;
+      this.legacyUserPoolClientId = gen1.spaClientId;
+
+      // The consumer stacks drop their gen1 McpClient/HostedUiDomain imports during cutover, but
+      // CloudFormation refuses to delete an export while it is still imported by a not-yet-updated
+      // stack mid-deploy. Pin those two exports here (exportValue reproduces their existing
+      // auto-generated names) so they persist through the cutover; they fall away cleanly in the
+      // green phase, when no stack imports them anymore. (UserPool + SpaClient are kept alive by
+      // the secondary-issuer wiring above, so they must NOT be re-pinned — that would duplicate.)
+      this.exportValue(gen1.mcpClientId);
+      if (gen1.hostedUiDomainRef) this.exportValue(gen1.hostedUiDomainRef);
+    }
+
+    // ── CloudFormation outputs (named exports — for humans/CI, not imported by other stacks) ──
+    new cdk.CfnOutput(this, "UserPoolIdOutput", {
+      exportName: "BookshelfUserPoolId",
+      value: active.userPoolId,
+    });
+    new cdk.CfnOutput(this, "UserPoolClientIdOutput", {
+      exportName: "BookshelfUserPoolClientId",
+      value: active.spaClientId,
+    });
+    new cdk.CfnOutput(this, "McpClientIdOutput", {
+      exportName: "BookshelfMcpClientId",
+      value: active.mcpClientId,
+    });
+    new cdk.CfnOutput(this, "HostedUiBaseUrlOutput", {
+      exportName: "BookshelfHostedUiBaseUrl",
+      value: active.hostedUiBaseUrl,
+    });
+    new cdk.CfnOutput(this, "HostedUiDomainOutput", {
+      exportName: "BookshelfHostedUiDomain",
+      value: active.hostedUiDomain,
+      description: "Cognito Hosted UI FQDN (no scheme) — used by Amplify oauth.domain config",
+    });
+    new cdk.CfnOutput(this, "UserPoolIssuerOutput", {
+      exportName: "BookshelfUserPoolIssuer",
+      value: active.issuer,
+      description: "JWKS issuer URL — used by Lambda JWT verification",
+    });
+  }
+
+  /**
+   * Builds one pool generation (pool + Google IdP + SPA/MCP clients + Hosted-UI domain) and
+   * attaches the shared Cognito triggers. `idSuffix` is "" for the legacy gen1 (keeping the
+   * original logical IDs byte-identical) and a non-empty value (e.g. "Green") for gen2, so the
+   * two generations are distinct CloudFormation resources that can coexist during a cutover.
+   */
+  private createPoolGeneration(args: {
+    idSuffix: string;
+    mutableEmail: boolean;
+    allowSelfSignUp: boolean;
+    oauthCallbackUrls?: string[];
+    oauthLogoutUrls?: string[];
+    cognitoCustomDomain?: AuthStackProps["cognitoCustomDomain"];
+    preSignUpFn: lambda.IFunction;
+    customMessageFn: lambda.IFunction;
+  }): PoolGeneration {
+    const {
+      idSuffix,
+      mutableEmail,
+      allowSelfSignUp,
+      oauthCallbackUrls,
+      oauthLogoutUrls,
+      cognitoCustomDomain,
+      preSignUpFn,
+      customMessageFn,
+    } = args;
+    const sid = (base: string) => `${base}${idSuffix}`;
+
     // ── User Pool ──────────────────────────────────────────────────────────
-    const userPool = new cognito.UserPool(this, "UserPool", {
-      userPoolName: "bookshelf-users",
+    const userPool = new cognito.UserPool(this, sid("UserPool"), {
+      userPoolName: `bookshelf-users${idSuffix ? `-${idSuffix.toLowerCase()}` : ""}`,
       selfSignUpEnabled: allowSelfSignUp,
       signInAliases: { email: true },
       autoVerify: { email: true },
       standardAttributes: {
-        email: { required: true, mutable: false },
+        // email mutability is per-generation (see AuthPoolPhase): gen2 (green) is mutable so
+        // Cognito's per-sign-in IdP attribute re-sync stops throwing "user.email: Attribute
+        // cannot be updated."; gen1 stays immutable so the live pool is never replaced.
+        email: { required: true, mutable: mutableEmail },
       },
       passwordPolicy: {
         minLength: 8,
@@ -91,19 +313,15 @@ export class AuthStack extends cdk.Stack {
     // CloudFormation does not support SSM SecureString dynamic references in
     // AWS::Cognito::UserPoolIdentityProvider, so the secret must live in
     // Secrets Manager instead of SSM SecureString.
-    //
-    // Create these before the first `cdk deploy`:
-    //   aws ssm put-parameter --name /bookshelf/google/client-id --value <id> --type String
-    //   aws secretsmanager create-secret --name /bookshelf/google/client-secret --secret-string <secret>
-    const googleIdp = new cognito.UserPoolIdentityProviderGoogle(this, "GoogleIdp", {
+    const googleIdp = new cognito.UserPoolIdentityProviderGoogle(this, sid("GoogleIdp"), {
       userPool,
       clientId: ssm.StringParameter.valueForStringParameter(this, "/bookshelf/google/client-id"),
       clientSecretValue: cdk.SecretValue.secretsManager("/bookshelf/google/client-secret"),
       scopes: ["email", "openid", "profile"],
       attributeMapping: {
-        // Maps Google's email to the Cognito email attribute.
-        // Cognito skips immutable attribute updates on subsequent sign-ins,
-        // so mutable:false on the pool's email attribute is safe here.
+        // Maps Google's email to the Cognito email attribute. Cognito re-applies this mapping on
+        // every federated sign-in, so the pool's email attribute must be mutable on gen2 (green)
+        // — otherwise the second sign-in fails with "user.email: Attribute cannot be updated."
         email: cognito.ProviderAttribute.GOOGLE_EMAIL,
       },
     });
@@ -141,103 +359,6 @@ export class AuthStack extends cdk.Stack {
     const cfnGoogleIdp = googleIdp.node.defaultChild as cognito.CfnUserPoolIdentityProvider;
     cfnAppClient.addDependency(cfnGoogleIdp);
 
-    // ── PreSignUp Lambda (allowlist + Google account linking) ─────────────
-    //
-    // Runs before Cognito creates a new user. Does two things:
-    //   1. Rejects sign-ins from emails not in EMAIL_ALLOWLIST (dev only)
-    //   2. Links a new Google sign-in to an existing native account with the
-    //      same email, preserving the user's sub and all their shelf data.
-    const preSignUpFn = new lambda.Function(this, "PreSignUpFn", {
-      functionName: "bookshelf-pre-signup",
-      runtime: lambda.Runtime.NODEJS_22_X,
-      handler: "index.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambda", "pre-signup")),
-      timeout: cdk.Duration.seconds(5),
-      description: "Cognito PreSignUp trigger — email allowlist + Google account linking",
-      environment: {
-        EMAIL_ALLOWLIST: googleEmailAllowlist ?? "",
-      },
-      // Explicit log group with a CDK-generated name. With
-      // `@aws-cdk/aws-lambda:useCdkManagedLogGroup`, the default managed group is
-      // named `/aws/lambda/<functionName>` — colliding with the one this Lambda
-      // auto-created before the flag (an environment that deployed pre-flag rejects
-      // the change set: "LogGroup already exists"). A dedicated group avoids it.
-      logGroup: new logs.LogGroup(this, "PreSignUpFnLogGroup", {
-        retention: logs.RetentionDays.ONE_MONTH,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-      }),
-    });
-
-    // Scope to all user pools in this account+region rather than referencing the specific
-    // pool ARN. Using userPool.userPoolArn (Fn::GetAtt) here would create a CloudFormation
-    // cycle: UserPool → PreSignUpFn → IAMPolicy → UserPool.
-    preSignUpFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["cognito-idp:ListUsers", "cognito-idp:AdminLinkProviderForUser"],
-        resources: [
-          `arn:${cdk.Aws.PARTITION}:cognito-idp:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:userpool/*`,
-        ],
-      }),
-    );
-
-    userPool.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, preSignUpFn);
-
-    // ── Hosted UI domain (required for MCP OAuth authorization code flow) ────
-    //
-    // Prod uses a custom domain (auth.bookshelf.whoiskevinrich.com) so Google's
-    // account chooser shows the branded domain instead of the Cognito-managed one.
-    // Dev falls back to a Cognito-managed domain (bookshelf-<account>.auth…).
-    // A Cognito custom domain (prod) can only be created once its parent apex
-    // (e.g. bookshelf.whoiskevinrich.com) resolves to a DNS A record — which is the
-    // WebStack's CloudFront alias. Since WebStack depends on this stack's outputs,
-    // the very first prod bring-up is a chicken-and-egg: gate the UserPoolDomain
-    // resource on the `authCustomDomain` context flag (default true) so it can be
-    // bootstrapped in order:
-    //   1. deploy Auth with `-c authCustomDomain=false` (no domain resource yet)
-    //   2. deploy Web (creates the apex A record)
-    //   3. deploy Auth with the default (creates the custom domain — apex A now resolves)
-    // Steady-state deploys use the default: the apex A record persists, so the domain
-    // creates/updates cleanly. The hosted-UI domain string is deterministic, so the
-    // exported hostedUiDomain/BaseUrl are always literals for the custom-domain case
-    // and never depend on the resource existing (decoupling MCP/Web from deploy order).
-    const createCustomDomain =
-      !!cognitoCustomDomain && this.node.tryGetContext("authCustomDomain") !== "false";
-
-    let hostedUiDomain: string;
-    let hostedUiBaseUrl: string;
-
-    if (cognitoCustomDomain) {
-      hostedUiDomain = cognitoCustomDomain.domainName;
-      hostedUiBaseUrl = `https://${cognitoCustomDomain.domainName}`;
-
-      if (createCustomDomain) {
-        const userPoolDomain = userPool.addDomain("HostedUiDomain", {
-          customDomain: {
-            domainName: cognitoCustomDomain.domainName,
-            certificate: cognitoCustomDomain.certificate,
-          },
-        });
-        const hostedZone = route53.HostedZone.fromLookup(this, "CognitoAuthZone", {
-          domainName: cognitoCustomDomain.hostedZoneName,
-        });
-        new route53.CnameRecord(this, "CognitoAuthCname", {
-          zone: hostedZone,
-          recordName: cognitoCustomDomain.domainName,
-          domainName: userPoolDomain.cloudFrontDomainName,
-          ttl: cdk.Duration.minutes(5),
-        });
-      }
-    } else {
-      const userPoolDomain = userPool.addDomain("HostedUiDomain", {
-        cognitoDomain: {
-          domainPrefix: `bookshelf-${cdk.Aws.ACCOUNT_ID}`,
-        },
-      });
-      hostedUiDomain = `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
-      hostedUiBaseUrl = userPoolDomain.baseUrl();
-    }
-
     // ── MCP app client (OAuth authorization code + PKCE) ─────────────────────
     //
     // Separate from the SPA client so MCP tokens can be independently revoked.
@@ -261,60 +382,66 @@ export class AuthStack extends cdk.Stack {
       refreshTokenValidity: cdk.Duration.days(30),
     });
 
-    // ── Custom message Lambda (HTML email templates for Cognito-triggered emails) ──
-    const customMessageFn = new lambda.Function(this, "CustomMessageFn", {
-      functionName: "bookshelf-custom-message",
-      runtime: lambda.Runtime.NODEJS_22_X,
-      handler: "index.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambda", "custom-message")),
-      timeout: cdk.Duration.seconds(5),
-      description:
-        "Cognito custom message trigger — HTML email templates for verification, password reset, and invitations",
-      // Explicit log group (see PreSignUpFn) to avoid the
-      // `/aws/lambda/bookshelf-custom-message` managed-group name collision in
-      // environments that deployed before useCdkManagedLogGroup was enabled.
-      logGroup: new logs.LogGroup(this, "CustomMessageFnLogGroup", {
-        retention: logs.RetentionDays.ONE_MONTH,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-      }),
-    });
+    // ── Cognito triggers (shared Lambdas) ────────────────────────────────────
+    userPool.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, preSignUpFn);
     userPool.addTrigger(cognito.UserPoolOperation.CUSTOM_MESSAGE, customMessageFn);
 
-    // ── CloudFormation outputs ─────────────────────────────────────────────
-    const issuer = `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`;
+    // ── Hosted UI domain ─────────────────────────────────────────────────────
+    //
+    // Prod uses a custom domain (auth.bookshelf.whoiskevinrich.com) so Google's account chooser
+    // shows the branded domain. Dev falls back to a Cognito-managed domain (bookshelf-<account>).
+    // Each generation needs a DISTINCT domain — two pools cannot share a prefix/host — so gen2
+    // gets a `-g2` managed-prefix suffix (dev) or an `auth2.` host (prod custom domain).
+    const createCustomDomain =
+      !!cognitoCustomDomain && this.node.tryGetContext("authCustomDomain") !== "false";
 
-    this.userPoolId = userPool.userPoolId;
-    this.userPoolClientId = appClient.userPoolClientId;
-    this.mcpClientId = mcpClient.userPoolClientId;
-    this.hostedUiBaseUrl = hostedUiBaseUrl;
-    this.userPoolIssuer = issuer;
-    this.hostedUiDomain = hostedUiDomain;
+    let hostedUiDomain: string;
+    let hostedUiBaseUrl: string;
+    let hostedUiDomainRef: string | undefined;
 
-    new cdk.CfnOutput(this, "UserPoolIdOutput", {
-      exportName: "BookshelfUserPoolId",
-      value: userPool.userPoolId,
-    });
-    new cdk.CfnOutput(this, "UserPoolClientIdOutput", {
-      exportName: "BookshelfUserPoolClientId",
-      value: appClient.userPoolClientId,
-    });
-    new cdk.CfnOutput(this, "McpClientIdOutput", {
-      exportName: "BookshelfMcpClientId",
-      value: mcpClient.userPoolClientId,
-    });
-    new cdk.CfnOutput(this, "HostedUiBaseUrlOutput", {
-      exportName: "BookshelfHostedUiBaseUrl",
-      value: hostedUiBaseUrl,
-    });
-    new cdk.CfnOutput(this, "HostedUiDomainOutput", {
-      exportName: "BookshelfHostedUiDomain",
-      value: hostedUiDomain,
-      description: "Cognito Hosted UI FQDN (no scheme) — used by Amplify oauth.domain config",
-    });
-    new cdk.CfnOutput(this, "UserPoolIssuerOutput", {
-      exportName: "BookshelfUserPoolIssuer",
-      value: issuer,
-      description: "JWKS issuer URL — used by Lambda JWT verification",
-    });
+    if (cognitoCustomDomain) {
+      // gen2 uses an `auth2.` host so it can stand up alongside gen1's `auth.` host. After
+      // gen1 is retired (green phase), the `auth.` host is free to be reclaimed in a later deploy.
+      const domainName = idSuffix
+        ? cognitoCustomDomain.domainName.replace(/^auth\./, "auth2.")
+        : cognitoCustomDomain.domainName;
+      hostedUiDomain = domainName;
+      hostedUiBaseUrl = `https://${domainName}`;
+
+      if (createCustomDomain) {
+        const userPoolDomain = userPool.addDomain("HostedUiDomain", {
+          customDomain: { domainName, certificate: cognitoCustomDomain.certificate },
+        });
+        const hostedZone = route53.HostedZone.fromLookup(this, sid("CognitoAuthZone"), {
+          domainName: cognitoCustomDomain.hostedZoneName,
+        });
+        new route53.CnameRecord(this, sid("CognitoAuthCname"), {
+          zone: hostedZone,
+          recordName: domainName,
+          domainName: userPoolDomain.cloudFrontDomainName,
+          ttl: cdk.Duration.minutes(5),
+        });
+      }
+    } else {
+      const userPoolDomain = userPool.addDomain("HostedUiDomain", {
+        cognitoDomain: {
+          // gen2 suffixes the prefix so it doesn't collide with gen1's retained domain.
+          domainPrefix: `bookshelf-${cdk.Aws.ACCOUNT_ID}${idSuffix ? "-g2" : ""}`,
+        },
+      });
+      hostedUiDomain = `${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`;
+      hostedUiBaseUrl = userPoolDomain.baseUrl();
+      hostedUiDomainRef = userPoolDomain.domainName;
+    }
+
+    return {
+      userPoolId: userPool.userPoolId,
+      spaClientId: appClient.userPoolClientId,
+      mcpClientId: mcpClient.userPoolClientId,
+      issuer: `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
+      hostedUiDomain,
+      hostedUiBaseUrl,
+      hostedUiDomainRef,
+    };
   }
 }

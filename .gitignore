@@ -30,3 +30,6 @@ blob-report/
 .DS_Store
 Thumbs.db
 /.claude/settings.local.json
+
+# Cognito migration exports — contain user emails/subs (see runbooks/cognito-email-mutable-migration.md)
+/migration/
