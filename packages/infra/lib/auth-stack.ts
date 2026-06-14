@@ -23,7 +23,8 @@ import { Construct } from "constructs";
  * attribute re-sync no longer throws "user.email: Attribute cannot be updated."
  * See docs/runbooks/cognito-email-mutable-migration.md and docs/adrs/015-*.md.
  */
-export type AuthPoolPhase = "legacy" | "cutover" | "green";
+export const AUTH_POOL_PHASES = ["legacy", "cutover", "green"] as const;
+export type AuthPoolPhase = (typeof AUTH_POOL_PHASES)[number];
 
 export interface AuthStackProps extends cdk.StackProps {
   /** Allow visitors to self-register. Set to true for prod; leave false (default) for dev. */

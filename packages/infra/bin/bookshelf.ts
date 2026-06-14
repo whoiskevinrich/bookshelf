@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
-import { AuthStack, AuthPoolPhase } from "../lib/auth-stack";
+import { AuthStack, AuthPoolPhase, AUTH_POOL_PHASES } from "../lib/auth-stack";
 import { ApiStack, ApiCustomDomainConfig } from "../lib/api-stack";
 import { McpStack, McpCustomDomainConfig } from "../lib/mcp-stack";
 import { WebStack, WebCustomDomainConfig } from "../lib/web-stack";
@@ -49,11 +49,11 @@ interface EnvConfig {
    */
   googleEmailAllowlist?: string;
   /**
-   * Steady-state Cognito pool phase for this environment (ADR-015). dev has completed the
-   * blue/green migration so its steady state is `green`; prod has not, so it stays `legacy`
-   * until its own cutover. A transient cutover is driven by overriding `-c authPool=cutover`
-   * (and the consumers-first `green` deploy) during the maintenance window — the override wins
-   * over this default, so routine CI deploys land on the correct phase without a flag.
+   * Steady-state Cognito pool phase for this environment (ADR-015). Both dev and prod completed
+   * the blue/green migration (2026-06-13), so their steady state is `green`. A transient cutover
+   * is driven by overriding `-c authPool=cutover` (and the consumers-first `green` deploy) during
+   * the maintenance window — the override wins over this default, so routine CI deploys land on
+   * the correct phase without a flag.
    */
   authPool: AuthPoolPhase;
 }
@@ -97,8 +97,10 @@ const version = (app.node.tryGetContext("version") as string | undefined) ?? "lo
 // (no flag) land on each environment's correct steady-state phase.
 const authPoolOverride = app.node.tryGetContext("authPool") as string | undefined;
 const authPool = authPoolOverride ?? config.authPool;
-if (authPool !== "legacy" && authPool !== "cutover" && authPool !== "green") {
-  throw new Error(`Invalid -c authPool="${authPool}". Valid values: legacy, cutover, green`);
+if (!AUTH_POOL_PHASES.includes(authPool as AuthPoolPhase)) {
+  throw new Error(
+    `Invalid -c authPool="${authPool}". Valid values: ${AUTH_POOL_PHASES.join(", ")}`,
+  );
 }
 const poolPhase = authPool as AuthPoolPhase;
 

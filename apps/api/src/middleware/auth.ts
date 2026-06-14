@@ -35,10 +35,13 @@ function getJwks(issuer: string): ReturnType<typeof createRemoteJWKSet> {
  * ADR-015 blue/green cutover `COGNITO_ISSUER_SECONDARY` is also set so tokens from the old
  * pool keep validating until they expire. Read at call time for testability.
  */
+/** Keep only the set (non-empty) values — used to collect optional env vars into a list. */
+function present(...values: (string | undefined)[]): string[] {
+  return values.filter((v): v is string => !!v);
+}
+
 function trustedIssuers(): string[] {
-  return [process.env["COGNITO_ISSUER"], process.env["COGNITO_ISSUER_SECONDARY"]].filter(
-    (i): i is string => !!i,
-  );
+  return present(process.env["COGNITO_ISSUER"], process.env["COGNITO_ISSUER_SECONDARY"]);
 }
 
 export interface AuthContext {
@@ -67,11 +70,11 @@ export async function authMiddleware(c: Context, next: Next): Promise<Response |
     // client (and, during an ADR-015 cutover, the legacy pool's SPA client). jose accepts an
     // audience array — a token is valid if its `aud` matches any entry. The clients stay
     // separate so MCP access can be revoked independently of the web app.
-    const audience = [
+    const audience = present(
       process.env["COGNITO_CLIENT_ID"],
       process.env["COGNITO_MCP_CLIENT_ID"],
       process.env["COGNITO_CLIENT_ID_SECONDARY"],
-    ].filter((a): a is string => !!a);
+    );
 
     // Verify against each trusted issuer in turn (two only during a cutover). Each pool has
     // its own JWKS, so any given token validates against exactly one issuer.

@@ -17,6 +17,10 @@ const {
 
 const client = new CognitoIdentityProviderClient({});
 
+// An email can resolve to a native account plus one or more federated (Google_*) entries.
+// Fetch enough rows to find the native account even when a federated entry sorts first.
+const MAX_LINK_CANDIDATES = 10;
+
 exports.handler = async (event) => {
   const { triggerSource, request, userName, userPoolId } = event;
   const email = (request.userAttributes.email ?? "").toLowerCase();
@@ -41,7 +45,7 @@ exports.handler = async (event) => {
       new ListUsersCommand({
         UserPoolId: userPoolId,
         Filter: `email = "${email}"`,
-        Limit: 10,
+        Limit: MAX_LINK_CANDIDATES,
       }),
     );
 
