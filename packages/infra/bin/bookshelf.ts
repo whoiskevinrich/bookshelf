@@ -73,7 +73,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     apiThroughCloudFront: true,
     domain: "bookshelf.whoiskevinrich.com",
     scannerEnabled: false,
-    authPool: "legacy", // not yet migrated — flip to green after the prod cutover
+    authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
 };
 
