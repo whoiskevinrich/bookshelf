@@ -273,19 +273,33 @@ export function ShelfBookCard({
       ? { animationDelay: `${Math.min(staggerIndex, MAX_STAGGER_INDEX) * STAGGER_STEP_MS}ms` }
       : undefined;
 
+  // Touch devices have no hover, so the action overlay can't reveal on hover and
+  // its invisible buttons would otherwise be blind-tappable. On coarse pointers,
+  // tapping the cover toggles the overlay; mouse hover / keyboard focus are unchanged.
+  const [revealed, setRevealed] = useState(false);
+  function handleCoverTap() {
+    if (typeof window !== "undefined" && window.matchMedia?.("(hover: none)").matches) {
+      setRevealed((v) => !v);
+    }
+  }
+
   return (
     <div
-      className="group/card flex flex-col gap-2 shrink-0 w-[130px] animate-fade-up"
+      // w-max: the card hugs the cover's natural width (covers share a height, not a width)
+      className="group/card flex flex-col gap-2 shrink-0 w-max animate-fade-up"
       style={staggerStyle}
     >
       {/* Cover + hover overlay */}
-      <div className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200">
+      <div
+        className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200"
+        onClick={handleCoverTap}
+      >
         <BookCover
           key={book?.coverUrl ?? "no-cover"}
           coverUrl={book?.coverUrl ?? null}
           title={title}
           authors={authors}
-          className="w-full aspect-[2/3]"
+          className="h-[195px]"
         />
 
         {/* Status dot — always visible */}
@@ -297,14 +311,18 @@ export function ShelfBookCard({
           aria-label={status === "owned" ? "Owned" : "Wishlist"}
         />
 
-        {/* Action overlay — hover (mouse) or focus-within (keyboard/touch) */}
+        {/* Action overlay — hover (mouse), focus-within (keyboard), or tap (touch).
+            pointer-events follow visibility so the buttons can't be blind-tapped while hidden. */}
         <div
-          className="absolute inset-0 flex flex-col items-center justify-end pb-2
+          className={`absolute inset-0 flex flex-col items-center justify-end pb-2
                      bg-gradient-to-t from-black/75 via-black/20 to-transparent
-                     opacity-0 group-hover/card:opacity-100 focus-within:opacity-100
-                     transition-opacity duration-200"
+                     transition-opacity duration-200
+                     group-hover/card:opacity-100 group-hover/card:pointer-events-auto
+                     focus-within:opacity-100 focus-within:pointer-events-auto
+                     ${revealed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
         >
-          <div className="flex items-center gap-1">
+          {/* Stop button taps from bubbling to the cover's toggle handler. */}
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <OverlayButton
               onClick={() => onMove(isbn, targetStatus)}
               {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}

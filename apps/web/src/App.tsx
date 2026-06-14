@@ -4,8 +4,8 @@ import { ScannerPreferencesProvider } from "./context/ScannerPreferencesContext"
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthRoute } from "./components/AuthRoute";
+import { HomeRoute } from "./components/HomeRoute";
 import { Footer } from "./components/Footer";
-import { LandingPage } from "./pages/LandingPage";
 import { AboutPage } from "./pages/AboutPage";
 import { ShelfPage } from "./pages/ShelfPage";
 import { WishlistPage } from "./pages/WishlistPage";
@@ -26,8 +26,8 @@ export function App() {
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              {/* Public */}
-              <Route path="/" element={<LandingPage />} />
+              {/* Public — `/` redirects signed-in users to their shelf */}
+              <Route path="/" element={<HomeRoute />} />
               <Route path="/about" element={<AboutPage />} />
 
               {/* Auth routes — redirect to /shelf if already signed in */}

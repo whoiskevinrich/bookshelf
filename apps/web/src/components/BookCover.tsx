@@ -14,7 +14,7 @@ export function BookCover({ coverUrl, title, authors, className = "" }: BookCove
     const authorLine = authors.length ? authors.join(", ") : null;
     return (
       <div
-        className={`flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-700 overflow-hidden p-1.5 gap-0.5 ${className}`}
+        className={`flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-700 overflow-hidden p-1.5 gap-0.5 aspect-[2/3] ${className}`}
         aria-label={authorLine ? `${title} by ${authorLine}` : title}
       >
         <p className="text-[0.6rem] font-semibold text-slate-700 dark:text-slate-200 text-center leading-tight line-clamp-3 w-full">
@@ -30,10 +30,13 @@ export function BookCover({ coverUrl, title, authors, className = "" }: BookCove
   }
 
   return (
+    // Loaded cover: caller sets the height; width follows the image's natural aspect
+    // ratio (no fixed box, so no slate letterbox band). `max-w-full` keeps a freak
+    // landscape cover from overflowing its container.
     <img
       src={coverUrl}
       alt={title}
-      className={`object-contain bg-slate-100 dark:bg-slate-700 ${className}`}
+      className={`w-auto max-w-full object-contain ${className}`}
       onError={() => {
         if (import.meta.env.DEV) console.error(`[BookCover] failed to load: ${coverUrl}`);
         setFailed(true);
