@@ -32,6 +32,14 @@ export interface ApiStackProps extends cdk.StackProps {
    * proxy on behalf of the user (see apps/api/src/middleware/auth.ts). */
   mcpClientId: string;
   /**
+   * Secondary (legacy) Cognito issuer trusted *in addition* to `userPoolIssuer`, set only
+   * during an ADR-015 blue/green cutover so tokens from the old pool keep validating until
+   * they expire. The auth middleware picks the JWKS matching each token's `iss`.
+   */
+  secondaryIssuer?: string;
+  /** Secondary (legacy) SPA client id — added to the accepted audience during a cutover. */
+  secondaryClientId?: string;
+  /**
    * When true, the browser reaches the API same-origin via CloudFront `/api/*`
    * (and MCP is non-browser), so **no CORS** is configured. When false/omitted
    * (dev), the SPA calls the execute-api URL cross-origin and permissive CORS is
@@ -89,6 +97,11 @@ export class ApiStack extends cdk.Stack {
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_MCP_CLIENT_ID: props.mcpClientId,
         COGNITO_ISSUER: props.userPoolIssuer,
+        // Set only during an ADR-015 cutover; the auth middleware ignores empty values.
+        ...(props.secondaryIssuer ? { COGNITO_ISSUER_SECONDARY: props.secondaryIssuer } : {}),
+        ...(props.secondaryClientId
+          ? { COGNITO_CLIENT_ID_SECONDARY: props.secondaryClientId }
+          : {}),
         // Resolved in lambda
         GOOGLE_BOOKS_API_KEY_SSM_NAME: "/bookshelf/google-books-api-key",
         // BOOK_PROVIDER defaults to 'google-books' inside the app

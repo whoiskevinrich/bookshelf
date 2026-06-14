@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
-import { AuthStack } from "../lib/auth-stack";
+import { AuthStack, AuthPoolPhase, AUTH_POOL_PHASES } from "../lib/auth-stack";
 import { ApiStack, ApiCustomDomainConfig } from "../lib/api-stack";
 import { McpStack, McpCustomDomainConfig } from "../lib/mcp-stack";
 import { WebStack, WebCustomDomainConfig } from "../lib/web-stack";
@@ -48,6 +48,14 @@ interface EnvConfig {
    * Omit for open enrollment.
    */
   googleEmailAllowlist?: string;
+  /**
+   * Steady-state Cognito pool phase for this environment (ADR-015). Both dev and prod completed
+   * the blue/green migration (2026-06-13), so their steady state is `green`. A transient cutover
+   * is driven by overriding `-c authPool=cutover` (and the consumers-first `green` deploy) during
+   * the maintenance window — the override wins over this default, so routine CI deploys land on
+   * the correct phase without a flag.
+   */
+  authPool: AuthPoolPhase;
 }
 
 const ENVIRONMENTS: Record<string, EnvConfig> = {
@@ -57,6 +65,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     apiThroughCloudFront: true,
     googleEmailAllowlist: "whoiskevinrich@gmail.com",
     scannerEnabled: true,
+    authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
   prod: {
     region: "us-west-2",
@@ -64,6 +73,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     apiThroughCloudFront: true,
     domain: "bookshelf.whoiskevinrich.com",
     scannerEnabled: false,
+    authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
 };
 
@@ -81,6 +91,18 @@ if (!config) {
 
 // Version is a per-deploy input (the active S3 prefix), not an environment trait.
 const version = (app.node.tryGetContext("version") as string | undefined) ?? "local";
+
+// Blue/green Cognito pool phase (ADR-015). Steady state comes from the env config; a maintenance
+// window overrides it with `-c authPool=cutover|green`. The override wins so routine CI deploys
+// (no flag) land on each environment's correct steady-state phase.
+const authPoolOverride = app.node.tryGetContext("authPool") as string | undefined;
+const authPool = authPoolOverride ?? config.authPool;
+if (!AUTH_POOL_PHASES.includes(authPool as AuthPoolPhase)) {
+  throw new Error(
+    `Invalid -c authPool="${authPool}". Valid values: ${AUTH_POOL_PHASES.join(", ")}`,
+  );
+}
+const poolPhase = authPool as AuthPoolPhase;
 
 // Account stays ambient (from the assumed role); region comes from env config.
 const account = process.env["CDK_DEFAULT_ACCOUNT"] ?? process.env["AWS_ACCOUNT_ID"];
@@ -159,6 +181,7 @@ const auth = new AuthStack(app, "BookshelfAuth", {
   googleEmailAllowlist: config.googleEmailAllowlist,
   oauthCallbackUrls,
   oauthLogoutUrls,
+  poolPhase,
   ...(config.domain && cdnCert
     ? {
         cognitoCustomDomain: {
@@ -176,6 +199,10 @@ const api = new ApiStack(app, "BookshelfApi", {
   userPoolIssuer: auth.userPoolIssuer,
   userPoolClientId: auth.userPoolClientId,
   mcpClientId: auth.mcpClientId,
+  // During an ADR-015 cutover, also trust the legacy (gen1) pool so sessions minted before
+  // the cutover keep working until they expire (≤1h). Undefined in legacy/green phases.
+  secondaryIssuer: auth.legacyUserPoolIssuer,
+  secondaryClientId: auth.legacyUserPoolClientId,
   sameOrigin: config.apiThroughCloudFront,
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
 });

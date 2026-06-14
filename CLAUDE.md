@@ -52,6 +52,16 @@ This skill checks for active AWS credentials, acquires them via
 
 **[NON-NEGOTIABLE] Never use `dev:mock` mode.** Auth always runs against the real dev Cognito pool. Mock mode bypasses authentication entirely and must not be used or suggested — it produces a dev environment that doesn't reflect real app behaviour.
 
+## AWS Environments & Local CDK
+
+- **One AWS account per environment.** Use that env's `AWSPowerUserAccess` SSO profile; list names with `aws configure list-profiles` if unsure. Pass `aws --profile …` explicitly — Granted `assume` env vars don't persist across Claude tool calls (fresh shell each call).
+  - **dev** = `dev/AWSPowerUserAccess` (account `058308164167`) → `https://d1n55zwqulukok.cloudfront.net`
+  - **prod** = `prod/AWSPowerUserAccess` (account `071526660165`) → `https://bookshelf.whoiskevinrich.com` — **this domain is PROD, not dev**
+- `cdk synth|diff|deploy` fail `CannotFindAsset` unless `apps/{api,mcp,web}/dist` exist — `pnpm -r build` first.
+- Clean no-op `cdk diff`: `-c env=dev -c version=<active> -c cloudfront-domain=d1n55zwqulukok.cloudfront.net` (omitting the last two diffs SPA callback URLs / version tags spuriously).
+- Cognito pool changes are **blue/green** via `-c authPool=legacy|cutover|green` (ADR-015) — never change email mutability or pool-identity props in place. The `green` deploy must run Api/Mcp/Web **before** BookshelfAuth (CFN won't delete still-imported exports).
+- `gh pr create` triggers an auto `chore: bump version` commit on the branch — `git pull --rebase` before pushing again.
+
 ## Workflow: Idea to Production
 
 > **Installed-skill caveat:** `/engineering:*` and `/vercel:*` are **not installed** in this environment and will fail if invoked. This project deploys via **AWS CDK + GitHub Actions**, not Vercel — use the CDK/manual equivalent wherever a phase below references those skills.

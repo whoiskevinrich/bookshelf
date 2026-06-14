@@ -143,3 +143,39 @@ describe("authMiddleware audience configuration", () => {
     expect(captureAudience()).toEqual(["test-client-id"]);
   });
 });
+
+// ADR-015 blue/green cutover — the API trusts a second (legacy) pool for the cutover window.
+describe("authMiddleware dual-issuer cutover", () => {
+  it("falls back to the secondary issuer when the primary pool rejects the token", async () => {
+    vi.stubEnv(
+      "COGNITO_ISSUER_SECONDARY",
+      "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_green",
+    );
+    // primary issuer fails (token minted by the other pool), secondary issuer verifies it.
+    vi.mocked(jwtVerify)
+      .mockRejectedValueOnce(new Error("signature mismatch"))
+      .mockResolvedValueOnce({
+        payload: { sub: "green-user", "cognito:username": "u@example.com", token_use: "id" },
+        protectedHeader: {} as never,
+      });
+    const app = makeApp();
+    const res = await app.request("/protected", { headers: { Authorization: "Bearer t" } });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { userId: string }).userId).toBe("green-user");
+    expect(vi.mocked(jwtVerify)).toHaveBeenCalledTimes(2); // tried both pools
+    vi.stubEnv("COGNITO_ISSUER_SECONDARY", "");
+  });
+
+  it("adds the secondary SPA client id to the accepted audience", async () => {
+    vi.stubEnv("COGNITO_CLIENT_ID_SECONDARY", "legacy-client-id");
+    vi.mocked(jwtVerify).mockResolvedValueOnce({
+      payload: { sub: "u", "cognito:username": "u@example.com", token_use: "id" },
+      protectedHeader: {} as never,
+    });
+    const app = makeApp();
+    await app.request("/protected", { headers: { Authorization: "Bearer t" } });
+    const aud = (vi.mocked(jwtVerify).mock.calls.at(-1)?.[2] as { audience?: string[] })?.audience;
+    expect(aud).toContain("legacy-client-id");
+    vi.stubEnv("COGNITO_CLIENT_ID_SECONDARY", "");
+  });
+});
