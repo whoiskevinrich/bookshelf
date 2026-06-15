@@ -64,7 +64,7 @@ This skill checks for active AWS credentials, acquires them via
 
 ## Workflow: Idea to Production
 
-> **Installed-skill caveat:** `/engineering:*` and `/vercel:*` are **not installed** in this environment and will fail if invoked. This project deploys via **AWS CDK + GitHub Actions**, not Vercel — use the CDK/manual equivalent wherever a phase below references those skills.
+> **Installed-skill caveat:** `/engineering:*` is now installed and available. Only `/vercel:*` remains **not installed** and will fail if invoked. This project deploys via **AWS CDK + GitHub Actions**, not Vercel — use the CDK/manual equivalent wherever a phase below references a Vercel skill.
 
 ### Phase 0 — Session Start
 
