@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { isValidIsbn10, isValidIsbn13, isValidIsbn, normalizeIsbn } from "../../src/lib/isbn.js";
+import {
+  isValidIsbn10,
+  isValidIsbn13,
+  isValidIsbn,
+  isbn10to13,
+  normalizeIsbn,
+} from "../../src/lib/isbn.js";
 
 describe("isValidIsbn10", () => {
   it("accepts a valid ISBN-10", () => {
@@ -52,8 +58,32 @@ describe("isValidIsbn", () => {
   });
 });
 
+describe("isbn10to13", () => {
+  it("converts a valid ISBN-10 to its ISBN-13 form", () => {
+    // 0553381350 (Dune) → 9780553381351
+    expect(isbn10to13("0553381350")).toBe("9780553381351");
+  });
+
+  it("converts an ISBN-10 with an X check digit", () => {
+    // 097522980X → 9780975229804
+    expect(isbn10to13("097522980X")).toBe("9780975229804");
+  });
+});
+
 describe("normalizeIsbn", () => {
-  it("strips hyphens", () => {
+  it("strips hyphens from an ISBN-13", () => {
     expect(normalizeIsbn("978-0-441-01359-3")).toBe("9780441013593");
+  });
+
+  it("canonicalizes an ISBN-10 to ISBN-13 so a book never forks across two keys", () => {
+    expect(normalizeIsbn("0553381350")).toBe("9780553381351");
+  });
+
+  it("canonicalizes a hyphenated ISBN-10 to ISBN-13", () => {
+    expect(normalizeIsbn("0-553-38135-0")).toBe("9780553381351");
+  });
+
+  it("leaves an ISBN-13 unchanged", () => {
+    expect(normalizeIsbn("9780553381351")).toBe("9780553381351");
   });
 });
