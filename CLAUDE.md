@@ -60,7 +60,7 @@ This skill checks for active AWS credentials, acquires them via
 - `cdk synth|diff|deploy` fail `CannotFindAsset` unless `apps/{api,mcp,web}/dist` exist — `pnpm -r build` first.
 - Clean no-op `cdk diff`: `-c env=dev -c version=<active> -c cloudfront-domain=d1n55zwqulukok.cloudfront.net` (omitting the last two diffs SPA callback URLs / version tags spuriously).
 - Cognito pool changes are **blue/green** via `-c authPool=legacy|cutover|green` (ADR-015) — never change email mutability or pool-identity props in place. The `green` deploy must run Api/Mcp/Web **before** BookshelfAuth (CFN won't delete still-imported exports).
-- `gh pr create` triggers an auto `chore: bump version` commit on the branch — `git pull --rebase` before pushing again.
+- **Release version is CI-derived (ADR-017):** the deploy workflow computes `max(existing v* tags) + 1` at merge time and tags after smoke passes. Never bump `package.json` (pinned to `0.0.0`) or create version tags by hand — there's no pre-PR bump step anymore.
 
 ## Workflow: Idea to Production
 
@@ -90,8 +90,9 @@ This skill checks for active AWS credentials, acquires them via
 
 ### Phase 4 — Pre-merge Review (REQUIRED before gh pr create)
 
-1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm version:bump`, then `pnpm preflight`
-   (`preflight` now includes `pnpm qa:guards` — the same QA Guards check CI runs)
+1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm preflight`
+   (`preflight` includes `pnpm qa:guards` — the same QA Guards check CI runs).
+   No version bump — the deploy workflow derives the version at merge (ADR-017).
 2. Document as appropriate (the Pre-PR docs gate hook will remind you):
    - Technical decisions → `docs/adrs/<slug>.md` + row in `docs/decisions.md`
    - Spec changes → `docs/specs/<slug>.md`

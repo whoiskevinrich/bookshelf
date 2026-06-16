@@ -158,7 +158,8 @@ Recommended protection rules for `prod`:
 Configure via **Settings → Branches → Add branch ruleset** for `main`:
 
 - ✅ Require status checks to pass before merging
-  - Add: `Lint`, `Format`, `Unit Tests`, `CDK Synth`, `Unique Version`
+  - Add: `Lint`, `Format`, `Unit Tests`, `CDK Synth`, `QA Guards`
+    (no `Unique Version` check — the version is CI-derived at deploy, see ADR-017)
 - ✅ Require branches to be up to date before merging
 - ✅ Restrict deletions
 - ✅ Block force pushes

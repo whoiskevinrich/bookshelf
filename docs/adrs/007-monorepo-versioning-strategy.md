@@ -1,7 +1,13 @@
 # ADR-007: Monorepo Versioning Strategy — Root-Only
 
-**Status**: Accepted  
+**Status**: Accepted (enforcement mechanism superseded by [ADR-017](017-ci-derived-release-versions.md))
 **Date**: 2026-06-02
+
+> **Note (2026-06-15):** the _scope_ decision here (root-only, workspaces at `0.0.0`)
+> still holds, but the **enforcement** described below — bumping root `package.json`
+> per PR and the "Unique Version" CI gate — is replaced by CI-derived versions in
+> [ADR-017](017-ci-derived-release-versions.md). Root `package.json` is now also
+> pinned to `0.0.0`; the release identity is the git tag CI creates at deploy.
 
 ## Context
 
