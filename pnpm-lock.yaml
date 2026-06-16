@@ -148,6 +148,9 @@ importers:
       aws-amplify:
         specifier: ^6.9.0
         version: 6.17.0
+      qrcode-generator:
+        specifier: ^1.4.4
+        version: 1.5.2
       react:
         specifier: ^19.1.0
         version: 19.2.6
@@ -2554,6 +2557,9 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
+  qrcode-generator@1.5.2:
+    resolution: {integrity: sha512-pItrW0Z9HnDBnFmgiNrY1uxRdri32Uh9EjNYLPVC2zZ3ZRIIEqBoDgm4DkvDwNNDHTK7FNkmr8zAa77BYc9xNw==}
+
   qs@6.15.2:
     resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
     engines: {node: '>=0.6'}
@@ -4599,7 +4605,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.7(@types/node@25.9.0)(@vitest/coverage-v8@4.1.7)(jsdom@26.1.0)(msw@2.14.6(@types/node@25.9.0)(typescript@6.0.3))(vite@8.0.16(@types/node@25.9.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3))
+      vitest: 4.1.7(@types/node@22.19.20)(@vitest/coverage-v8@4.1.7)(jsdom@26.1.0)(msw@2.14.6(@types/node@22.19.20)(typescript@6.0.3))(vite@8.0.16(@types/node@22.19.20)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
 
   '@vitest/expect@4.1.7':
     dependencies:
@@ -5980,6 +5986,8 @@ snapshots:
       ipaddr.js: 1.9.1
 
   punycode@2.3.1: {}
+
+  qrcode-generator@1.5.2: {}
 
   qs@6.15.2:
     dependencies:

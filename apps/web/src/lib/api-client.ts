@@ -201,6 +201,28 @@ export async function deleteAccount(
   await throwIfError(res);
 }
 
+// ── Analytics API ────────────────────────────────────────────────────────────
+
+/** Client event names the API accepts (must match the server allowlist). */
+export type AnalyticsEvent = "hint_shown" | "hint_link_clicked" | "hint_dismissed";
+
+/**
+ * Record a client analytics event (ADR-016). Resolves on 204; throws ApiError
+ * otherwise. Callers that want fire-and-forget behaviour should use
+ * `track()` from `lib/analytics.ts` rather than calling this directly.
+ */
+export async function postEvent(
+  name: AnalyticsEvent,
+  props?: Record<string, string | number | boolean>,
+): Promise<void> {
+  const res = await authedFetch("/v1/events", {
+    method: "POST",
+    body: JSON.stringify({ name, ...(props ? { props } : {}) }),
+  });
+  if (res.status === 204) return;
+  await throwIfError(res);
+}
+
 // ── Books API ──────────────────────────────────────────────────────────────
 
 export async function searchBooks(q: string): Promise<BookSearchResult[]> {
