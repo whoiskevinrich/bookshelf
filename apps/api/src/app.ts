@@ -5,6 +5,7 @@ import { booksRouter } from "./routes/books.js";
 import { shelfRouter } from "./routes/shelf.js";
 import { shelvesRouter } from "./routes/shelves.js";
 import { usersRouter } from "./routes/users.js";
+import { eventsRouter } from "./routes/events.js";
 
 /**
  * Shared Hono app instance — used by both the Lambda handler (index.ts)
@@ -44,6 +45,7 @@ app.route("/v1/books", booksRouter);
 app.route("/v1/shelf", shelfRouter);
 app.route("/v1/shelves", shelvesRouter);
 app.route("/v1/users", usersRouter);
+app.route("/v1/events", eventsRouter);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 app.onError((err, c) => {

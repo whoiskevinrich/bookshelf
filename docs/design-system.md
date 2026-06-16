@@ -153,6 +153,57 @@ import { inputClass, labelClass } from "../../lib/form-styles";
 
 ---
 
+## Callout
+
+`Callout` (`src/components/ui/Callout.tsx`) is the shared container for low-urgency, **supporting** messages — tips and "you can also do X over there" pointers. Use it instead of inventing one-off bordered boxes. It is **not** for form validation feedback tied to an action — those stay inline with the red/green semantic tokens.
+
+**Anatomy:** optional leading `icon` · `title` · body (`children`) · optional `actions` row · optional dismiss button (top-right, shown when `onDismiss` is passed).
+
+**Tokens:**
+
+| Part         | Light                                                       | Dark                                                                |
+| ------------ | ----------------------------------------------------------- | ------------------------------------------------------------------- |
+| Container bg | `bg-slate-50`                                               | `dark:bg-slate-800/50`                                              |
+| Border       | `border border-slate-200`                                   | `dark:border-slate-700`                                             |
+| Radius       | `rounded-2xl`                                               | —                                                                   |
+| Padding      | `p-5`                                                       | —                                                                   |
+| Title        | `text-sm font-semibold slate-900`                           | `dark:text-white`                                                   |
+| Body         | `text-sm text-slate-600`                                    | `dark:text-slate-300`                                               |
+| Icon         | `text-slate-500`                                            | `dark:text-slate-400`                                               |
+| Dismiss btn  | `text-slate-500 hover:bg-slate-200/70 hover:text-slate-900` | `dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white` |
+
+**Rules:**
+
+- The dismiss control is a real `<button>` with `aria-label`, an `h-11 w-11` (44×44px) tap target, and `hover:bg` feedback — never an icon-only `div`, never hover-only visibility.
+- Pair the message with an icon or text — never color alone (WCAG 1.4.1).
+- Action buttons inside `actions` use `<Button>` (`secondary`/`ghost`), never a raw `<button>`.
+- Every color class ships a `dark:` counterpart. `role="note"`.
+- Ambient only — never modal or blocking.
+
+**Usage example** — `MobileScanHint` (`src/components/shelf/MobileScanHint.tsx`) points desktop users to the mobile scanner:
+
+```tsx
+<Callout
+  title="Scan books with your phone"
+  icon={<CameraIcon aria-hidden="true" />}
+  dismissLabel="Dismiss scan tip"
+  onDismiss={() => {
+    track("hint_dismissed");
+    setDismissed("yes");
+  }}
+>
+  <p>
+    Open <span className="font-medium text-slate-900 dark:text-white">bookshelf</span> on your
+    phone and tap <span className="font-medium text-slate-900 dark:text-white">Scan</span>…
+  </p>
+  <QrCode value={appUrl} label={`QR code linking to ${displayUrl}`} className="h-28 w-28" />
+</Callout>
+```
+
+> **QR codes** (`src/components/ui/QrCode.tsx`) always render dark-on-white with a quiet-zone margin, regardless of theme, because scanners expect dark-on-light. This is a deliberate exception to the dark-mode rule — the same reasoning as the always-dark camera scanner surface. The encoder is lazily imported so only views that show a QR pay for it.
+
+---
+
 ## Links
 
 ### Inline navigation links (within auth forms)

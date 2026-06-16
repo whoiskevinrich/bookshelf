@@ -20,6 +20,7 @@ import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
+import { MobileScanHint } from "../components/shelf/MobileScanHint";
 import { BookSearch } from "../components/BookSearch";
 import { Button } from "../components/ui/Button";
 import { ScanModal } from "../components/scanner/ScanModal";
@@ -422,6 +423,8 @@ export function ShelfPage() {
         </div>
 
         {showScanner && <ScanModal onClose={() => setShowScanner(false)} />}
+
+        <MobileScanHint />
 
         {showCreateShelf && (
           <div className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">

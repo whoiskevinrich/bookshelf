@@ -6,6 +6,7 @@ import { useShelves, useAddBookToShelf, useRemoveBookFromShelf } from "../hooks/
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
+import { MobileScanHint } from "../components/shelf/MobileScanHint";
 import { Button } from "../components/ui/Button";
 
 export function WishlistPage() {
@@ -29,6 +30,8 @@ export function WishlistPage() {
 
       <main className="max-w-4xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold dark:text-white mb-8">Wishlist</h1>
+
+        <MobileScanHint />
 
         {isLoading && <ShelfSkeleton sections={1} />}
 
