@@ -124,8 +124,9 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 
 ### General
 
-- No console.log in production code
+- No console.log in production code — the `no-console` QA guard blocks `console.log`/`info`/`debug`; server metrics use `process.stdout.write` for CloudWatch EMF (see `apps/api/src/lib/metrics.ts`)
 - Error boundaries on all async operations
+- Client analytics: use `track()` from `apps/web/src/lib/analytics.ts` (fire-and-forget) → `POST /v1/events`; to add an event, add its name to **both** the client `AnalyticsEvent` union and the server `ALLOWED_EVENTS` allowlist (ADR-016)
 - Environment variables for all external service credentials
 - **[NON-NEGOTIABLE] Never add mock/stub auth** — `VITE_MOCK_API`, fake `getCurrentUser()` returns, or any bypass of Cognito authentication. Auth always runs against the real dev Cognito pool. Flag any `MOCK_MODE` guard in `lib/auth.ts` or `main.tsx` as a blocker.
 
@@ -142,6 +143,7 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 ### UI / Design System
 
 - Buttons: always use `<Button>` from `src/components/ui/Button.tsx` — never inline `bg-indigo-600` or `bg-gray-900` button classes on a raw `<button>`
+- Informational callouts/tips: use `<Callout>` from `src/components/ui/Callout.tsx` (not for form validation — use inline red/green); QR codes via `<QrCode>` (lazy-loaded, always dark-on-white). See `docs/design-system.md`
 - Auth form inputs/labels: import `inputClass`/`labelClass` from `src/lib/form-styles.ts` — never redeclare locally
 - Muted/secondary text: minimum `text-gray-500 dark:text-zinc-400` for any visible text content on light backgrounds (`text-gray-400` fails WCAG AA contrast)
 - Interactive elements: no hover-only affordances (e.g. `opacity-0 group-hover:opacity-100`) — touch users can't hover
