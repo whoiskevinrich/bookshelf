@@ -20,10 +20,7 @@ const NAMESPACE = "Bookshelf/WebEvents";
  * queryable in CloudWatch Logs Insights. Never throws: a metric failure must
  * not break the request that triggered it.
  */
-export function emitMetric(
-  event: string,
-  props?: Record<string, string | number | boolean>,
-): void {
+export function emitMetric(event: string, props?: Record<string, string | number | boolean>): void {
   try {
     const line = {
       _aws: {
