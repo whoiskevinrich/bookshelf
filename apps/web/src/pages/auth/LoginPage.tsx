@@ -38,7 +38,14 @@ export function LoginPage() {
   const banner = (location.state as { banner?: string } | null)?.banner;
   const next = safeNext(searchParams.get("next"));
 
-  const [email, setEmail] = useState("");
+  // Dev-only convenience: prefill the email (NOT a secret) so local QA against the
+  // real Cognito pool skips retyping it on every reload. The `import.meta.env.DEV`
+  // guard lets Vite dead-code-eliminate this in production builds, so neither the
+  // prefill nor VITE_QA_EMAIL ships. The password is never prefilled — type it or
+  // let the browser's password manager autofill it (see .env.example).
+  const [email, setEmail] = useState(
+    import.meta.env.DEV ? ((import.meta.env.VITE_QA_EMAIL as string | undefined) ?? "") : "",
+  );
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 /**
@@ -7,8 +8,42 @@ import { defineConfig, devices } from "@playwright/test";
  *   TEST_USER_EMAIL    Cognito test-user email  (required for signed-in tests)
  *   TEST_USER_PASSWORD Cognito test-user password (required for signed-in tests)
  *
- * Store these in apps/web/.env.test.local (gitignored) for local runs.
+ * For local runs, copy .env.test.local.example → apps/web/.env.test.local
+ * (gitignored) and fill it in — it is auto-loaded below. In CI, set the same
+ * names as repository secrets instead. These are read Node-side only and are NOT
+ * VITE_-prefixed, so they never reach the browser bundle.
  */
+
+/**
+ * Load apps/web/.env.test.local into process.env. Playwright does not auto-load
+ * dotenv files, so without this the documented TEST_USER_* vars would never reach
+ * the setup project. Already-set vars win, so CI-provided secrets are never
+ * overridden. Zero-dependency by design — keeps the e2e setup self-contained.
+ */
+function loadTestEnv(relPath: string): void {
+  let contents: string;
+  try {
+    contents = readFileSync(new URL(relPath, import.meta.url), "utf8");
+  } catch {
+    return; // No local file — rely on the ambient environment (e.g. CI secrets).
+  }
+  for (const rawLine of contents.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    if (!key || key in process.env) continue;
+    let value = line.slice(eq + 1).trim();
+    const quoted =
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"));
+    if (quoted) value = value.slice(1, -1);
+    process.env[key] = value;
+  }
+}
+
+loadTestEnv("./.env.test.local");
 
 const APP_BASE_URL = (process.env.APP_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
