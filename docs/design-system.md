@@ -193,8 +193,8 @@ import { inputClass, labelClass } from "../../lib/form-styles";
   }}
 >
   <p>
-    Open <span className="font-medium text-slate-900 dark:text-white">bookshelf</span> on your
-    phone and tap <span className="font-medium text-slate-900 dark:text-white">Scan</span>…
+    Open <span className="font-medium text-slate-900 dark:text-white">bookshelf</span> on your phone
+    and tap <span className="font-medium text-slate-900 dark:text-white">Scan</span>…
   </p>
   <QrCode value={appUrl} label={`QR code linking to ${displayUrl}`} className="h-28 w-28" />
 </Callout>

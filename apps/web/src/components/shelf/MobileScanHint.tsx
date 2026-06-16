@@ -31,10 +31,7 @@ export function MobileScanHint() {
   );
 
   // Eligible = feature on for this env AND this device can't scan itself.
-  const eligible = useMemo(
-    () => getRuntimeConfig().features.scanner && !supportsCameraScan(),
-    [],
-  );
+  const eligible = useMemo(() => getRuntimeConfig().features.scanner && !supportsCameraScan(), []);
   const show = eligible && dismissed === "no";
 
   useEffect(() => {

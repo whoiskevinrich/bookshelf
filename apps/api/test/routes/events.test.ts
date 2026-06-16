@@ -37,13 +37,13 @@ describe("POST /v1/events", () => {
   it("records an allowlisted event and returns 204", async () => {
     const res = await post({ name: "hint_shown" });
     expect(res.status).toBe(204);
-    expect(emitMetric).toHaveBeenCalledWith("hint_shown");
+    expect(emitMetric).toHaveBeenCalledWith("hint_shown", undefined);
   });
 
-  it("accepts valid props", async () => {
+  it("accepts valid props and forwards them to the metric", async () => {
     const res = await post({ name: "hint_link_clicked", props: { page: "shelf" } });
     expect(res.status).toBe(204);
-    expect(emitMetric).toHaveBeenCalledWith("hint_link_clicked");
+    expect(emitMetric).toHaveBeenCalledWith("hint_link_clicked", { page: "shelf" });
   });
 
   it("rejects an unknown event name with 400 and emits nothing", async () => {

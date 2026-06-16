@@ -20,7 +20,7 @@ Constraints that shape the decision:
 - This is the app's **first** event sink, so the shape should be reusable, not
   scan-hint-specific.
 
-Options weighed (full trade-offs in the spec's *Analytics Options*): (A) a `POST
+Options weighed (full trade-offs in the spec's _Analytics Options_): (A) a `POST
 /v1/events` route emitting CloudWatch EMF; (B) Amazon CloudWatch RUM; (C) third-party
 (Plausible/PostHog/GA4). B adds a per-event cost line and an App Monitor resource for
 three events; C sends behavior off-platform and adds a consent surface.
@@ -44,8 +44,10 @@ POST /v1/events
   `hint_dismissed` for v1). Allowlisting bounds metric cardinality — an open `name`
   field would let any client mint unbounded CloudWatch metrics.
 - `props` is an optional flat `Record<string, string | number | boolean>`, capped at
-  `EVENT_PROPS_MAX_KEYS` (8) and `EVENT_PROP_VALUE_MAX_LENGTH` (200) per the New
-  Endpoint Checklist. Nested objects/arrays rejected.
+  `PROPS_MAX_KEYS` (8) and `PROP_VALUE_MAX_LENGTH` (200) per the New Endpoint Checklist.
+  Nested objects/arrays rejected. Validated props are written as a nested field on the
+  EMF log line (queryable in Logs Insights) but are **not** metric dimensions, so they
+  never widen metric cardinality.
 - The global 64 KB `bodyLimit` already applies; no tighter per-route cap needed for a
   payload this small, but the prop caps prevent log bloat.
 
@@ -59,14 +61,16 @@ metrics from it. We do **not** add `@aws-lambda-powertools/metrics` or call
 {
   "_aws": {
     "Timestamp": 1718500000000,
-    "CloudWatchMetrics": [{
-      "Namespace": "Bookshelf/WebEvents",
-      "Dimensions": [["event"]],
-      "Metrics": [{ "Name": "Count", "Unit": "Count" }]
-    }]
+    "CloudWatchMetrics": [
+      {
+        "Namespace": "Bookshelf/WebEvents",
+        "Dimensions": [["event"]],
+        "Metrics": [{ "Name": "Count", "Unit": "Count" }],
+      },
+    ],
   },
   "event": "hint_shown",
-  "Count": 1
+  "Count": 1,
 }
 ```
 

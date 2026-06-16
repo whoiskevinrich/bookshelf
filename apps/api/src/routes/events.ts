@@ -15,11 +15,7 @@ export const eventsRouter = new Hono();
 eventsRouter.use("*", authMiddleware);
 
 /** Known client event names. Add new events here before the client emits them. */
-const ALLOWED_EVENTS = new Set<string>([
-  "hint_shown",
-  "hint_link_clicked",
-  "hint_dismissed",
-]);
+const ALLOWED_EVENTS = new Set<string>(["hint_shown", "hint_link_clicked", "hint_dismissed"]);
 
 // Props are accepted for forward-compatibility but only validated/bounded, not
 // recorded as metric dimensions (that would create unbounded metrics).
@@ -55,6 +51,6 @@ eventsRouter.post("/", async (c) => {
     return c.json({ error: "Invalid event props" }, 400);
   }
 
-  emitMetric(name);
+  emitMetric(name, props as Record<string, string | number | boolean> | undefined);
   return c.body(null, 204);
 });

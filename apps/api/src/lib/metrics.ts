@@ -12,11 +12,18 @@ const NAMESPACE = "Bookshelf/WebEvents";
 
 /**
  * Emit a single `Count: 1` metric named by `event`, with `event` as the only
- * dimension. Callers MUST pass a value from a bounded allowlist — an unbounded
- * dimension value would create unbounded CloudWatch metrics. Never throws: a
- * metric failure must not break the request that triggered it.
+ * metric dimension. Callers MUST pass a value from a bounded allowlist — an
+ * unbounded dimension value would create unbounded CloudWatch metrics.
+ *
+ * Optional `props` are written as a nested field on the same log line (NOT as
+ * metric dimensions, so they never widen metric cardinality) — they stay
+ * queryable in CloudWatch Logs Insights. Never throws: a metric failure must
+ * not break the request that triggered it.
  */
-export function emitMetric(event: string): void {
+export function emitMetric(
+  event: string,
+  props?: Record<string, string | number | boolean>,
+): void {
   try {
     const line = {
       _aws: {
@@ -31,6 +38,7 @@ export function emitMetric(event: string): void {
       },
       event,
       Count: 1,
+      ...(props ? { props } : {}),
     };
     // EMF is delivered via stdout to CloudWatch Logs.
     console.log(JSON.stringify(line));
