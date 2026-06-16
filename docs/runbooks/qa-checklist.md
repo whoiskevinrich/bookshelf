@@ -81,5 +81,6 @@ The **QA Guards** job only protects `main` if branch protection requires it:
 
 1. GitHub → **Settings → Branches → Branch protection rules → `main`**.
 2. Under **Require status checks to pass before merging**, add **QA Guards** (and confirm
-   **Lint**, **Unit Tests**, **Type Check**, **CDK Synth**, **Unique Version** are present).
+   **Lint**, **Unit Tests**, **Type Check**, **CDK Synth** are present). There is no
+   **Unique Version** check — the version is CI-derived at deploy (ADR-017).
 3. Save. A failing guard now blocks merge.
