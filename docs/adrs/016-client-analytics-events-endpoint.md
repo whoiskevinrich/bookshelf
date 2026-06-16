@@ -51,11 +51,12 @@ POST /v1/events
 - The global 64 KB `bodyLimit` already applies; no tighter per-route cap needed for a
   payload this small, but the prop caps prevent log bloat.
 
-**3. Emit EMF as a structured `console.log` line — no new dependency.** Embedded Metric
-Format is just a JSON log line with an `_aws` envelope; CloudWatch Logs auto-extracts
-metrics from it. We do **not** add `@aws-lambda-powertools/metrics` or call
-`PutMetricData` (avoids both a dependency and per-API-call cost). A tiny
-`emitMetric(name, dimensions)` helper writes:
+**3. Emit EMF as a structured line written to `process.stdout` — no new dependency.**
+Embedded Metric Format is just a JSON log line with an `_aws` envelope; CloudWatch Logs
+auto-extracts metrics from it. We write it via `process.stdout.write` (the `no-console`
+QA guard forbids `console.log`, and EMF requires stdout, not stderr). We do **not** add
+`@aws-lambda-powertools/metrics` or call `PutMetricData` (avoids both a dependency and
+per-API-call cost). A tiny `emitMetric(event, props?)` helper writes:
 
 ```jsonc
 {

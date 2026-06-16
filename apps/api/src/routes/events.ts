@@ -15,14 +15,17 @@ export const eventsRouter = new Hono();
 eventsRouter.use("*", authMiddleware);
 
 /** Known client event names. Add new events here before the client emits them. */
-const ALLOWED_EVENTS = new Set<string>(["hint_shown", "hint_link_clicked", "hint_dismissed"]);
+const ALLOWED_EVENTS = ["hint_shown", "hint_link_clicked", "hint_dismissed"] as const;
+const ALLOWED_EVENT_SET: ReadonlySet<string> = new Set(ALLOWED_EVENTS);
 
-// Props are accepted for forward-compatibility but only validated/bounded, not
-// recorded as metric dimensions (that would create unbounded metrics).
+type EventProps = Record<string, string | number | boolean>;
+
+// Props are bounded so a client can't bloat the log line. They are written as a
+// non-dimension field (see emitMetric), never as a metric dimension.
 const PROPS_MAX_KEYS = 8;
 const PROP_VALUE_MAX_LENGTH = 200;
 
-function isValidProps(props: unknown): boolean {
+function isValidProps(props: unknown): props is EventProps | undefined {
   if (props === undefined) return true;
   if (typeof props !== "object" || props === null || Array.isArray(props)) return false;
   const entries = Object.entries(props as Record<string, unknown>);
@@ -44,13 +47,13 @@ eventsRouter.post("/", async (c) => {
 
   const { name, props } = body as { name?: unknown; props?: unknown };
 
-  if (typeof name !== "string" || !ALLOWED_EVENTS.has(name)) {
+  if (typeof name !== "string" || !ALLOWED_EVENT_SET.has(name)) {
     return c.json({ error: "Unknown event name" }, 400);
   }
   if (!isValidProps(props)) {
     return c.json({ error: "Invalid event props" }, 400);
   }
 
-  emitMetric(name, props as Record<string, string | number | boolean> | undefined);
+  emitMetric(name, props);
   return c.body(null, 204);
 });

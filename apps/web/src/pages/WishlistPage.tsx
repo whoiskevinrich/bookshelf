@@ -31,7 +31,7 @@ export function WishlistPage() {
       <main className="max-w-4xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold dark:text-white mb-8">Wishlist</h1>
 
-        <MobileScanHint />
+        <MobileScanHint page="wishlist" />
 
         {isLoading && <ShelfSkeleton sections={1} />}
 

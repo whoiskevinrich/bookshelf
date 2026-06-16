@@ -46,6 +46,23 @@ describe("POST /v1/events", () => {
     expect(emitMetric).toHaveBeenCalledWith("hint_link_clicked", { page: "shelf" });
   });
 
+  it("accepts props at the boundaries: 8 keys, 200-char string, number and boolean", async () => {
+    const props: Record<string, string | number | boolean> = {
+      s: "x".repeat(200),
+      n: 42,
+      b: true,
+    };
+    for (let i = 0; i < 5; i++) props[`k${i}`] = i; // total 8 keys
+    const res = await post({ name: "hint_shown", props });
+    expect(res.status).toBe(204);
+    expect(emitMetric).toHaveBeenCalledWith("hint_shown", props);
+  });
+
+  it("rejects props: null and props: [] with 400", async () => {
+    expect((await post({ name: "hint_shown", props: null })).status).toBe(400);
+    expect((await post({ name: "hint_shown", props: [] })).status).toBe(400);
+  });
+
   it("rejects an unknown event name with 400 and emits nothing", async () => {
     const res = await post({ name: "totally_made_up" });
     expect(res.status).toBe(400);

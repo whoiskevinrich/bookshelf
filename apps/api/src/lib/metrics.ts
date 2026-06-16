@@ -39,7 +39,9 @@ export function emitMetric(event: string, props?: Record<string, string | number
     };
     // EMF is delivered as a single stdout line to CloudWatch Logs.
     process.stdout.write(`${JSON.stringify(line)}\n`);
-  } catch {
-    // Metric emission is best-effort; swallow so it never affects the response.
+  } catch (err) {
+    // Best-effort: never let metric emission affect the response. But log it,
+    // so a broken emitter surfaces in CloudWatch instead of a silent flatline.
+    console.error("emitMetric failed", event, err instanceof Error ? err.message : err);
   }
 }

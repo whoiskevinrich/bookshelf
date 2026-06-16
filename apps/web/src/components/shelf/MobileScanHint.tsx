@@ -22,8 +22,11 @@ const parseDismissed = (raw: string): "yes" | "no" | null =>
  * device (`supportsCameraScan()` is false). Renders nothing when scanning is
  * disabled for the environment, when the current device can already scan, or
  * once the user has dismissed it. See `docs/specs/mobile-scan-discoverability.md`.
+ *
+ * `page` is attached to every analytics event so CloudWatch can attribute
+ * shown/clicked/dismissed by where the hint was surfaced.
  */
-export function MobileScanHint() {
+export function MobileScanHint({ page }: { page: "shelf" | "wishlist" }) {
   const [dismissed, setDismissed] = useLocalStorage<"yes" | "no">(
     DISMISSED_KEY,
     "no",
@@ -37,9 +40,9 @@ export function MobileScanHint() {
   useEffect(() => {
     if (show && !shownThisSession) {
       shownThisSession = true;
-      track("hint_shown");
+      track("hint_shown", { page });
     }
-  }, [show]);
+  }, [show, page]);
 
   if (!show) return null;
 
@@ -52,7 +55,7 @@ export function MobileScanHint() {
       title="Scan books with your phone"
       dismissLabel="Dismiss scan tip"
       onDismiss={() => {
-        track("hint_dismissed");
+        track("hint_dismissed", { page });
         setDismissed("yes");
       }}
       icon={
@@ -85,7 +88,7 @@ export function MobileScanHint() {
             href={appUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => track("hint_link_clicked")}
+            onClick={() => track("hint_link_clicked", { page })}
             className="mt-2 inline-block text-sm text-slate-900 underline underline-offset-2 dark:text-white"
           >
             {displayUrl}

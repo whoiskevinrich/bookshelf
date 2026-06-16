@@ -424,7 +424,7 @@ export function ShelfPage() {
 
         {showScanner && <ScanModal onClose={() => setShowScanner(false)} />}
 
-        <MobileScanHint />
+        <MobileScanHint page="shelf" />
 
         {showCreateShelf && (
           <div className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
