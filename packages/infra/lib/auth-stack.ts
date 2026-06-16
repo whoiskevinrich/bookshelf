@@ -341,9 +341,14 @@ export class AuthStack extends cdk.Stack {
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.EMAIL, cognito.OAuthScope.OPENID, cognito.OAuthScope.PROFILE],
-        // localhost:5173 is Vite's default dev port; additional prod URLs come from props
-        callbackUrls: ["http://localhost:5173/auth/callback", ...(oauthCallbackUrls ?? [])],
-        logoutUrls: ["http://localhost:5173", ...(oauthLogoutUrls ?? [])],
+        // localhost:3000 is this app's dev port (vite.config.ts + API CORS default);
+        // 5173 is Vite's default, kept for safety. Prod URLs come from props.
+        callbackUrls: [
+          "http://localhost:3000/auth/callback",
+          "http://localhost:5173/auth/callback",
+          ...(oauthCallbackUrls ?? []),
+        ],
+        logoutUrls: ["http://localhost:3000", "http://localhost:5173", ...(oauthLogoutUrls ?? [])],
       },
       preventUserExistenceErrors: true,
       accessTokenValidity: cdk.Duration.hours(1),

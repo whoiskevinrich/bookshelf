@@ -41,7 +41,7 @@ by email**.
 
 ```powershell
 # Authenticate to the target account (run once per environment: dev, then prod)
-assume Sandbox/AWSPowerUserAccess          # dev
+assume dev/AWSPowerUserAccess          # dev
 # (prod: use the prod profile / role)
 
 $env:AWS_REGION = "us-west-2"
