@@ -7,6 +7,6 @@
 
 if (Test-Path $PROFILE) { . $PROFILE }
 
-assume Sandbox/AWSPowerUserAccess
+assume dev/AWSPowerUserAccess
 
 pnpm --filter @bookshelf/api run dev

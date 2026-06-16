@@ -149,7 +149,16 @@ export function LoginPage() {
           variant="secondary"
           className="w-full flex items-center justify-center gap-2"
           onClick={() => {
-            void signInWithGoogle(next);
+            setError(null);
+            // On success the browser redirects away, so this promise only ever
+            // settles on failure — surface it instead of failing silently.
+            signInWithGoogle(next).catch((err: unknown) => {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : "Couldn't start Google sign-in. Please try again.",
+              );
+            });
           }}
         >
           <GoogleIcon />

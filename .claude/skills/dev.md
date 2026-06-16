@@ -6,7 +6,7 @@ Granted Assume automatically.
 ## AWS profile
 
 ```
-Sandbox/AWSPowerUserAccess
+dev/AWSPowerUserAccess
 ```
 
 ## Steps
@@ -24,7 +24,7 @@ Sandbox/AWSPowerUserAccess
    process inherits the credentials without requiring shell integration:
 
    ```bash
-   assume Sandbox/AWSPowerUserAccess --exec "pnpm --filter @bookshelf/api dev"
+   assume dev/AWSPowerUserAccess --exec "pnpm --filter @bookshelf/api dev"
    ```
 
    This starts the API server with credentials injected. Skip step 3 for the API
