@@ -4,8 +4,8 @@
  * EMF is just a structured JSON log line: when CloudWatch Logs ingests a line
  * carrying the `_aws` envelope, it auto-extracts the named metrics — no
  * `PutMetricData` API call (and its per-call cost), and no extra dependency.
- * See ADR-016. In Lambda, `console.log` writes straight to the function's log
- * group, so this is the whole integration.
+ * See ADR-016. In Lambda, writing the line to stdout sends it straight to the
+ * function's log group, so this is the whole integration.
  */
 
 const NAMESPACE = "Bookshelf/WebEvents";
@@ -37,8 +37,8 @@ export function emitMetric(event: string, props?: Record<string, string | number
       Count: 1,
       ...(props ? { props } : {}),
     };
-    // EMF is delivered via stdout to CloudWatch Logs.
-    console.log(JSON.stringify(line));
+    // EMF is delivered as a single stdout line to CloudWatch Logs.
+    process.stdout.write(`${JSON.stringify(line)}\n`);
   } catch {
     // Metric emission is best-effort; swallow so it never affects the response.
   }
