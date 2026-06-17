@@ -37,14 +37,18 @@ jobs:
           ref: v${{ inputs.version }}
 
       - name: Confirm promotion target
+        # The release identity is the git tag, not package.json (ADR-017). We are
+        # checked out at `v${inputs.version}`, so the tree is exactly what was
+        # deployed to dev. Verify the tag resolves; package.json carries no version.
         run: |
-          ACTUAL=$(jq -r .version package.json)
+          set -euo pipefail
           echo "=================================================="
-          echo "  Promoting version : $ACTUAL"
+          echo "  Promoting version : v${{ inputs.version }}"
           echo "  Target environment: prod"
+          echo "  Commit            : $(git rev-parse HEAD)"
           echo "=================================================="
-          if [ "$ACTUAL" != "${{ inputs.version }}" ]; then
-            echo "::error::package.json version ($ACTUAL) does not match input (${{ inputs.version }})"
+          if ! git describe --tags --exact-match >/dev/null 2>&1; then
+            echo "::error::HEAD is not at tag v${{ inputs.version }} — refusing to promote an untagged commit"
             exit 1
           fi
 
@@ -264,10 +268,19 @@ jobs:
         run: pnpm --filter @bookshelf/api run test:smoke
 
       - name: Create GitHub Release
+        # Idempotent (ADR-017): a re-run, or promoting an already-released version,
+        # is a no-op instead of an HTTP 422. The release — not package.json — is the
+        # immutable record that this version shipped.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ inputs.version }}" \
-            --title "v${{ inputs.version }}" \
+          set -euo pipefail
+          TAG="v${{ inputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists — skipping creation (idempotent)."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --title "$TAG" \
             --generate-notes \
             --verify-tag

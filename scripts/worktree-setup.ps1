@@ -36,7 +36,7 @@ if ($copied -eq 0) {
   Write-Host "`nNothing copied. If the files already exist you're set."
   Write-Host "If the main worktree has no .env.local files yet, populate them from SSM —"
   Write-Host "see docs/runbooks/local-dev.md (`"New worktree setup`"):"
-  Write-Host "  assume Sandbox/AWSPowerUserAccess"
+  Write-Host "  assume dev/AWSPowerUserAccess"
   Write-Host "  aws ssm get-parameter --name /bookshelf/api/url --query Parameter.Value --output text"
 } else {
   Write-Host "`nDone. Start the stack with:"

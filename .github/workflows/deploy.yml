@@ -49,12 +49,31 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Last good tag: $TAG"
 
-      - name: Resolve version
+      - name: Compute next version
         id: version
+        # The release version is derived from the immutable tag ledger, never from
+        # package.json (ADR-017). The deploy-dev concurrency group serializes main
+        # builds, so each run reads max+1 *after* the previous run pushed its tag —
+        # the computed number is always fresh and collisions are impossible.
         run: |
-          VERSION=$(jq -r .version package.json)
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          git fetch --tags --force
+          LATEST=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
+          LATEST=${LATEST:-v0.0.0}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
+          PATCH=$((PATCH + 1))
+          NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+          # Paranoia: skip any number that already exists as a tag or a release.
+          while git rev-parse -q --verify "refs/tags/${NEXT}" >/dev/null \
+            || gh release view "${NEXT}" >/dev/null 2>&1; do
+            PATCH=$((PATCH + 1))
+            NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+          done
+          echo "Next version: ${NEXT} (previous: ${LATEST})"
+          echo "tag=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "version=${NEXT#v}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
@@ -170,8 +189,10 @@ jobs:
           echo "Tagging commit as $TAG"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -f "$TAG"
-          git push origin -f "$TAG"
+          # Non-forced: a version tag is immutable (ADR-017). If this somehow
+          # collides, fail here — before promote — rather than after prod deploy.
+          git tag "$TAG"
+          git push origin "$TAG"
 
   promote:
     name: Promote → prod

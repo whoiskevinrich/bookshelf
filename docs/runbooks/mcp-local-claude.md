@@ -29,7 +29,7 @@ Copy-Item apps/mcp/.env.example apps/mcp/.env.local
 Then fill in the real values. The Cognito config comes from **AuthStack
 CloudFormation exports** — there are no `/bookshelf/cognito/*` SSM parameters
 (the AuthStack publishes CFN exports, not SSM, for these). With AWS credentials
-active (`assume Sandbox/AWSPowerUserAccess`):
+active (`assume dev/AWSPowerUserAccess`):
 
 ```powershell
 $region = "us-west-2"
@@ -83,7 +83,7 @@ real dev DynamoDB/Cognito and needs AWS credentials (see
 [`local-dev.md`](local-dev.md)).
 
 ```powershell
-assume Sandbox/AWSPowerUserAccess
+assume dev/AWSPowerUserAccess
 pnpm --filter @bookshelf/api dev          # API on http://localhost:3001
 pnpm --filter @bookshelf/mcp dev          # MCP on http://localhost:3002
 ```

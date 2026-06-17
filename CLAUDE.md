@@ -48,7 +48,7 @@ If the main worktree path differs, pass it:
 ```
 
 This skill checks for active AWS credentials, acquires them via
-`assume Sandbox/AWSPowerUserAccess` if needed, then starts the API and web servers.
+`assume dev/AWSPowerUserAccess` if needed, then starts the API and web servers.
 
 **[NON-NEGOTIABLE] Never use `dev:mock` mode.** Auth always runs against the real dev Cognito pool. Mock mode bypasses authentication entirely and must not be used or suggested — it produces a dev environment that doesn't reflect real app behaviour.
 
@@ -60,7 +60,7 @@ This skill checks for active AWS credentials, acquires them via
 - `cdk synth|diff|deploy` fail `CannotFindAsset` unless `apps/{api,mcp,web}/dist` exist — `pnpm -r build` first.
 - Clean no-op `cdk diff`: `-c env=dev -c version=<active> -c cloudfront-domain=d1n55zwqulukok.cloudfront.net` (omitting the last two diffs SPA callback URLs / version tags spuriously).
 - Cognito pool changes are **blue/green** via `-c authPool=legacy|cutover|green` (ADR-015) — never change email mutability or pool-identity props in place. The `green` deploy must run Api/Mcp/Web **before** BookshelfAuth (CFN won't delete still-imported exports).
-- `gh pr create` triggers an auto `chore: bump version` commit on the branch — `git pull --rebase` before pushing again.
+- **Release version is CI-derived (ADR-017):** the deploy workflow computes `max(existing v* tags) + 1` at merge time and tags after smoke passes. Never bump `package.json` (pinned to `0.0.0`) or create version tags by hand — there's no pre-PR bump step anymore.
 
 ## Workflow: Idea to Production
 
@@ -90,8 +90,9 @@ This skill checks for active AWS credentials, acquires them via
 
 ### Phase 4 — Pre-merge Review (REQUIRED before gh pr create)
 
-1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm version:bump`, then `pnpm preflight`
-   (`preflight` now includes `pnpm qa:guards` — the same QA Guards check CI runs)
+1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm preflight`
+   (`preflight` includes `pnpm qa:guards` — the same QA Guards check CI runs).
+   No version bump — the deploy workflow derives the version at merge (ADR-017).
 2. Document as appropriate (the Pre-PR docs gate hook will remind you):
    - Technical decisions → `docs/adrs/<slug>.md` + row in `docs/decisions.md`
    - Spec changes → `docs/specs/<slug>.md`
@@ -124,8 +125,9 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 
 ### General
 
-- No console.log in production code
+- No console.log in production code — the `no-console` QA guard blocks `console.log`/`info`/`debug`; server metrics use `process.stdout.write` for CloudWatch EMF (see `apps/api/src/lib/metrics.ts`)
 - Error boundaries on all async operations
+- Client analytics: use `track()` from `apps/web/src/lib/analytics.ts` (fire-and-forget) → `POST /v1/events`; to add an event, add its name to **both** the client `AnalyticsEvent` union and the server `ALLOWED_EVENTS` allowlist (ADR-016)
 - Environment variables for all external service credentials
 - **[NON-NEGOTIABLE] Never add mock/stub auth** — `VITE_MOCK_API`, fake `getCurrentUser()` returns, or any bypass of Cognito authentication. Auth always runs against the real dev Cognito pool. Flag any `MOCK_MODE` guard in `lib/auth.ts` or `main.tsx` as a blocker.
 
@@ -142,6 +144,7 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 ### UI / Design System
 
 - Buttons: always use `<Button>` from `src/components/ui/Button.tsx` — never inline `bg-indigo-600` or `bg-gray-900` button classes on a raw `<button>`
+- Informational callouts/tips: use `<Callout>` from `src/components/ui/Callout.tsx` (not for form validation — use inline red/green); QR codes via `<QrCode>` (lazy-loaded, always dark-on-white). See `docs/design-system.md`
 - Auth form inputs/labels: import `inputClass`/`labelClass` from `src/lib/form-styles.ts` — never redeclare locally
 - Muted/secondary text: minimum `text-gray-500 dark:text-zinc-400` for any visible text content on light backgrounds (`text-gray-400` fails WCAG AA contrast)
 - Interactive elements: no hover-only affordances (e.g. `opacity-0 group-hover:opacity-100`) — touch users can't hover
