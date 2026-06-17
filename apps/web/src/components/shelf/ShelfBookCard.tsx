@@ -285,13 +285,17 @@ export function ShelfBookCard({
 
   return (
     <div
-      // w-max: the card hugs the cover's natural width (covers share a height, not a width)
-      className="group/card flex flex-col gap-2 shrink-0 w-max animate-fade-up"
+      // Fixed-width column: covers vary in width (they share a height, not a width), so a
+      // content-sized card made long titles widen the card and knock the metadata rows out
+      // of alignment. A fixed width gives the row an even rhythm; the cover is centered
+      // within it and the title slot below is height-reserved for two lines.
+      className="group/card flex flex-col gap-2 shrink-0 w-[136px] animate-fade-up"
       style={staggerStyle}
     >
-      {/* Cover + hover overlay */}
+      {/* Cover + hover overlay — w-fit + mx-auto so the rounded corners and overlay hug the
+          image exactly (not the wider column), and the cover sits centered in the column. */}
       <div
-        className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200"
+        className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200 w-fit max-w-full mx-auto"
         onClick={handleCoverTap}
       >
         <BookCover
@@ -353,7 +357,7 @@ export function ShelfBookCard({
 
       {/* Book info */}
       <div className="px-0.5">
-        <p className="text-xs font-medium leading-snug line-clamp-2 dark:text-white text-slate-900">
+        <p className="text-xs font-medium leading-snug line-clamp-2 min-h-[2.1rem] dark:text-white text-slate-900">
           {title}
         </p>
         {authors.length > 0 && (
