@@ -15,16 +15,6 @@
       "autoPort": false
     },
     {
-      "name": "web-chrome-windows",
-      "runtimeExecutable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-      "runtimeArgs": [
-        "--app=http://localhost:3000/",
-        "--user-data-dir=C:\\Users\\whois\\AppData\\Local\\Temp\\bookshelf-preview-chrome"
-      ],
-      "port": 3100,
-      "autoPort": false
-    },
-    {
       "name": "dashboard",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
