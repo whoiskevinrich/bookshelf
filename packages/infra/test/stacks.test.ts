@@ -182,6 +182,21 @@ describe("ApiStack", () => {
     template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
   });
 
+  it("caps Lambda reserved concurrency as a cost ceiling (ADR-018)", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      ReservedConcurrentExecutions: 10,
+    });
+  });
+
+  it("throttles the default stage to shed floods before Lambda (ADR-018)", () => {
+    template.hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      DefaultRouteSettings: {
+        ThrottlingRateLimit: 50,
+        ThrottlingBurstLimit: 100,
+      },
+    });
+  });
+
   it("exports API URL as a CloudFormation output", () => {
     template.hasOutput("ApiUrlOutput", {
       Export: { Name: "BookshelfApiUrl" },
