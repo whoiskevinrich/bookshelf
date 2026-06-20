@@ -1,0 +1,45 @@
+name: CodeQL
+
+# Satisfies the `main` ruleset's required Code Scanning (CodeQL) result, and
+# scans first-party JS/TS on every PR + push to main. CodeQL's JS/TS analysis
+# reads source directly, so no pnpm install or build step is needed.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly baseline scan of the default branch (Mondays 06:00 UTC).
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # 'security-extended' broadens coverage slightly beyond the default
+          # query suite; drop to 'security-and-quality' or remove to use defaults.
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
