@@ -10,6 +10,24 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
 import { addApiGatewayCustomDomain } from "./api-gateway-domain";
 
+// ── Abuse / cost-ceiling controls (ADR-018, free-layer baseline) ────────────
+//
+// These are the two *infra-side* free controls. They are deliberately blunt and
+// aggregate — the per-user fairness limit lives in the Lambda (Hono middleware),
+// because the API is a single `/{proxy+}` integration so the gateway can only see
+// one route and cannot distinguish `/v1/books` from `/v1/shelf`.
+
+/** Aggregate request/second across the whole API. Sheds floods *before Lambda*
+ *  (API Gateway returns 429, the function is never invoked). Generous for a
+ *  single-user-scale app; the real per-user cap is enforced in-Lambda. */
+const API_THROTTLE_RATE = 50;
+/** Token-bucket burst above the steady rate. */
+const API_THROTTLE_BURST = 100;
+/** Hard ceiling on attack-driven Lambda/DynamoDB spend. Hobby traffic almost
+ *  never runs more than a couple of concurrent invocations; keep this well above
+ *  expected peak — it also throttles *legitimate* spikes once exceeded. */
+const API_MAX_CONCURRENCY = 10;
+
 /**
  * Custom API hostname config (full prod only) — the canonical `api.<app>...`
  * door for MCP / programmatic clients. Independent of `sameOrigin`: the interim
@@ -90,6 +108,9 @@ export class ApiStack extends cdk.Stack {
       code: lambda.Code.fromAsset("../../apps/api/dist"),
       timeout: cdk.Duration.seconds(29), // API GW max is 30s
       memorySize: 256,
+      // Cost ceiling: cap concurrent invocations so a flood can't run up an
+      // unbounded Lambda/DynamoDB bill (ADR-018). Excess invocations throttle.
+      reservedConcurrentExecutions: API_MAX_CONCURRENCY,
       environment: {
         NODE_ENV: "production",
         DYNAMODB_TABLE_NAME: table.tableName,
@@ -163,6 +184,16 @@ export class ApiStack extends cdk.Stack {
       methods: [apigatewayv2.HttpMethod.ANY],
       integration: lambdaIntegration,
     });
+
+    // Stage-level throttling on the auto-created default stage (ADR-018). The L2
+    // HttpApi construct doesn't surface throttle settings, so reach the CfnStage
+    // and set DefaultRouteSettings — this applies to the single catch-all route,
+    // i.e. aggregate across the whole API.
+    const defaultStage = httpApi.defaultStage?.node.defaultChild as apigatewayv2.CfnStage;
+    defaultStage.defaultRouteSettings = {
+      throttlingRateLimit: API_THROTTLE_RATE,
+      throttlingBurstLimit: API_THROTTLE_BURST,
+    };
 
     // Bare execute-api host (no scheme/path) for use as the CloudFront `/api` origin.
     this.executeApiDomain = `${httpApi.apiId}.execute-api.${this.region}.amazonaws.com`;

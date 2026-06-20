@@ -8,7 +8,7 @@
  * function's log group, so this is the whole integration.
  */
 
-const NAMESPACE = "Bookshelf/WebEvents";
+const DEFAULT_NAMESPACE = "Bookshelf/WebEvents";
 
 /**
  * Emit a single `Count: 1` metric named by `event`, with `event` as the only
@@ -19,15 +19,22 @@ const NAMESPACE = "Bookshelf/WebEvents";
  * metric dimensions, so they never widen metric cardinality) — they stay
  * queryable in CloudWatch Logs Insights. Never throws: a metric failure must
  * not break the request that triggered it.
+ *
+ * `namespace` defaults to the web-events namespace; other concerns (e.g. abuse
+ * counters, ADR-018) pass their own namespace to keep metrics grouped.
  */
-export function emitMetric(event: string, props?: Record<string, string | number | boolean>): void {
+export function emitMetric(
+  event: string,
+  props?: Record<string, string | number | boolean>,
+  namespace: string = DEFAULT_NAMESPACE,
+): void {
   try {
     const line = {
       _aws: {
         Timestamp: Date.now(),
         CloudWatchMetrics: [
           {
-            Namespace: NAMESPACE,
+            Namespace: namespace,
             Dimensions: [["event"]],
             Metrics: [{ Name: "Count", Unit: "Count" }],
           },

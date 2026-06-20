@@ -2,10 +2,24 @@ import { Hono } from "hono";
 import { searchBooks, getBookByIsbn, getBookByAsin } from "../lib/books/search.js";
 import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { FixedWindowRateLimiter, userRateLimit } from "../middleware/rate-limit.js";
 
 export const booksRouter = new Hono();
 
+// Per-user rate limit on the book routes — these proxy Google Books, whose daily
+// quota is shared across all users, so one user must not be able to drain it
+// (ADR-018). Limits are set well above any human cataloguing workflow. Held at
+// module scope so the counter survives across warm Lambda invocations.
+const BOOKS_PER_MINUTE = 30;
+const BOOKS_PER_HOUR = 300;
+const booksLimiter = new FixedWindowRateLimiter([
+  { label: "minute", limit: BOOKS_PER_MINUTE, windowMs: 60_000 },
+  { label: "hour", limit: BOOKS_PER_HOUR, windowMs: 3_600_000 },
+]);
+
+// Order matters: auth first (sets userId), then the per-user limit reads it.
 booksRouter.use("*", authMiddleware);
+booksRouter.use("*", userRateLimit(booksLimiter, { metricEvent: "rate_limited_books" }));
 
 const SEARCH_MAX_LENGTH = 200;
 // Real ASINs are 10 alphanumeric chars; ceiling raised to 20 so callers can
