@@ -15,7 +15,16 @@ export const eventsRouter = new Hono();
 eventsRouter.use("*", authMiddleware);
 
 /** Known client event names. Add new events here before the client emits them. */
-const ALLOWED_EVENTS = ["hint_shown", "hint_link_clicked", "hint_dismissed"] as const;
+const ALLOWED_EVENTS = [
+  "hint_shown",
+  "hint_link_clicked",
+  "hint_dismissed",
+  "scan_text_mode_activated",
+  "scan_text_mode_suggested",
+  "scan_text_mode_accepted",
+  "scan_text_success",
+  "scan_text_miss",
+] as const;
 const ALLOWED_EVENT_SET: ReadonlySet<string> = new Set(ALLOWED_EVENTS);
 
 type EventProps = Record<string, string | number | boolean>;

@@ -291,6 +291,122 @@ Stagger cap: `MAX_STAGGER_INDEX = 9` at `STAGGER_STEP_MS = 50ms` steps. Cards be
 
 ---
 
+## Scanner Components
+
+The camera scanner runs on a **forced-dark surface** (`bg-black`) regardless of the user's theme. All scanner components omit `dark:` prefixes — the dark surface is unconditional. Do not add light-mode variants to scanner internals.
+
+### ScannerReticle
+
+The viewport overlay that guides the user's aim. Two variants share the same corner-bracket style but differ in shape and position.
+
+| Variant             | Dimensions                             | Position    | Purpose                     |
+| ------------------- | -------------------------------------- | ----------- | --------------------------- |
+| `barcode` (default) | 240×150 px                             | Centered    | Framing a barcode label     |
+| `text`              | ≈70% screen width × ≈18% screen height | Lower third | Framing a printed ISBN line |
+
+**Shared tokens:**
+
+- Corner brackets: `w-6 h-6 border-white border-[3px]` with matching `rounded-*-2xl`
+- Dimmed surround: `box-shadow: 0 0 0 2000px rgba(2,6,23,0.55)` on the inner box
+- Instructional label: `text-sm text-slate-200`, centered, `bottom-6`
+
+**Barcode-variant additions:**
+
+- Animated scan line: `animate-scan-line h-0.5 bg-emerald-400` at vertical center, `box-shadow: 0 0 8px #34d399`
+- Label text: "Point at the barcode on the back cover"
+
+**Text-variant additions:**
+
+- No animated scan line
+- Optional inline hint inside the box: `text-xs text-slate-400` "Align the ISBN line here" (fades after first successful scan)
+- Label text: "Align the ISBN line here" (same copy as hint, shown while hint is visible; hidden after)
+
+**Do's and Don'ts:**
+
+| ✅ Do                                                                     | ❌ Don't                                                                              |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Use `border-white` for brackets regardless of theme                       | Add `dark:` variants to reticle internals                                             |
+| Position `text` variant in lower third via absolute positioning           | Center the text reticle — ISBN text appears low on the cover                          |
+| Keep the dimmed surround `box-shadow` — do not use a backdrop overlay div | Replace `box-shadow` surround with a separate dim layer (breaks reticle transparency) |
+
+---
+
+### ScannerViewfinder
+
+Wraps the `<video>` element and `ScannerReticle`. Owns the camera surface.
+
+```tsx
+<ScannerViewfinder
+  videoRef={videoRef}
+  reticleVariant="barcode" | "text"
+  hint?: string          // inline text-xs text-slate-400 hint inside the reticle
+  onScanTap?: () => void // text mode: tap-to-scan button handler
+  scanning?: boolean     // drives the "Scan" button loading state
+/>
+```
+
+- The `<video>` element fills the container: `w-full h-full object-cover`
+- In `reticleVariant="text"` mode a `<Button variant="app">` labelled "Scan" (or "Scanning…" when `scanning`) is absolutely positioned below the reticle box
+- The Scan button must be inside `ScannerViewfinder` so it overlays the camera feed; it must not be in the modal footer
+
+---
+
+### ScannerModeBar
+
+Owns the mode toggle and the auto-fallback nudge. Sits between the viewfinder and the footer.
+
+```tsx
+<ScannerModeBar
+  mode="barcode" | "text"
+  onModeChange={(mode) => void}
+  showFallbackNudge?: boolean  // true after 2.5s barcode-free
+  onNudgeAccept?: () => void   // called when user taps "Switch to Text"
+  onNudgeDismiss?: () => void
+/>
+```
+
+- Mode toggle: `<SegmentedControl>` with options `[{ value: "barcode", label: "Barcode" }, { value: "text", label: "Text" }]`
+- Auto-fallback nudge: `<Callout role="note">` with title "Can't find a barcode?", body text, and `<Button size="sm" variant="secondary">Switch to Text</Button>` in the `actions` slot
+- The nudge appears when `showFallbackNudge` is true and dismisses (via `onNudgeDismiss`) if a barcode is detected while it is visible
+
+---
+
+### ScannerResultFlow
+
+Owns the lookup → confirmation → success → error view states. Extracted from `ScanModal` with no visual changes. Receives the detected ISBN-13 and fires callbacks:
+
+```tsx
+<ScannerResultFlow
+  isbn13: string
+  onConfirm: (status: "owned" | "want") => void
+  onCancel: () => void
+  onSuccess: () => void
+  onError: (err: Error) => void
+  postScanBehavior: "confirm" | "autoAddOwned"
+/>
+```
+
+This component has no new design tokens. All visual states (confirmation card, success banner, error state) are unchanged from the pre-refactor `ScanModal`.
+
+---
+
+### Scanner Surface Tokens (summary)
+
+| Element                 | Classes                                                    |
+| ----------------------- | ---------------------------------------------------------- |
+| Full-screen backdrop    | `fixed inset-0 bg-black`                                   |
+| Reticle corner brackets | `absolute w-6 h-6 border-white border-[3px] rounded-*-2xl` |
+| Dimmed surround         | `box-shadow: 0 0 0 2000px rgba(2,6,23,0.55)`               |
+| Scan-line animation     | `animate-scan-line h-0.5 bg-emerald-400`                   |
+| Instructional label     | `text-sm text-slate-200`                                   |
+| Inline hint (text mode) | `text-xs text-slate-400`                                   |
+| Result card surface     | `rounded-2xl border border-white/10 bg-slate-900 p-4 m-3`  |
+| Footer surface          | `border-t border-white/10 bg-slate-950/90 px-4 py-3`       |
+| Success accent          | `text-emerald-400`                                         |
+| Manual-entry surface    | `absolute inset-0 overflow-y-auto bg-slate-950`            |
+
+---
+
 ## Component Checklist (code review)
 
 - [ ] Buttons use `<Button>` — no raw `<button>` with `bg-slate-900` or `bg-blue-600`
@@ -302,3 +418,6 @@ Stagger cap: `MAX_STAGGER_INDEX = 9` at `STAGGER_STEP_MS = 50ms` steps. Cards be
 - [ ] No `opacity-0 group-hover:opacity-100` — all interactive elements visible without hover
 - [ ] Touch targets: no `py-1` or smaller on interactive elements
 - [ ] Neutral colors use `slate-*` only — no `gray-*` or `zinc-*`
+- [ ] Scanner internals have no `dark:` prefixes — the surface is unconditionally dark
+- [ ] Text-mode reticle uses `variant="text"` prop — no ad-hoc width/height overrides inline
+- [ ] Scan button (`variant="app"`, label "Scan" / "Scanning…") lives inside `ScannerViewfinder`, not the modal footer

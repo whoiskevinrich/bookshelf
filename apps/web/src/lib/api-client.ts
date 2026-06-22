@@ -204,7 +204,15 @@ export async function deleteAccount(
 // ── Analytics API ────────────────────────────────────────────────────────────
 
 /** Client event names the API accepts (must match the server allowlist). */
-export type AnalyticsEvent = "hint_shown" | "hint_link_clicked" | "hint_dismissed";
+export type AnalyticsEvent =
+  | "hint_shown"
+  | "hint_link_clicked"
+  | "hint_dismissed"
+  | "scan_text_mode_activated"
+  | "scan_text_mode_suggested"
+  | "scan_text_mode_accepted"
+  | "scan_text_success"
+  | "scan_text_miss";
 
 /**
  * Record a client analytics event (ADR-016). Resolves on 204; throws ApiError
@@ -237,4 +245,29 @@ export async function getBookByIsbn(isbn: string): Promise<BookSearchResult | nu
   if (res.status === 404) return null;
   await throwIfError(res);
   return res.json() as Promise<BookSearchResult>;
+}
+
+// ── OCR scan API ───────────────────────────────────────────────────────────────
+
+/**
+ * Send a captured image to the server for ISBN OCR via AWS Rekognition.
+ * Returns the ISBN-13 string, or null if no ISBN was found or the feature is
+ * disabled server-side (404). Throws ApiError on non-recoverable failures.
+ */
+export async function scanTextIsbn(image: Blob): Promise<string | null> {
+  const token = await getSession();
+  const form = new FormData();
+  form.append("image", image, "frame.jpg");
+  // No Content-Type header — the browser sets it with the multipart boundary.
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${getRuntimeConfig().apiBaseUrl}/v1/scan/text`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  if (res.status === 404) return null; // feature disabled (OCR_SCAN_ENABLED=false)
+  await throwIfError(res);
+  const body = (await res.json()) as { isbn13: string | null };
+  return body.isbn13 ?? null;
 }
