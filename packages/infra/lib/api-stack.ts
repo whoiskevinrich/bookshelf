@@ -25,8 +25,11 @@ const API_THROTTLE_RATE = 50;
 const API_THROTTLE_BURST = 100;
 /** Hard ceiling on attack-driven Lambda/DynamoDB spend. Hobby traffic almost
  *  never runs more than a couple of concurrent invocations; keep this well above
- *  expected peak — it also throttles *legitimate* spikes once exceeded. */
-const API_MAX_CONCURRENCY = 10;
+ *  expected peak — it also throttles *legitimate* spikes once exceeded.
+ *  Not applied in dev: the dev account concurrency quota (10) is below the AWS
+ *  minimum-unreserved floor (also 10), so any reservation fails deployment.
+ *  The account-level cap acts as the ceiling there instead (see tech debt). */
+export const API_MAX_CONCURRENCY = 8;
 
 /**
  * Custom API hostname config (full prod only) — the canonical `api.<app>...`
@@ -66,6 +69,12 @@ export interface ApiStackProps extends cdk.StackProps {
   sameOrigin?: boolean;
   /** Custom API hostname (full prod). Omit for dev and the domainless interim. */
   customDomain?: ApiCustomDomainConfig;
+  /**
+   * Cap concurrent Lambda invocations (ADR-018 cost ceiling). Omit in dev —
+   * the dev account quota equals the AWS minimum-unreserved floor so any
+   * reservation fails CloudFormation. The account-level cap covers dev instead.
+   */
+  reservedConcurrency?: number;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -108,9 +117,12 @@ export class ApiStack extends cdk.Stack {
       code: lambda.Code.fromAsset("../../apps/api/dist"),
       timeout: cdk.Duration.seconds(29), // API GW max is 30s
       memorySize: 256,
-      // Cost ceiling: cap concurrent invocations so a flood can't run up an
-      // unbounded Lambda/DynamoDB bill (ADR-018). Excess invocations throttle.
-      reservedConcurrentExecutions: API_MAX_CONCURRENCY,
+      // Cost ceiling: cap concurrent invocations (ADR-018). Only set when the
+      // prop is provided — omitted in dev where the account quota equals the
+      // AWS minimum-unreserved floor and any reservation fails deployment.
+      ...(props.reservedConcurrency !== undefined
+        ? { reservedConcurrentExecutions: props.reservedConcurrency }
+        : {}),
       environment: {
         NODE_ENV: "production",
         DYNAMODB_TABLE_NAME: table.tableName,

@@ -2,7 +2,7 @@
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { AuthStack, AuthPoolPhase, AUTH_POOL_PHASES } from "../lib/auth-stack";
-import { ApiStack, ApiCustomDomainConfig } from "../lib/api-stack";
+import { ApiStack, ApiCustomDomainConfig, API_MAX_CONCURRENCY } from "../lib/api-stack";
 import { McpStack, McpCustomDomainConfig } from "../lib/mcp-stack";
 import { WebStack, WebCustomDomainConfig } from "../lib/web-stack";
 import { CdnCertStack } from "../lib/cdn-cert-stack";
@@ -204,6 +204,10 @@ const api = new ApiStack(app, "BookshelfApi", {
   secondaryClientId: auth.legacyUserPoolClientId,
   sameOrigin: config.apiThroughCloudFront,
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
+  // Dev account quota (10) equals the AWS minimum-unreserved floor — any
+  // reservation fails CFN. The account cap covers dev; prod gets the explicit
+  // ceiling (raise the dev quota to re-enable — see tech debt in TASKS.md).
+  ...(envName === "prod" ? { reservedConcurrency: API_MAX_CONCURRENCY } : {}),
 });
 
 // mcpCustomDomain references api.regionalCertificate (the wildcard regional cert
