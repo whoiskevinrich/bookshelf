@@ -5,15 +5,20 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 export type PostScanBehavior = "confirm" | "autoAddOwned";
 /** Whether the camera stops after one book or keeps scanning. */
 export type ScanMode = "single" | "continuous";
+/** Whether the scanner reads barcodes or printed ISBN text (OCR). */
+export type OcrInputMode = "barcode" | "text";
 
 const POST_SCAN_VALUES: readonly PostScanBehavior[] = ["confirm", "autoAddOwned"];
 const SCAN_MODE_VALUES: readonly ScanMode[] = ["single", "continuous"];
+const OCR_INPUT_MODE_VALUES: readonly OcrInputMode[] = ["barcode", "text"];
 
 interface ScannerPreferencesValue {
   postScanBehavior: PostScanBehavior;
   scanMode: ScanMode;
+  ocrInputMode: OcrInputMode;
   setPostScanBehavior: (value: PostScanBehavior) => void;
   setScanMode: (value: ScanMode) => void;
+  setOcrInputMode: (value: OcrInputMode) => void;
 }
 
 const ScannerPreferencesContext = createContext<ScannerPreferencesValue | null>(null);
@@ -38,10 +43,22 @@ export function ScannerPreferencesProvider({ children }: { children: ReactNode }
     "single",
     memberOf(SCAN_MODE_VALUES),
   );
+  const [ocrInputMode, setOcrInputMode] = useLocalStorage<OcrInputMode>(
+    "scanner:ocrInputMode",
+    "barcode",
+    memberOf(OCR_INPUT_MODE_VALUES),
+  );
 
   const value = useMemo(
-    () => ({ postScanBehavior, scanMode, setPostScanBehavior, setScanMode }),
-    [postScanBehavior, scanMode, setPostScanBehavior, setScanMode],
+    () => ({
+      postScanBehavior,
+      scanMode,
+      ocrInputMode,
+      setPostScanBehavior,
+      setScanMode,
+      setOcrInputMode,
+    }),
+    [postScanBehavior, scanMode, ocrInputMode, setPostScanBehavior, setScanMode, setOcrInputMode],
   );
 
   return (

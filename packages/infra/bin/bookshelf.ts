@@ -42,6 +42,11 @@ interface EnvConfig {
    */
   scannerEnabled: boolean;
   /**
+   * OCR text-scan feature (client UI flag + server Rekognition endpoint).
+   * Ships dark (false) in all envs; enable here when ready to launch.
+   */
+  ocrScanEnabled?: boolean;
+  /**
    * Comma-separated email allowlist for the Cognito PreSignUp Lambda.
    * When set, only these emails can register or sign in (native or Google).
    * Omit for open enrollment.
@@ -203,6 +208,7 @@ const api = new ApiStack(app, "BookshelfApi", {
   secondaryIssuer: auth.legacyUserPoolIssuer,
   secondaryClientId: auth.legacyUserPoolClientId,
   sameOrigin: config.apiThroughCloudFront,
+  ocrScanEnabled: config.ocrScanEnabled,
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
 });
 
@@ -242,6 +248,7 @@ const web = new WebStack(app, "BookshelfWeb", {
     cognitoOauthDomain: auth.hostedUiDomain,
     apiBaseUrl: config.apiThroughCloudFront ? "/api" : api.apiUrl,
     featureScanner: config.scannerEnabled,
+    featureOcrScan: config.ocrScanEnabled,
   },
 });
 

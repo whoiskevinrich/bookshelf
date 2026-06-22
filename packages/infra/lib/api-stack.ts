@@ -66,6 +66,12 @@ export interface ApiStackProps extends cdk.StackProps {
   sameOrigin?: boolean;
   /** Custom API hostname (full prod). Omit for dev and the domainless interim. */
   customDomain?: ApiCustomDomainConfig;
+  /**
+   * Enable the OCR text-scan endpoint (`POST /v1/scan/text`, backed by Rekognition).
+   * Ships dark (false) in all envs until the feature is ready to launch.
+   * Will become a per-user entitlement check in a future release.
+   */
+  ocrScanEnabled?: boolean;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -126,6 +132,7 @@ export class ApiStack extends cdk.Stack {
         // Resolved in lambda
         GOOGLE_BOOKS_API_KEY_SSM_NAME: "/bookshelf/google-books-api-key",
         // BOOK_PROVIDER defaults to 'google-books' inside the app
+        OCR_SCAN_ENABLED: props.ocrScanEnabled ? "true" : "false",
       },
       logGroup,
     });
@@ -140,6 +147,14 @@ export class ApiStack extends cdk.Stack {
         resources: [
           `arn:aws:ssm:${this.region}:${this.account}:parameter/bookshelf/google-books-api-key`,
         ],
+      }),
+    );
+
+    // Allow Lambda to call Rekognition DetectText for the OCR ISBN scan endpoint
+    apiFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["rekognition:DetectText"],
+        resources: ["*"], // DetectText operates on inline bytes — no resource ARN
       }),
     );
 
