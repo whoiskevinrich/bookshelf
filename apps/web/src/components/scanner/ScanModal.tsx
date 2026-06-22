@@ -1,14 +1,20 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toIsbn13 } from "../../lib/isbn";
 import { getBookByIsbn, type BookSearchResult, type ShelfStatus } from "../../lib/api-client";
 import { useAddToShelf, useRemoveFromShelf } from "../../hooks/useShelf";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner";
 import { useScannerPreferences } from "../../context/ScannerPreferencesContext";
+import { getRuntimeConfig } from "../../lib/runtime-config";
+import { createOcrScanner, type OcrScanner } from "../../lib/ocr/scanner";
+import { track } from "../../lib/analytics";
+import { supportsCameraScan } from "../../lib/device";
 import { BookCover } from "../BookCover";
 import { Button } from "../ui/Button";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { inputClass, labelClass } from "../../lib/form-styles";
+import { ScannerViewfinder } from "./ScannerViewfinder";
+import { ScannerModeBar } from "./ScannerModeBar";
 
 type View = "scanning" | "manual" | "looking-up" | "confirm" | "not-found" | "added";
 
@@ -41,7 +47,14 @@ function buildAddedItem(
 }
 
 export function ScanModal({ onClose }: { onClose: () => void }) {
-  const { postScanBehavior, scanMode, setPostScanBehavior, setScanMode } = useScannerPreferences();
+  const {
+    postScanBehavior,
+    scanMode,
+    ocrInputMode,
+    setPostScanBehavior,
+    setScanMode,
+    setOcrInputMode,
+  } = useScannerPreferences();
   const addMutation = useAddToShelf();
   const removeMutation = useRemoveFromShelf();
 
@@ -51,21 +64,56 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
   const [added, setAdded] = useState<AddedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Transient success banner shown after each continuous-scan add.
   const [flash, setFlash] = useState<{ item: AddedItem; key: number } | null>(null);
+
+  // OCR text-scan state
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrMissHint, setOcrMissHint] = useState<string | null>(null);
+  const [showFallbackCallout, setShowFallbackCallout] = useState(false);
+
   const addedIsbns = useRef<Set<string>>(new Set());
   const dialogRef = useRef<HTMLDivElement>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashKey = useRef(0);
-  // Bumped whenever we abandon the current decode (cancel / resume / add) so a
-  // late lookup result can't overwrite the view the user has moved on to.
   const runId = useRef(0);
-  // True while a decoded barcode is being handled — drops re-entrant decodes
-  // from the 250ms loop before the `active` gate has re-rendered to false.
   const processing = useRef(false);
+  const ocrScannerRef = useRef<OcrScanner | null>(null);
+
+  const features = getRuntimeConfig().features;
+
+  // ── OCR scanner lifecycle ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!features.ocrScan) return;
+    const scanner = createOcrScanner();
+    ocrScannerRef.current = scanner;
+    return () => {
+      scanner.dispose().catch(() => {});
+      ocrScannerRef.current = null;
+    };
+  }, [features.ocrScan]);
+
+  // ── Miss hint auto-clear ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!ocrMissHint) return;
+    const id = setTimeout(() => setOcrMissHint(null), 2000);
+    return () => clearTimeout(id);
+  }, [ocrMissHint]);
+
+  // ── Auto-fallback callout (2.5 s barcode-free in barcode mode) ────────────
+  useEffect(() => {
+    if (!features.ocrScan || ocrInputMode !== "barcode" || view !== "scanning") {
+      setShowFallbackCallout(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowFallbackCallout(true);
+      track("scan_text_mode_suggested");
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [features.ocrScan, ocrInputMode, view]);
 
   function resumeScanning() {
-    runId.current += 1; // invalidate any in-flight lookup so it can't reopen a sheet
+    runId.current += 1;
     setFoundBook(null);
     setPendingIsbn(null);
     setError(null);
@@ -92,7 +140,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     setView("looking-up");
     try {
       const book = await getBookByIsbn(isbn);
-      if (id !== runId.current) return; // cancelled or superseded while awaiting
+      if (id !== runId.current) return;
       setFoundBook(book);
       setView(book ? "confirm" : "not-found");
     } catch (err) {
@@ -132,8 +180,6 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     try {
       book = await getBookByIsbn(isbn);
     } catch (err) {
-      // Add with a bare ISBN if the metadata lookup fails — but log it so a
-      // systemic lookup outage isn't masked as a shelf full of unknown books.
       if (import.meta.env.DEV)
         console.error(`[ScanModal] metadata lookup failed for ${isbn}; adding bare ISBN`, err);
       book = null;
@@ -141,12 +187,12 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     await commitAdd(isbn, "owned", book);
   }
 
-  // Called by the decode loop for every recognized barcode.
   function handleDecode(raw: string) {
-    if (processing.current) return; // a decode is already being handled
-    const isbn = toIsbn13(raw); // normalize ISBN-10 → ISBN-13; null on misread
-    if (!isbn) return; // ignore misreads / non-ISBN barcodes (e.g. a UPC that isn't a book)
-    if (scanMode === "continuous" && addedIsbns.current.has(isbn)) return; // already added
+    if (processing.current) return;
+    const isbn = toIsbn13(raw);
+    if (!isbn) return;
+    if (scanMode === "continuous" && addedIsbns.current.has(isbn)) return;
+    setShowFallbackCallout(false);
     processing.current = true;
     const job = postScanBehavior === "autoAddOwned" ? autoAdd(isbn) : beginLookup(isbn);
     void job.finally(() => {
@@ -155,7 +201,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
   }
 
   function manualLookup(value: string) {
-    const isbn = toIsbn13(value); // accept ISBN-10 or ISBN-13; store/look up as ISBN-13
+    const isbn = toIsbn13(value);
     if (!isbn) {
       setError("Enter a valid 10- or 13-digit ISBN.");
       return;
@@ -169,8 +215,6 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     setAdded((prev) => prev.filter((a) => a.isbn !== isbn));
     setFlash((f) => (f?.item.isbn === isbn ? null : f));
     if (view === "added") resumeScanning();
-    // Confirm the removal actually lands; if it fails, restore the row so the
-    // modal's state doesn't silently diverge from the server's shelf.
     void (async () => {
       try {
         await removeMutation.mutateAsync(isbn);
@@ -184,12 +228,44 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     })();
   }
 
+  // ── OCR tap-to-scan ────────────────────────────────────────────────────────
+
+  async function handleOcrScan() {
+    if (ocrBusy || !ocrScannerRef.current) return;
+    const video = dialogRef.current?.querySelector<HTMLVideoElement>("video");
+    if (!video) return;
+    setOcrBusy(true);
+    setOcrMissHint(null);
+    let isbn: string | null = null;
+    try {
+      isbn = await ocrScannerRef.current.scan(video);
+    } finally {
+      setOcrBusy(false);
+    }
+    if (!isbn) {
+      setOcrMissHint("Nothing found — try re-aligning");
+      track("scan_text_miss");
+    } else {
+      setShowFallbackCallout(false);
+      track("scan_text_success");
+      void beginLookup(isbn);
+    }
+  }
+
+  function handleModeChange(mode: typeof ocrInputMode) {
+    setOcrInputMode(mode);
+    setOcrMissHint(null);
+    setShowFallbackCallout(false);
+    if (mode === "text") track("scan_text_mode_activated");
+  }
+
+  // ── Barcode scanner (paused in text mode) ──────────────────────────────────
   const { videoRef, status, retry } = useBarcodeScanner({
     onDecode: handleDecode,
-    active: view === "scanning" && !busy,
+    active: view === "scanning" && !busy && ocrInputMode === "barcode",
   });
 
-  // Scroll lock + Escape-to-close + Tab focus trap for the modal's lifetime.
+  // ── Focus trap + Escape + scroll lock ─────────────────────────────────────
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -224,14 +300,16 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
-  // Move focus to each new view's primary control as the flow advances.
   useEffect(() => {
     const el = dialogRef.current?.querySelector<HTMLElement>("[data-autofocus]");
     el?.focus({ preventScroll: true });
   }, [view, status]);
 
+  // ── Computed display flags ─────────────────────────────────────────────────
   const cameraUnavailable = status === "denied" || status === "no-camera" || status === "error";
   const showFooter = status === "scanning" && view === "scanning";
+  const showModeBar =
+    features.ocrScan && supportsCameraScan() && status === "scanning" && view === "scanning";
 
   return createPortal(
     <div
@@ -255,26 +333,18 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         <span className="w-11" aria-hidden="true" />
       </header>
 
-      <div className="relative flex-1 overflow-hidden">
-        {(status === "starting" || status === "scanning") && (
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
-
-        {status === "starting" && (
-          <CenteredOverlay>
-            <Spinner label="Starting camera…" />
-          </CenteredOverlay>
-        )}
-
-        {status === "scanning" && view === "scanning" && <Reticle />}
-
-        {/* Loud per-scan feedback for the continuous "sweep a shelf" flow. */}
+      <ScannerViewfinder
+        videoRef={videoRef}
+        showVideo={status === "starting" || status === "scanning"}
+        showCameraSpinner={status === "starting"}
+        showReticle={status === "scanning" && view === "scanning"}
+        mode={ocrInputMode}
+        ocrEnabled={features.ocrScan}
+        ocrBusy={ocrBusy}
+        ocrMissHint={ocrMissHint}
+        onOcrScan={() => void handleOcrScan()}
+      >
+        {/* Continuous-scan success flash */}
         {flash && view === "scanning" && (
           <>
             <div
@@ -285,7 +355,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
             <div className="absolute inset-x-0 top-4 flex justify-center px-4">
               <div className="animate-fade-up flex max-w-full items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm font-medium text-emerald-300">
                 <CheckIcon />
-                <span className="truncate">Added “{flash.item.title}”</span>
+                <span className="truncate">Added "{flash.item.title}"</span>
                 <button
                   type="button"
                   onClick={() => undo(flash.item.isbn)}
@@ -298,10 +368,38 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           </>
         )}
 
+        {/* ISBN lookup in progress */}
         {view === "looking-up" && (
-          <CenteredOverlay>
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 p-6">
             <div className="flex flex-col items-center gap-5">
-              <Spinner label="Looking up…" />
+              <div
+                className="flex flex-col items-center gap-3"
+                role="status"
+                aria-label="Looking up…"
+              >
+                <svg
+                  className="h-8 w-8 animate-spin text-white/80"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeOpacity="0.25"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M22 12a10 10 0 0 0-10-10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <p className="text-sm text-slate-300">Looking up…</p>
+              </div>
               <button
                 type="button"
                 onClick={resumeScanning}
@@ -310,7 +408,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
                 Cancel
               </button>
             </div>
-          </CenteredOverlay>
+          </div>
         )}
 
         {cameraUnavailable && (
@@ -378,8 +476,24 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           {view === "not-found" ? "No matching book found" : ""}
           {view === "added" && added[0] ? `Added ${added[0].title}` : ""}
           {flash ? `Added ${flash.item.title}` : ""}
+          {showFallbackCallout
+            ? "Can't find a barcode? This book may only have a printed ISBN. Try Text mode."
+            : ""}
         </div>
-      </div>
+      </ScannerViewfinder>
+
+      {showModeBar && (
+        <ScannerModeBar
+          mode={ocrInputMode}
+          onChange={handleModeChange}
+          showCallout={showFallbackCallout}
+          onCalloutDismiss={() => setShowFallbackCallout(false)}
+          onSwitchToText={() => {
+            handleModeChange("text");
+            track("scan_text_mode_accepted");
+          }}
+        />
+      )}
 
       {showFooter && (
         <footer className="space-y-3 border-t border-white/10 bg-slate-950/90 px-4 py-3">
@@ -425,71 +539,6 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
 }
 
 // ── Presentational pieces ────────────────────────────────────────────────────
-
-function Reticle() {
-  const bracket = "absolute w-6 h-6 border-white";
-  return (
-    <div className="pointer-events-none absolute inset-0">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="relative" style={{ width: 240, height: 150 }}>
-          <div
-            className="absolute inset-0 rounded-2xl"
-            style={{ boxShadow: "0 0 0 2000px rgba(2,6,23,0.55)" }}
-          />
-          <span
-            className={`${bracket} left-0 top-0 rounded-tl-2xl border-l-[3px] border-t-[3px]`}
-          />
-          <span
-            className={`${bracket} right-0 top-0 rounded-tr-2xl border-r-[3px] border-t-[3px]`}
-          />
-          <span
-            className={`${bracket} bottom-0 left-0 rounded-bl-2xl border-b-[3px] border-l-[3px]`}
-          />
-          <span
-            className={`${bracket} bottom-0 right-0 rounded-br-2xl border-b-[3px] border-r-[3px]`}
-          />
-          <div
-            className="animate-scan-line absolute left-[8%] right-[8%] top-1/2 h-0.5 bg-emerald-400"
-            style={{ boxShadow: "0 0 8px #34d399" }}
-          />
-        </div>
-      </div>
-      <p className="absolute inset-x-0 bottom-6 text-center text-sm text-slate-200">
-        Point at the barcode on the back cover
-      </p>
-    </div>
-  );
-}
-
-function CenteredOverlay({ children }: { children: ReactNode }) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 p-6">
-      {children}
-    </div>
-  );
-}
-
-function Spinner({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-3" role="status" aria-label={label}>
-      <svg
-        className="h-8 w-8 animate-spin text-white/80"
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-        <path
-          d="M22 12a10 10 0 0 0-10-10"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-      </svg>
-      <p className="text-sm text-slate-300">{label}</p>
-    </div>
-  );
-}
 
 function ConfirmSheet({
   book,
@@ -662,7 +711,6 @@ function ManualPanel({
             id="manual-isbn"
             data-autofocus
             className={inputClass}
-            // ISBN-10 can end in "X", so allow text (a numeric keypad hides X).
             inputMode="text"
             autoComplete="off"
             autoCapitalize="characters"
