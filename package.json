@@ -2,10 +2,10 @@
   "name": "bookshelf",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.8.0+sha512.c1f5e7c4cb241c8f174b743851d82f42b802324afc8b0f116b96adb15aa06664948dde36960a3ba1079ba5b4b29dd0140135b94b5b5f5263592249d68e555f26",
   "engines": {
     "node": ">=20",
-    "pnpm": ">=10"
+    "pnpm": ">=11"
   },
   "scripts": {
     "build": "pnpm -r build",
@@ -27,20 +27,12 @@
     "@eslint/js": "^10.0.1",
     "@eslint/json": "^2.0.0",
     "@eslint/markdown": "^8.0.2",
-    "eslint": "^10.4.1",
-    "globals": "^17.6.0",
+    "eslint": "^10.5.0",
+    "globals": "^17.7.0",
     "husky": "^9.1.7",
-    "jiti": "^2.4.2",
-    "prettier": "^3.8.3",
+    "jiti": "^2.7.0",
+    "prettier": "^3.8.4",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.60.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ],
-    "overrides": {
-      "esbuild": ">=0.28.1"
-    }
+    "typescript-eslint": "^8.62.0"
   }
 }
