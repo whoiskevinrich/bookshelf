@@ -69,6 +69,7 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     apiThroughCloudFront: true,
     googleEmailAllowlist: "whoiskevinrich@gmail.com",
     scannerEnabled: true,
+    ocrScanEnabled: true,
     authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
   prod: {
