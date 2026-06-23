@@ -1,3 +1,19 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+overrides:
+  esbuild: ">=0.28.1"
+
+confirmModulesPurge: false
+
+# pnpm 11 supply-chain policy: disabled here because all deps are published by
+# well-known trusted maintainers (AWS SDK, Hono, React) and this is a solo project.
+# Re-enable (e.g. minimumReleaseAge: "72 hours") if contributors are added.
+minimumReleaseAge: false
+
+# pnpm 11 replaces onlyBuiltDependencies with allowBuilds (explicit per-package consent).
+allowBuilds:
+  esbuild: true
+  msw: true
+  tesseract.js: true
