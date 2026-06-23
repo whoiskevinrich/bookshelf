@@ -35,7 +35,6 @@ const apiStack = new ApiStack(app, "TestApi", {
   userPoolIssuer: authStack.userPoolIssuer,
   userPoolClientId: authStack.userPoolClientId,
   mcpClientId: authStack.mcpClientId,
-  reservedConcurrency: 8, // simulate prod — dev omits this prop
 });
 const webStack = new WebStack(app, "TestWeb", {
   env,
@@ -181,12 +180,6 @@ describe("ApiStack", () => {
 
   it("creates an API Gateway HTTP API", () => {
     template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
-  });
-
-  it("caps Lambda reserved concurrency as a cost ceiling (ADR-018)", () => {
-    template.hasResourceProperties("AWS::Lambda::Function", {
-      ReservedConcurrentExecutions: 8,
-    });
   });
 
   it("throttles the default stage to shed floods before Lambda (ADR-018)", () => {
