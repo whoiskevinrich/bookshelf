@@ -22,7 +22,7 @@
     "@bookshelf/api": "workspace:*",
     "@bookshelf/mcp": "workspace:*",
     "@bookshelf/web": "workspace:*",
-    "@types/node": "^25.9.4",
+    "@types/node": "^26.0.0",
     "@types/source-map-support": "^0.5.10",
     "@typescript-eslint/eslint-plugin": "^8.62.0",
     "aws-cdk": "^2.1128.1",
