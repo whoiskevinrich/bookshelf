@@ -35,7 +35,6 @@ const apiStack = new ApiStack(app, "TestApi", {
   userPoolIssuer: authStack.userPoolIssuer,
   userPoolClientId: authStack.userPoolClientId,
   mcpClientId: authStack.mcpClientId,
-  reservedConcurrency: 8, // simulate prod — dev omits this prop
 });
 const webStack = new WebStack(app, "TestWeb", {
   env,
