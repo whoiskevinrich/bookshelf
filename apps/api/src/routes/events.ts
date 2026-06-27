@@ -24,6 +24,9 @@ const ALLOWED_EVENTS = [
   "scan_text_mode_accepted",
   "scan_text_success",
   "scan_text_miss",
+  "shelf_opened",
+  "shelf_renamed",
+  "shelf_deleted",
 ] as const;
 const ALLOWED_EVENT_SET: ReadonlySet<string> = new Set(ALLOWED_EVENTS);
 

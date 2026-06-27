@@ -8,6 +8,7 @@ import { HomeRoute } from "./components/HomeRoute";
 import { Footer } from "./components/Footer";
 import { AboutPage } from "./pages/AboutPage";
 import { ShelfPage } from "./pages/ShelfPage";
+import { SingleShelfPage } from "./pages/SingleShelfPage";
 import { WishlistPage } from "./pages/WishlistPage";
 import { AccountSettingsPage } from "./pages/account/AccountSettingsPage";
 import { ChangePasswordPage } from "./pages/account/ChangePasswordPage";
@@ -66,6 +67,14 @@ export function App() {
                 element={
                   <ProtectedRoute>
                     <ShelfPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/shelves/:shelfId"
+                element={
+                  <ProtectedRoute>
+                    <SingleShelfPage />
                   </ProtectedRoute>
                 }
               />

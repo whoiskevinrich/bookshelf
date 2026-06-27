@@ -3,6 +3,7 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { authMiddleware } from "../middleware/auth.js";
 import {
   queryAllShelvesWithBookIds,
+  queryShelvesMeta,
   getShelfMetaItem,
   putShelfMeta,
   updateShelfMetaName,
@@ -49,18 +50,25 @@ shelvesRouter.post("/", async (c) => {
     return c.json({ error: "name must be a non-empty string (max 100 chars)" }, 400);
   }
 
+  const trimmedName = name.trim();
+
+  const existing = await queryShelvesMeta(userId);
+  if (existing.some((s) => s.name.toLowerCase() === trimmedName.toLowerCase())) {
+    return c.json({ error: "A shelf with this name already exists" }, 409);
+  }
+
   const shelfId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const sortOrder = Date.now();
 
   try {
-    await putShelfMeta(userId, shelfId, name.trim(), createdAt, sortOrder);
+    await putShelfMeta(userId, shelfId, trimmedName, createdAt, sortOrder);
   } catch (err) {
     console.error("Shelf create error:", err);
     return c.json({ error: "Failed to create shelf" }, 500);
   }
 
-  const shelf: ShelfWithBookIds = { shelfId, name: name.trim(), createdAt, bookIds: [] };
+  const shelf: ShelfWithBookIds = { shelfId, name: trimmedName, createdAt, bookIds: [] };
   return c.json(shelf, 201);
 });
 
@@ -105,8 +113,19 @@ shelvesRouter.patch("/:shelfId", async (c) => {
     return c.json({ error: "name must be a non-empty string (max 100 chars)" }, 400);
   }
 
+  const trimmedName = name.trim();
+
+  const allShelves = await queryShelvesMeta(userId);
+  if (
+    allShelves.some(
+      (s) => s.shelfId !== shelfId && s.name.toLowerCase() === trimmedName.toLowerCase(),
+    )
+  ) {
+    return c.json({ error: "A shelf with this name already exists" }, 409);
+  }
+
   try {
-    await updateShelfMetaName(userId, shelfId, name.trim());
+    await updateShelfMetaName(userId, shelfId, trimmedName);
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
       return c.json({ error: "Shelf not found" }, 404);
@@ -115,12 +134,12 @@ shelvesRouter.patch("/:shelfId", async (c) => {
     return c.json({ error: "Failed to rename shelf" }, 500);
   }
 
-  const [existing, bookIds] = await Promise.all([
+  const [updated, bookIds] = await Promise.all([
     getShelfMetaItem(userId, shelfId),
     queryShelfMemberIsns(userId, shelfId),
   ]);
-  if (!existing) return c.json({ error: "Shelf not found" }, 404);
-  return c.json({ ...existing, bookIds });
+  if (!updated) return c.json({ error: "Shelf not found" }, 404);
+  return c.json({ ...updated, bookIds });
 });
 
 // DELETE /v1/shelves/:shelfId
