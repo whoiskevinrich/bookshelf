@@ -10,7 +10,6 @@ import { AboutPage } from "./pages/AboutPage";
 import { ShelfPage } from "./pages/ShelfPage";
 import { SingleShelfPage } from "./pages/SingleShelfPage";
 import { BookDetailPage } from "./pages/BookDetailPage";
-import { WishlistPage } from "./pages/WishlistPage";
 import { AccountSettingsPage } from "./pages/account/AccountSettingsPage";
 import { ChangePasswordPage } from "./pages/account/ChangePasswordPage";
 import { DeleteAccountPage } from "./pages/account/DeleteAccountPage";
@@ -84,14 +83,6 @@ export function App() {
                 element={
                   <ProtectedRoute>
                     <BookDetailPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/wishlist"
-                element={
-                  <ProtectedRoute>
-                    <WishlistPage />
                   </ProtectedRoute>
                 }
               />

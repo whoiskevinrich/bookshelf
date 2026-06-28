@@ -32,9 +32,6 @@ export function AppHeader() {
         <NavLink to="/shelf" className={navLinkClass}>
           My Library
         </NavLink>
-        <NavLink to="/wishlist" className={navLinkClass}>
-          Wishlist
-        </NavLink>
         <NavLink to="/about" className={navLinkClass}>
           About
         </NavLink>
@@ -57,9 +54,6 @@ export function AppHeader() {
         <MobileMenu>
           <NavLink to="/shelf" className={panelLinkClass}>
             My Library
-          </NavLink>
-          <NavLink to="/wishlist" className={panelLinkClass}>
-            Wishlist
           </NavLink>
           <NavLink to="/about" className={panelLinkClass}>
             About

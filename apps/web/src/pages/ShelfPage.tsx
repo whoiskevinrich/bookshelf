@@ -38,8 +38,6 @@ import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
-import { ShelfNameEditor } from "../components/shelf/ShelfNameEditor";
-import { DeleteShelfDialog } from "../components/shelf/DeleteShelfDialog";
 import { MobileScanHint } from "../components/shelf/MobileScanHint";
 import { useHorizontalScrollOnWheel } from "../hooks/useHorizontalScrollOnWheel";
 import { BookSearch } from "../components/BookSearch";
@@ -88,60 +86,42 @@ function ChevronRightIcon() {
 }
 
 function SectionHeader({
-  shelfId,
   title,
   count,
-  onDelete,
   onNavigate,
   onDragStart,
   onDragEnd,
 }: {
-  shelfId?: string;
   title: string;
   count: number;
-  onDelete?: () => void;
   onNavigate?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
 }) {
+  const titleClass =
+    "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 shrink-0";
   return (
     <div className="flex items-center gap-3 mb-4">
       {onDragStart && <DragHandle draggable onDragStart={onDragStart} onDragEnd={onDragEnd} />}
-      {shelfId ? (
-        <ShelfNameEditor
-          shelfId={shelfId}
-          name={title}
-          className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400"
-        />
+      {/* The title itself navigates to the shelf detail — users reach for it before
+          a chevron (QA feedback); rename/delete live on the detail page. */}
+      {onNavigate ? (
+        <button
+          type="button"
+          onClick={onNavigate}
+          aria-label={`Open shelf ${title}`}
+          className={`group/sh flex items-center gap-1 rounded ${titleClass} hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300 transition-colors`}
+        >
+          <span className="group-hover/sh:underline">{title}</span>
+          <ChevronRightIcon />
+        </button>
       ) : (
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 shrink-0">
-          {title}
-        </h2>
+        <h2 className={titleClass}>{title}</h2>
       )}
       <span className="flex-1 h-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
       <span className="text-xs text-slate-500 dark:text-zinc-400 bg-slate-200 dark:bg-slate-800 rounded-full px-2 py-0.5">
         {count}
       </span>
-      {onNavigate && (
-        <button
-          type="button"
-          onClick={onNavigate}
-          aria-label={`Open shelf ${title}`}
-          className="shrink-0 p-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300 transition-colors"
-        >
-          <ChevronRightIcon />
-        </button>
-      )}
-      {onDelete && (
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={onDelete}
-          aria-label={`Delete shelf ${title}`}
-        >
-          Delete shelf
-        </Button>
-      )}
     </div>
   );
 }
@@ -236,7 +216,6 @@ function SaveSmartShelfForm({
 // ── Shelf section ──────────────────────────────────────────────────────────
 
 interface ShelfSectionProps {
-  shelfId?: string;
   title: string;
   entries: ShelfEntry[];
   emptyMessage: string;
@@ -245,7 +224,6 @@ interface ShelfSectionProps {
   removeMutation: ReturnType<typeof useRemoveFromShelf>;
   addToShelfMutation: ReturnType<typeof useAddBookToShelf>;
   removeFromShelfMutation: ReturnType<typeof useRemoveBookFromShelf>;
-  onDelete?: () => void;
   onNavigate?: () => void;
   // Drag-and-drop
   onDragStart?: (e: React.DragEvent) => void;
@@ -257,7 +235,6 @@ interface ShelfSectionProps {
 }
 
 function ShelfSection({
-  shelfId,
   title,
   entries,
   emptyMessage,
@@ -266,7 +243,6 @@ function ShelfSection({
   removeMutation,
   addToShelfMutation,
   removeFromShelfMutation,
-  onDelete,
   onNavigate,
   onDragStart,
   onDragEnd,
@@ -293,8 +269,6 @@ function ShelfSection({
       <SectionHeader
         title={title}
         count={entries.length}
-        {...(shelfId ? { shelfId } : {})}
-        {...(onDelete ? { onDelete } : {})}
         {...(onNavigate ? { onNavigate } : {})}
         {...(onDragStart ? { onDragStart } : {})}
         {...(onDragEnd ? { onDragEnd } : {})}
@@ -353,7 +327,6 @@ export function ShelfPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [showCreateShelf, setShowCreateShelf] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [deletingShelf, setDeletingShelf] = useState<Shelf | null>(null);
   const searchPanelRef = useRef<HTMLDivElement>(null);
 
   // Show the Scan button only where it makes sense: the feature is enabled for
@@ -691,16 +664,14 @@ export function ShelfPage() {
                     {namedShelfEntries.map(({ shelf, entries }, idx) => (
                       <ShelfSection
                         key={shelf.shelfId}
-                        shelfId={shelf.shelfId}
                         title={shelf.name}
                         entries={entries}
-                        emptyMessage="No books on this shelf yet — add books and use the Shelves button to assign them."
+                        emptyMessage="No books on this shelf yet — add books from your library and use the Shelves button to assign them."
                         shelves={orderedShelves}
                         moveMutation={moveMutation}
                         removeMutation={removeMutation}
                         addToShelfMutation={addToShelfMutation}
                         removeFromShelfMutation={removeFromShelfMutation}
-                        onDelete={() => setDeletingShelf(shelf)}
                         onNavigate={() => navigate(`/shelves/${shelf.shelfId}`)}
                         onDragStart={(e) => {
                           e.dataTransfer.effectAllowed = "move";
@@ -745,15 +716,6 @@ export function ShelfPage() {
           </>
         )}
       </main>
-
-      {deletingShelf && (
-        <DeleteShelfDialog
-          shelf={deletingShelf}
-          open={true}
-          onClose={() => setDeletingShelf(null)}
-          onDeleted={() => setDeletingShelf(null)}
-        />
-      )}
     </div>
   );
 }

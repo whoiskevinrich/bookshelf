@@ -113,7 +113,9 @@ export async function fetchShelf(
   if (opts.tag) params.set("tag", opts.tag);
   if (opts.cursor) params.set("cursor", opts.cursor);
   if (opts.limit) params.set("limit", String(opts.limit));
-  const qs = params.toString();
+  // URLSearchParams encodes spaces as "+", which Hono decodes literally (not as a
+  // space) — breaking multi-word tag filters like "science fiction". Force %20.
+  const qs = params.toString().replace(/\+/g, "%20");
   const res = await authedFetch(`/v1/shelf${qs ? `?${qs}` : ""}`);
   await throwIfError(res);
   return res.json() as Promise<ShelfPage>;

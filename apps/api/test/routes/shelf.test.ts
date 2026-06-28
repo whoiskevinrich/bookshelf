@@ -155,6 +155,16 @@ describe("GET /v1/shelf", () => {
     );
   });
 
+  it("decodes a %20-encoded multi-word tag to a space", async () => {
+    vi.mocked(queryBookEntries).mockResolvedValueOnce(SHELF_RESULT);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf?tag=science%20fiction");
+    expect(res.status).toBe(200);
+    expect(vi.mocked(queryBookEntries)).toHaveBeenCalledWith(
+      expect.objectContaining({ filter: expect.objectContaining({ tag: "science fiction" }) }),
+    );
+  });
+
   it("returns 400 for invalid limit", async () => {
     const app = makeApp();
     const res = await app.request("/v1/shelf?limit=200");
