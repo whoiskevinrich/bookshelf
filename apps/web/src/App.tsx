@@ -9,6 +9,7 @@ import { Footer } from "./components/Footer";
 import { AboutPage } from "./pages/AboutPage";
 import { ShelfPage } from "./pages/ShelfPage";
 import { SingleShelfPage } from "./pages/SingleShelfPage";
+import { BookDetailPage } from "./pages/BookDetailPage";
 import { WishlistPage } from "./pages/WishlistPage";
 import { AccountSettingsPage } from "./pages/account/AccountSettingsPage";
 import { ChangePasswordPage } from "./pages/account/ChangePasswordPage";
@@ -75,6 +76,14 @@ export function App() {
                 element={
                   <ProtectedRoute>
                     <SingleShelfPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/book/:isbn"
+                element={
+                  <ProtectedRoute>
+                    <BookDetailPage />
                   </ProtectedRoute>
                 }
               />

@@ -177,14 +177,17 @@ async function seed(): Promise<void> {
   const items = BOOKS.flatMap((book) => {
     const { isbn, status, title, authors, coverUrl, publishedYear, description } = book;
     return [
-      // Shelf entry for the user
+      // Shelf entry for the user — ENTRY#<isbn> key with independent owned/want
+      // attributes (ADR-019); matches the schema queryBookEntries reads.
       {
         PutRequest: {
           Item: {
             PK: `USER#${USER_ID}`,
-            SK: `SHELF#${status}#${isbn}`,
+            SK: `ENTRY#${isbn}`,
             isbn,
-            status,
+            owned: status === "owned",
+            want: status === "want",
+            readingStatus: null,
             addedAt,
             notes: null,
           },

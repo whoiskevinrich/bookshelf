@@ -5,6 +5,8 @@ import { getRuntimeConfig } from "./runtime-config";
 
 export type ShelfStatus = "owned" | "want";
 
+export type ReadingStatus = "unread" | "reading" | "finished";
+
 export interface BookMetadata {
   title: string;
   authors: string[];
@@ -15,9 +17,17 @@ export interface BookMetadata {
 
 export interface ShelfEntry {
   isbn: string;
-  status: ShelfStatus;
+  /** Independent attribute (ADR-019). */
+  owned: boolean;
+  /** Independent attribute (ADR-019). */
+  want: boolean;
+  readingStatus: ReadingStatus | null;
+  /** Normalized tags; empty when none. */
+  tags: string[];
   addedAt: string;
   notes: string | null;
+  /** @deprecated Derived from owned/want during the transition (ADR-019). */
+  status: ShelfStatus;
   book: BookMetadata | null;
 }
 
@@ -84,13 +94,23 @@ async function throwIfError(res: Response): Promise<void> {
 
 // ── Shelf API ──────────────────────────────────────────────────────────────
 
-export async function fetchShelf(opts: {
-  status?: ShelfStatus;
-  cursor?: string;
-  limit?: number;
-}): Promise<ShelfPage> {
+/** A combinable filter over shelf entries (ADR-019 — system facets + tag). */
+export interface ShelfFilter {
+  owned?: boolean;
+  want?: boolean;
+  readingStatus?: ReadingStatus;
+  tag?: string;
+}
+
+export async function fetchShelf(
+  opts: ShelfFilter & { status?: ShelfStatus; cursor?: string; limit?: number },
+): Promise<ShelfPage> {
   const params = new URLSearchParams();
   if (opts.status) params.set("status", opts.status);
+  if (opts.owned !== undefined) params.set("owned", String(opts.owned));
+  if (opts.want !== undefined) params.set("want", String(opts.want));
+  if (opts.readingStatus) params.set("readingStatus", opts.readingStatus);
+  if (opts.tag) params.set("tag", opts.tag);
   if (opts.cursor) params.set("cursor", opts.cursor);
   if (opts.limit) params.set("limit", String(opts.limit));
   const qs = params.toString();
@@ -119,6 +139,60 @@ export async function updateShelfStatus(isbn: string, status: ShelfStatus): Prom
   });
   await throwIfError(res);
   return res.json() as Promise<ShelfEntry>;
+}
+
+export async function fetchShelfEntry(isbn: string): Promise<ShelfEntry> {
+  const res = await authedFetch(`/v1/shelf/${encodeURIComponent(isbn)}`);
+  await throwIfError(res);
+  return res.json() as Promise<ShelfEntry>;
+}
+
+export interface EntryAttributes {
+  owned?: boolean;
+  want?: boolean;
+  readingStatus?: ReadingStatus | null;
+}
+
+export async function updateShelfAttributes(
+  isbn: string,
+  attrs: EntryAttributes,
+): Promise<ShelfEntry> {
+  const res = await authedFetch(`/v1/shelf/${encodeURIComponent(isbn)}`, {
+    method: "PATCH",
+    body: JSON.stringify(attrs),
+  });
+  await throwIfError(res);
+  return res.json() as Promise<ShelfEntry>;
+}
+
+export async function updateShelfTags(isbn: string, tags: string[]): Promise<ShelfEntry> {
+  const res = await authedFetch(`/v1/shelf/${encodeURIComponent(isbn)}/tags`, {
+    method: "PATCH",
+    body: JSON.stringify({ tags }),
+  });
+  await throwIfError(res);
+  return res.json() as Promise<ShelfEntry>;
+}
+
+export async function updateShelfNotes(isbn: string, notes: string | null): Promise<ShelfEntry> {
+  const res = await authedFetch(`/v1/shelf/${encodeURIComponent(isbn)}/notes`, {
+    method: "PATCH",
+    body: JSON.stringify({ notes }),
+  });
+  await throwIfError(res);
+  return res.json() as Promise<ShelfEntry>;
+}
+
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+export async function fetchTags(): Promise<TagCount[]> {
+  const res = await authedFetch("/v1/tags");
+  await throwIfError(res);
+  const body = (await res.json()) as { tags: TagCount[] };
+  return body.tags;
 }
 
 export async function removeFromShelf(isbn: string): Promise<void> {
@@ -192,6 +266,53 @@ export async function fetchShelfBooks(shelfId: string): Promise<ShelfEntry[]> {
   const res = await authedFetch(`/v1/shelves/${encodeURIComponent(shelfId)}/books`);
   await throwIfError(res);
   return res.json() as Promise<ShelfEntry[]>;
+}
+
+// ── Smart shelves API (saved filter rules — ADR-019) ────────────────────────
+
+export type SmartShelfRule = ShelfFilter;
+
+export interface SmartShelf {
+  smartShelfId: string;
+  name: string;
+  rule: SmartShelfRule;
+  createdAt: string;
+}
+
+export interface SmartShelfWithCount extends SmartShelf {
+  count: number;
+}
+
+export async function fetchSmartShelves(): Promise<SmartShelfWithCount[]> {
+  const res = await authedFetch("/v1/smart-shelves");
+  await throwIfError(res);
+  return res.json() as Promise<SmartShelfWithCount[]>;
+}
+
+export async function createSmartShelf(name: string, rule: SmartShelfRule): Promise<SmartShelf> {
+  const res = await authedFetch("/v1/smart-shelves", {
+    method: "POST",
+    body: JSON.stringify({ name, rule }),
+  });
+  await throwIfError(res);
+  return res.json() as Promise<SmartShelf>;
+}
+
+export async function renameSmartShelf(smartShelfId: string, name: string): Promise<void> {
+  const res = await authedFetch(`/v1/smart-shelves/${encodeURIComponent(smartShelfId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+  if (res.status === 204) return;
+  await throwIfError(res);
+}
+
+export async function deleteSmartShelf(smartShelfId: string): Promise<void> {
+  const res = await authedFetch(`/v1/smart-shelves/${encodeURIComponent(smartShelfId)}`, {
+    method: "DELETE",
+  });
+  if (res.status === 204) return;
+  await throwIfError(res);
 }
 
 // ── Account API ───────────────────────────────────────────────────────────

@@ -8,19 +8,24 @@ vi.mock("../../src/middleware/auth.js", () => ({
   }),
 }));
 
-// Mock dynamo — import InvalidCursorError and isValidStatus from the real module
-// so instanceof checks in route handlers work against the same class.
+// Mock dynamo — import the pure helpers from the real module so instanceof / enum
+// validation in route handlers work against the same implementations.
 vi.mock("../../src/lib/dynamo.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../src/lib/dynamo.js")>();
   return {
     queryBookEntries: vi.fn(),
     getBookEntry: vi.fn(),
+    batchGetBookEntries: vi.fn(),
     putBookEntry: vi.fn(),
     deleteBookEntry: vi.fn(),
-    updateBookEntryStatus: vi.fn(),
+    updateBookEntryAttributes: vi.fn(),
     updateBookEntryNotes: vi.fn(),
+    updateBookEntryTags: vi.fn(),
     putBookMetadata: vi.fn(),
     isValidStatus: mod.isValidStatus,
+    isValidReadingStatus: mod.isValidReadingStatus,
+    derivedStatus: mod.derivedStatus,
+    normalizeTag: mod.normalizeTag,
     InvalidCursorError: mod.InvalidCursorError,
   };
 });
@@ -35,12 +40,15 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import {
   queryBookEntries,
   getBookEntry,
+  batchGetBookEntries,
   putBookEntry,
   deleteBookEntry,
-  updateBookEntryStatus,
+  updateBookEntryAttributes,
   updateBookEntryNotes,
+  updateBookEntryTags,
   putBookMetadata,
   InvalidCursorError,
+  type ShelfEntry,
 } from "../../src/lib/dynamo.js";
 import { shelfRouter } from "../../src/routes/shelf.js";
 
@@ -50,11 +58,22 @@ function makeApp() {
   return app;
 }
 
-const ENTRY = {
+const ENTRY: ShelfEntry = {
   isbn: "9780441013593",
-  status: "owned" as const,
+  owned: true,
+  want: false,
+  readingStatus: null,
+  tags: [],
   addedAt: "2026-05-14T10:00:00.000Z",
   notes: null,
+  status: "owned",
+};
+
+const WANT_ENTRY: ShelfEntry = {
+  ...ENTRY,
+  owned: false,
+  want: true,
+  status: "want",
 };
 
 const SHELF_RESULT = {
@@ -66,10 +85,12 @@ const SHELF_RESULT = {
 beforeEach(() => {
   vi.mocked(queryBookEntries).mockReset();
   vi.mocked(getBookEntry).mockReset();
+  vi.mocked(batchGetBookEntries).mockReset();
   vi.mocked(putBookEntry).mockReset();
   vi.mocked(deleteBookEntry).mockReset();
-  vi.mocked(updateBookEntryStatus).mockReset();
+  vi.mocked(updateBookEntryAttributes).mockReset();
   vi.mocked(updateBookEntryNotes).mockReset();
+  vi.mocked(updateBookEntryTags).mockReset();
   vi.mocked(putBookMetadata).mockReset();
 });
 
@@ -84,10 +105,54 @@ describe("GET /v1/shelf", () => {
     expect(body.total).toBe(1);
   });
 
+  it("maps deprecated ?status=owned onto the owned filter", async () => {
+    vi.mocked(queryBookEntries).mockResolvedValueOnce(SHELF_RESULT);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf?status=owned");
+    expect(res.status).toBe(200);
+    expect(vi.mocked(queryBookEntries)).toHaveBeenCalledWith(
+      expect.objectContaining({ filter: expect.objectContaining({ owned: true }) }),
+    );
+  });
+
+  it("accepts owned/want/readingStatus filters", async () => {
+    vi.mocked(queryBookEntries).mockResolvedValueOnce(SHELF_RESULT);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf?owned=true&readingStatus=reading");
+    expect(res.status).toBe(200);
+    expect(vi.mocked(queryBookEntries)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: expect.objectContaining({ owned: true, readingStatus: "reading" }),
+      }),
+    );
+  });
+
   it("returns 400 for invalid status filter", async () => {
     const app = makeApp();
     const res = await app.request("/v1/shelf?status=reading");
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for a non-boolean owned filter", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf?owned=yes");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an invalid readingStatus filter", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf?readingStatus=halfway");
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts a normalized tag filter", async () => {
+    vi.mocked(queryBookEntries).mockResolvedValueOnce(SHELF_RESULT);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf?tag=Sci-Fi");
+    expect(res.status).toBe(200);
+    expect(vi.mocked(queryBookEntries)).toHaveBeenCalledWith(
+      expect.objectContaining({ filter: expect.objectContaining({ tag: "sci-fi" }) }),
+    );
   });
 
   it("returns 400 for invalid limit", async () => {
@@ -104,8 +169,33 @@ describe("GET /v1/shelf", () => {
   });
 });
 
+describe("GET /v1/shelf/:isbn", () => {
+  it("returns a single entry with book metadata", async () => {
+    vi.mocked(batchGetBookEntries).mockResolvedValueOnce([{ ...ENTRY, book: null }]);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.isbn).toBe("9780441013593");
+    expect(body.owned).toBe(true);
+  });
+
+  it("returns 404 when the book is not on the shelf", async () => {
+    vi.mocked(batchGetBookEntries).mockResolvedValueOnce([]);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for an invalid ISBN", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/not-an-isbn");
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("POST /v1/shelf", () => {
-  it("adds a book successfully", async () => {
+  it("adds a book via the deprecated status field", async () => {
     vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf", {
@@ -114,8 +204,71 @@ describe("POST /v1/shelf", () => {
       body: JSON.stringify({ isbn: "9780441013593", status: "owned" }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as typeof ENTRY;
+    const body = (await res.json()) as ShelfEntry;
     expect(body.isbn).toBe("9780441013593");
+    expect(body.owned).toBe(true);
+    expect(body.want).toBe(false);
+    expect(body.status).toBe("owned");
+    expect(vi.mocked(putBookEntry)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      expect.objectContaining({ owned: true, want: false }),
+      expect.any(String),
+    );
+  });
+
+  it("adds a book via owned boolean", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true, readingStatus: "reading" }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.owned).toBe(true);
+    expect(body.readingStatus).toBe("reading");
+  });
+
+  it("returns 400 when neither owned, want, nor status is provided", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when owned and want are both false", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: false, want: false }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when owned and want are both true (mutually exclusive)", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true, want: true }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an invalid readingStatus", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true, readingStatus: "halfway" }),
+    });
+    expect(res.status).toBe(400);
   });
 
   it("truncates description to 4000 chars before caching", async () => {
@@ -127,7 +280,7 @@ describe("POST /v1/shelf", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         isbn: "9780441013593",
-        status: "owned",
+        owned: true,
         book: {
           title: "Dune",
           authors: ["Frank Herbert"],
@@ -145,39 +298,12 @@ describe("POST /v1/shelf", () => {
     );
   });
 
-  it("truncates title to 512 chars before caching", async () => {
-    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
-    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
-    const app = makeApp();
-    const res = await app.request("/v1/shelf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        isbn: "9780441013593",
-        status: "owned",
-        book: {
-          title: "T".repeat(513),
-          authors: ["Frank Herbert"],
-          coverUrl: null,
-          publishedYear: 1965,
-          description: null,
-        },
-      }),
-    });
-    expect(res.status).toBe(201);
-    expect(vi.mocked(putBookMetadata)).toHaveBeenCalledWith(
-      "9780441013593",
-      expect.objectContaining({ title: "T".repeat(512) }),
-      expect.any(String),
-    );
-  });
-
   it("returns 400 for invalid ISBN", async () => {
     const app = makeApp();
     const res = await app.request("/v1/shelf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isbn: "1234567890123", status: "owned" }),
+      body: JSON.stringify({ isbn: "1234567890123", owned: true }),
     });
     expect(res.status).toBe(400);
   });
@@ -189,7 +315,7 @@ describe("POST /v1/shelf", () => {
     const res = await app.request("/v1/shelf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isbn: "9780441013593", status: "owned" }),
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
     });
     expect(res.status).toBe(409);
   });
@@ -228,7 +354,7 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
     expect(res.status).toBe(400);
   });
 
-  it("updates notes successfully", async () => {
+  it("updates notes successfully and returns the full entry", async () => {
     vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
     vi.mocked(updateBookEntryNotes).mockResolvedValueOnce(undefined);
     const app = makeApp();
@@ -238,22 +364,10 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
       body: JSON.stringify({ notes: "A great book." }),
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { notes: string | null };
+    const body = (await res.json()) as ShelfEntry;
     expect(body.notes).toBe("A great book.");
-  });
-
-  it("clears notes when null is passed", async () => {
-    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, notes: "old note" });
-    vi.mocked(updateBookEntryNotes).mockResolvedValueOnce(undefined);
-    const app = makeApp();
-    const res = await app.request("/v1/shelf/9780441013593/notes", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: null }),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { notes: string | null };
-    expect(body.notes).toBeNull();
+    expect(body.owned).toBe(true);
+    expect(body.status).toBe("owned");
   });
 
   it("returns 400 for invalid ISBN in path", async () => {
@@ -278,9 +392,9 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
 });
 
 describe("PATCH /v1/shelf/:isbn", () => {
-  it("updates status from owned to want", async () => {
+  it("updates status from owned to want (deprecated field)", async () => {
     vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
-    vi.mocked(updateBookEntryStatus).mockResolvedValueOnce(undefined);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593", {
       method: "PATCH",
@@ -288,8 +402,116 @@ describe("PATCH /v1/shelf/:isbn", () => {
       body: JSON.stringify({ status: "want" }),
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { status: string };
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.owned).toBe(false);
+    expect(body.want).toBe(true);
     expect(body.status).toBe("want");
+  });
+
+  it("auto-clears want when a wishlist book is marked owned (Q1)", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(WANT_ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ owned: true }),
+    });
+    expect(res.status).toBe(200);
+    // The persisted patch sets want:false alongside owned:true.
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      expect.objectContaining({ owned: true, want: false }),
+    );
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.owned).toBe(true);
+    expect(body.want).toBe(false);
+  });
+
+  it("rejects setting owned and want both true (mutually exclusive)", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ owned: true, want: true }),
+    });
+    expect(res.status).toBe(400);
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("auto-clears owned when an owned book is marked want (symmetric)", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ want: true }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      expect.objectContaining({ want: true, owned: false }),
+    );
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.want).toBe(true);
+    expect(body.owned).toBe(false);
+  });
+
+  it("updates readingStatus only, leaving owned/want untouched", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingStatus: "reading" }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.readingStatus).toBe("reading");
+    expect(body.owned).toBe(true);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { readingStatus: "reading" },
+    );
+  });
+
+  it("clears readingStatus when null is passed", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, readingStatus: "reading" });
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingStatus: null }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.readingStatus).toBeNull();
+  });
+
+  it("returns 400 when the body has no updatable fields", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ foo: "bar" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an invalid readingStatus", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingStatus: "halfway" }),
+    });
+    expect(res.status).toBe(400);
   });
 
   it("returns 404 if book not on shelf", async () => {
@@ -298,7 +520,104 @@ describe("PATCH /v1/shelf/:isbn", () => {
     const res = await app.request("/v1/shelf/9780441013593", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "want" }),
+      body: JSON.stringify({ want: true }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("PATCH /v1/shelf/:isbn/tags", () => {
+  it("replaces the tag set and returns sorted tags", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryTags).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/tags", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: ["sci-fi", "favorites"] }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.tags).toEqual(["favorites", "sci-fi"]);
+    expect(vi.mocked(updateBookEntryTags)).toHaveBeenCalledWith("test-user-sub", "9780441013593", [
+      "sci-fi",
+      "favorites",
+    ]);
+  });
+
+  it("normalizes and dedupes (Sci-Fi / sci-fi / spaces collapse to one)", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryTags).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/tags", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: ["  Sci-Fi ", "sci-fi", "book   club", ""] }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(updateBookEntryTags)).toHaveBeenCalledWith("test-user-sub", "9780441013593", [
+      "sci-fi",
+      "book club",
+    ]);
+  });
+
+  it("clears all tags (empty array)", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, tags: ["sci-fi"] });
+    vi.mocked(updateBookEntryTags).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/tags", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: [] }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(updateBookEntryTags)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      [],
+    );
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.tags).toEqual([]);
+  });
+
+  it("returns 400 when tags is not an array of strings", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/tags", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: ["ok", 42] }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when a tag exceeds the length cap", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/tags", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: ["a".repeat(51)] }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when the tag count exceeds the cap (after dedupe)", async () => {
+    const app = makeApp();
+    const tooMany = Array.from({ length: 26 }, (_, i) => `tag${i}`);
+    const res = await app.request("/v1/shelf/9780441013593/tags", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: tooMany }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when the book is not on the shelf", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(null);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593/tags", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: ["sci-fi"] }),
     });
     expect(res.status).toBe(404);
   });

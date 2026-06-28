@@ -7,16 +7,23 @@ import { authMiddleware } from "../middleware/auth.js";
 import {
   queryBookEntries,
   getBookEntry,
+  batchGetBookEntries,
   putBookEntry,
   deleteBookEntry,
-  updateBookEntryStatus,
+  updateBookEntryAttributes,
   updateBookEntryNotes,
+  updateBookEntryTags,
   putBookMetadata,
   isValidStatus,
+  isValidReadingStatus,
+  derivedStatus,
+  normalizeTag,
   InvalidCursorError,
   type BookMetadata,
   type ShelfEntry,
-  type ShelfStatus,
+  type EntryAttributePatch,
+  type EntryFilter,
+  type ReadingStatus,
 } from "../lib/dynamo.js";
 import { getBookByIsbn } from "../lib/books/search.js";
 import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
@@ -28,6 +35,10 @@ export const shelfRouter = new Hono();
 shelfRouter.use("*", authMiddleware);
 
 const NOTES_MAX_LENGTH = 2000;
+
+// Tag caps (ADR-019 / endpoint checklist). Enforced on the normalized form.
+const TAGS_MAX_COUNT = 25;
+const TAG_MAX_LENGTH = 50;
 
 // BookMetadata field caps — applied before every putBookMetadata write.
 // The BOOK#${isbn} cache is shared across all users, so we bound the fields
@@ -60,16 +71,53 @@ function parseIsbnParam(c: Context, raw: string): string | Response {
 // GET /v1/shelf
 shelfRouter.get("/", async (c) => {
   const { userId } = c.get("auth");
-  const rawStatus = c.req.query("status");
   const cursor = c.req.query("cursor");
   const rawLimit = c.req.query("limit");
 
-  let status: ShelfStatus | undefined;
+  // Build the in-memory filter (ADR-019). `status` is the deprecated enum kept for
+  // one release; it maps onto the owned/want booleans.
+  const filter: EntryFilter = {};
+
+  const rawStatus = c.req.query("status");
   if (rawStatus) {
     if (!isValidStatus(rawStatus)) {
       return c.json({ error: "status must be 'owned' or 'want'" }, 400);
     }
-    status = rawStatus;
+    if (rawStatus === "owned") filter.owned = true;
+    else filter.want = true;
+  }
+
+  const rawOwned = c.req.query("owned");
+  if (rawOwned !== undefined) {
+    if (rawOwned !== "true" && rawOwned !== "false") {
+      return c.json({ error: "owned must be 'true' or 'false'" }, 400);
+    }
+    filter.owned = rawOwned === "true";
+  }
+
+  const rawWant = c.req.query("want");
+  if (rawWant !== undefined) {
+    if (rawWant !== "true" && rawWant !== "false") {
+      return c.json({ error: "want must be 'true' or 'false'" }, 400);
+    }
+    filter.want = rawWant === "true";
+  }
+
+  const rawReadingStatus = c.req.query("readingStatus");
+  if (rawReadingStatus !== undefined) {
+    if (!isValidReadingStatus(rawReadingStatus)) {
+      return c.json({ error: "readingStatus must be 'unread', 'reading', or 'finished'" }, 400);
+    }
+    filter.readingStatus = rawReadingStatus;
+  }
+
+  const rawTag = c.req.query("tag");
+  if (rawTag !== undefined) {
+    const tag = normalizeTag(rawTag);
+    if (tag.length === 0 || tag.length > TAG_MAX_LENGTH) {
+      return c.json({ error: "tag must be 1–50 characters" }, 400);
+    }
+    filter.tag = tag;
   }
 
   let limit: number | undefined;
@@ -83,7 +131,7 @@ shelfRouter.get("/", async (c) => {
   try {
     const result = await queryBookEntries({
       userId,
-      ...(status !== undefined ? { status } : {}),
+      filter,
       ...(cursor !== undefined ? { cursor } : {}),
       ...(limit !== undefined ? { limit } : {}),
     });
@@ -104,6 +152,26 @@ shelfRouter.get("/", async (c) => {
   }
 });
 
+// GET /v1/shelf/:isbn — single entry with book metadata (for the book-detail view)
+shelfRouter.get("/:isbn", async (c) => {
+  const { userId } = c.get("auth");
+
+  const isbnOrErr = parseIsbnParam(c, c.req.param("isbn"));
+  if (isbnOrErr instanceof Response) return isbnOrErr;
+  const isbn = isbnOrErr;
+
+  try {
+    const [entry] = await batchGetBookEntries(userId, [isbn]);
+    if (!entry) {
+      return c.json({ error: "Book not found on your shelf" }, 404);
+    }
+    return c.json(entry);
+  } catch (err) {
+    console.error("Shelf entry fetch error:", err);
+    return c.json({ error: "Failed to fetch book" }, 500);
+  }
+});
+
 // POST /v1/shelf
 shelfRouter.post("/", async (c) => {
   const { userId } = c.get("auth");
@@ -112,30 +180,65 @@ shelfRouter.post("/", async (c) => {
   if (bodyOrErr instanceof Response) return bodyOrErr;
   const body = bodyOrErr;
 
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    typeof (body as Record<string, unknown>)["isbn"] !== "string" ||
-    typeof (body as Record<string, unknown>)["status"] !== "string"
-  ) {
-    return c.json({ error: "Body must include isbn (string) and status (string)" }, 400);
+  if (typeof body !== "object" || body === null) {
+    return c.json({ error: "Body must be a JSON object" }, 400);
+  }
+  const obj = body as Record<string, unknown>;
+
+  if (typeof obj["isbn"] !== "string") {
+    return c.json({ error: "Body must include isbn (string)" }, 400);
   }
 
-  const rawIsbn = (body as Record<string, string>)["isbn"]!;
-  const rawStatus = (body as Record<string, string>)["status"]!;
-
-  const isbnOrErr = parseIsbnParam(c, rawIsbn);
+  const isbnOrErr = parseIsbnParam(c, obj["isbn"]);
   if (isbnOrErr instanceof Response) return isbnOrErr;
   const isbn = isbnOrErr;
 
-  if (!isValidStatus(rawStatus)) {
-    return c.json({ error: "status must be 'owned' or 'want'" }, 400);
+  // Attributes: accept owned/want/readingStatus, or the deprecated `status` enum
+  // (one transition release). At least one of owned/want must end up true.
+  let owned = false;
+  let want = false;
+
+  if (obj["status"] !== undefined) {
+    if (!isValidStatus(obj["status"])) {
+      return c.json({ error: "status must be 'owned' or 'want'" }, 400);
+    }
+    owned = obj["status"] === "owned";
+    want = obj["status"] === "want";
   }
-  const status = rawStatus;
+  if (obj["owned"] !== undefined) {
+    if (typeof obj["owned"] !== "boolean") {
+      return c.json({ error: "owned must be a boolean" }, 400);
+    }
+    owned = obj["owned"];
+  }
+  if (obj["want"] !== undefined) {
+    if (typeof obj["want"] !== "boolean") {
+      return c.json({ error: "want must be a boolean" }, 400);
+    }
+    want = obj["want"];
+  }
+
+  // Owned and Want are mutually exclusive — a book is on the shelf or the
+  // wishlist, never both, never neither.
+  if (owned && want) {
+    return c.json({ error: "owned and want are mutually exclusive" }, 400);
+  }
+  if (!owned && !want) {
+    return c.json({ error: "A book must be added as owned or want" }, 400);
+  }
+
+  let readingStatus: ReadingStatus | null = null;
+  if (obj["readingStatus"] !== undefined && obj["readingStatus"] !== null) {
+    if (!isValidReadingStatus(obj["readingStatus"])) {
+      return c.json({ error: "readingStatus must be 'unread', 'reading', or 'finished'" }, 400);
+    }
+    readingStatus = obj["readingStatus"];
+  }
+
   const addedAt = new Date().toISOString();
 
   try {
-    await putBookEntry(userId, isbn, status, addedAt);
+    await putBookEntry(userId, isbn, { owned, want, readingStatus }, addedAt);
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
       return c.json({ error: "Book already exists on your shelf" }, 409);
@@ -159,7 +262,19 @@ shelfRouter.post("/", async (c) => {
     console.error("Book metadata cache error:", err);
   }
 
-  return c.json({ isbn, status, addedAt, notes: null }, 201);
+  return c.json(
+    {
+      isbn,
+      owned,
+      want,
+      readingStatus,
+      tags: [],
+      addedAt,
+      notes: null,
+      status: derivedStatus(owned),
+    },
+    201,
+  );
 });
 
 // PATCH /v1/shelf/:isbn/notes
@@ -201,11 +316,11 @@ shelfRouter.patch("/:isbn/notes", async (c) => {
     return c.json({ error: "Failed to update notes" }, 500);
   }
 
-  return c.json({ isbn, status: existing.status, addedAt: existing.addedAt, notes });
+  return c.json({ ...existing, notes });
 });
 
-// PATCH /v1/shelf/:isbn
-shelfRouter.patch("/:isbn", async (c) => {
+// PATCH /v1/shelf/:isbn/tags — replace the entry's tag set
+shelfRouter.patch("/:isbn/tags", async (c) => {
   const { userId } = c.get("auth");
 
   const isbnOrErr = parseIsbnParam(c, c.req.param("isbn"));
@@ -215,34 +330,144 @@ shelfRouter.patch("/:isbn", async (c) => {
   const bodyOrErr = await parseJsonBody(c);
   if (bodyOrErr instanceof Response) return bodyOrErr;
 
-  const rawStatus = (bodyOrErr as Record<string, unknown>)?.["status"];
-  if (!isValidStatus(rawStatus)) {
-    return c.json({ error: "status must be 'owned' or 'want'" }, 400);
+  const rawTags = (bodyOrErr as Record<string, unknown>)?.["tags"];
+  if (!Array.isArray(rawTags) || !rawTags.every((t) => typeof t === "string")) {
+    return c.json({ error: "tags must be an array of strings" }, 400);
   }
-  const newStatus = rawStatus;
+
+  // Normalize, drop empties, dedupe (so "Sci-Fi" + "sci-fi" collapse to one).
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of rawTags as string[]) {
+    const tag = normalizeTag(raw);
+    if (tag.length === 0) continue;
+    if (tag.length > TAG_MAX_LENGTH) {
+      return c.json({ error: `Each tag must be ${TAG_MAX_LENGTH} characters or fewer` }, 400);
+    }
+    if (!seen.has(tag)) {
+      seen.add(tag);
+      normalized.push(tag);
+    }
+  }
+
+  if (normalized.length > TAGS_MAX_COUNT) {
+    return c.json({ error: `A book can have at most ${TAGS_MAX_COUNT} tags` }, 400);
+  }
 
   let existing: ShelfEntry | null;
   try {
     existing = await getBookEntry(userId, isbn);
   } catch (err) {
-    console.error("Shelf entry lookup error (status):", err);
+    console.error("Shelf entry lookup error (tags):", err);
     return c.json({ error: "Failed to look up book" }, 500);
   }
   if (!existing) {
     return c.json({ error: "Book not found on your shelf" }, 404);
   }
-  if (existing.status === newStatus) {
-    return c.json(existing);
+
+  try {
+    await updateBookEntryTags(userId, isbn, normalized);
+  } catch (err) {
+    console.error("Shelf tags update error:", err);
+    return c.json({ error: "Failed to update tags" }, 500);
+  }
+
+  return c.json({ ...existing, tags: [...normalized].sort() });
+});
+
+// PATCH /v1/shelf/:isbn — update owned / want / readingStatus (or legacy status)
+shelfRouter.patch("/:isbn", async (c) => {
+  const { userId } = c.get("auth");
+
+  const isbnOrErr = parseIsbnParam(c, c.req.param("isbn"));
+  if (isbnOrErr instanceof Response) return isbnOrErr;
+  const isbn = isbnOrErr;
+
+  const bodyOrErr = await parseJsonBody(c);
+  if (bodyOrErr instanceof Response) return bodyOrErr;
+  const obj = (bodyOrErr ?? {}) as Record<string, unknown>;
+
+  const patch: EntryAttributePatch = {};
+
+  // Deprecated `status` enum (one transition release) → owned/want booleans.
+  if (obj["status"] !== undefined) {
+    if (!isValidStatus(obj["status"])) {
+      return c.json({ error: "status must be 'owned' or 'want'" }, 400);
+    }
+    patch.owned = obj["status"] === "owned";
+    patch.want = obj["status"] === "want";
+  }
+  if (obj["owned"] !== undefined) {
+    if (typeof obj["owned"] !== "boolean") {
+      return c.json({ error: "owned must be a boolean" }, 400);
+    }
+    patch.owned = obj["owned"];
+  }
+  if (obj["want"] !== undefined) {
+    if (typeof obj["want"] !== "boolean") {
+      return c.json({ error: "want must be a boolean" }, 400);
+    }
+    patch.want = obj["want"];
+  }
+  if (obj["readingStatus"] !== undefined) {
+    if (obj["readingStatus"] !== null && !isValidReadingStatus(obj["readingStatus"])) {
+      return c.json(
+        { error: "readingStatus must be 'unread', 'reading', 'finished', or null" },
+        400,
+      );
+    }
+    patch.readingStatus = obj["readingStatus"] as ReadingStatus | null;
+  }
+
+  if (patch.owned === undefined && patch.want === undefined && patch.readingStatus === undefined) {
+    return c.json({ error: "Body must include owned, want, or readingStatus" }, 400);
+  }
+
+  // Owned and Want are mutually exclusive (ADR-019, revised). Setting one true
+  // auto-clears the other when the other isn't explicitly provided; an explicit
+  // request to set both true is rejected.
+  if (patch.owned === true && patch.want === undefined) {
+    patch.want = false;
+  } else if (patch.want === true && patch.owned === undefined) {
+    patch.owned = false;
+  }
+  if (patch.owned === true && patch.want === true) {
+    return c.json({ error: "owned and want are mutually exclusive" }, 400);
+  }
+
+  let existing: ShelfEntry | null;
+  try {
+    existing = await getBookEntry(userId, isbn);
+  } catch (err) {
+    console.error("Shelf entry lookup error (attributes):", err);
+    return c.json({ error: "Failed to look up book" }, 500);
+  }
+  if (!existing) {
+    return c.json({ error: "Book not found on your shelf" }, 404);
   }
 
   try {
-    await updateBookEntryStatus(userId, isbn, newStatus);
+    await updateBookEntryAttributes(userId, isbn, patch);
   } catch (err) {
     console.error("Shelf update error:", err);
-    return c.json({ error: "Failed to update book status" }, 500);
+    return c.json({ error: "Failed to update book" }, 500);
   }
 
-  return c.json({ isbn, status: newStatus, addedAt: existing.addedAt, notes: existing.notes });
+  const owned = patch.owned ?? existing.owned;
+  const want = patch.want ?? existing.want;
+  const readingStatus =
+    patch.readingStatus !== undefined ? patch.readingStatus : existing.readingStatus;
+
+  return c.json({
+    isbn,
+    owned,
+    want,
+    readingStatus,
+    tags: existing.tags,
+    addedAt: existing.addedAt,
+    notes: existing.notes,
+    status: derivedStatus(owned),
+  });
 });
 
 // DELETE /v1/shelf/:isbn

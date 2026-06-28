@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BookCover } from "../BookCover";
-import type { ShelfEntry, ShelfStatus, Shelf } from "../../lib/api-client";
+import type { ShelfEntry, ShelfStatus, ReadingStatus, Shelf } from "../../lib/api-client";
 
 const MAX_STAGGER_INDEX = 9;
 const STAGGER_STEP_MS = 50;
@@ -106,6 +107,90 @@ function SpinIcon() {
     </svg>
   );
 }
+
+// ── State pill icons (icon + label, never color alone — WCAG 1.4.1) ─────────
+
+function PillCheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-2.5 h-2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="6.5" />
+      <path d="M5.5 8.5l1.75 1.75L11 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PillBookmarkIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-2.5 h-2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path
+        d="M4 2.5h8a.5.5 0 01.5.5v10.25l-4.5-3-4.5 3V3a.5.5 0 01.5-.5z"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PillBookIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-2.5 h-2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d="M2.5 3.5h4a1.5 1.5 0 011.5 1.5v8a1.5 1.5 0 00-1.5-1.5h-4z" strokeLinejoin="round" />
+      <path d="M13.5 3.5h-4A1.5 1.5 0 008 5v8a1.5 1.5 0 011.5-1.5h4z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TagIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-2.5 h-2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path d="M2.5 2.5h4.8l6.2 6.2-4.8 4.8L2.5 7.3z" strokeLinejoin="round" />
+      <circle cx="5.2" cy="5.2" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Icon + label chip over the cover. State is conveyed by icon+text, not color. */
+function StatePill({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+const READING_LABEL: Record<ReadingStatus, string> = {
+  unread: "Unread",
+  reading: "Reading",
+  finished: "Read",
+};
 
 // ── Overlay action button ──────────────────────────────────────────────────
 
@@ -262,24 +347,27 @@ export function ShelfBookCard({
   error,
   staggerIndex,
 }: ShelfBookCardProps) {
-  const { isbn, status, book } = entry;
+  const { isbn, owned, want, readingStatus, tags, book } = entry;
   const title = book?.title ?? isbn;
   const authors = book?.authors ?? [];
-  const targetStatus: ShelfStatus = status === "owned" ? "want" : "owned";
-  const moveLabel = status === "owned" ? "Move to Wishlist" : "Mark as Owned";
 
   const staggerStyle =
     staggerIndex !== undefined
       ? { animationDelay: `${Math.min(staggerIndex, MAX_STAGGER_INDEX) * STAGGER_STEP_MS}ms` }
       : undefined;
 
+  const navigate = useNavigate();
+
   // Touch devices have no hover, so the action overlay can't reveal on hover and
   // its invisible buttons would otherwise be blind-tappable. On coarse pointers,
-  // tapping the cover toggles the overlay; mouse hover / keyboard focus are unchanged.
+  // tapping the cover toggles the overlay; on hover-capable pointers, clicking the
+  // cover opens the book-detail view (the title link is the explicit affordance).
   const [revealed, setRevealed] = useState(false);
-  function handleCoverTap() {
+  function handleCoverClick() {
     if (typeof window !== "undefined" && window.matchMedia?.("(hover: none)").matches) {
       setRevealed((v) => !v);
+    } else {
+      navigate(`/book/${isbn}`);
     }
   }
 
@@ -296,7 +384,7 @@ export function ShelfBookCard({
           image exactly (not the wider column), and the cover sits centered in the column. */}
       <div
         className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200 w-fit max-w-full mx-auto"
-        onClick={handleCoverTap}
+        onClick={handleCoverClick}
       >
         <BookCover
           key={book?.coverUrl ?? "no-cover"}
@@ -304,15 +392,6 @@ export function ShelfBookCard({
           title={title}
           authors={authors}
           className="h-[195px]"
-        />
-
-        {/* Status dot — always visible */}
-        <div
-          className={`absolute top-1.5 left-1.5 w-2 h-2 rounded-full ring-1 ring-black/20 ${
-            status === "owned" ? "bg-emerald-400" : "bg-sky-400"
-          }`}
-          title={status === "owned" ? "Owned" : "Wishlist"}
-          aria-label={status === "owned" ? "Owned" : "Wishlist"}
         />
 
         {/* Action overlay — hover (mouse), focus-within (keyboard), or tap (touch).
@@ -327,13 +406,18 @@ export function ShelfBookCard({
         >
           {/* Stop button taps from bubbling to the cover's toggle handler. */}
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <OverlayButton
-              onClick={() => onMove(isbn, targetStatus)}
-              {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
-              title={isMoving ? "Moving…" : moveLabel}
-            >
-              {isMoving ? <SpinIcon /> : <MoveIcon toStatus={targetStatus} />}
-            </OverlayButton>
+            {/* One-directional quick action: wishlist → owned ("Mark as Owned").
+                Wishlisting an owned book is the confusing direction — that lives in
+                the book-detail view, not a card hover button. */}
+            {want && (
+              <OverlayButton
+                onClick={() => onMove(isbn, "owned")}
+                {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
+                title={isMoving ? "Moving…" : "Mark as Owned"}
+              >
+                {isMoving ? <SpinIcon /> : <MoveIcon toStatus="owned" />}
+              </OverlayButton>
+            )}
 
             <ShelfPicker
               isbn={isbn}
@@ -353,13 +437,51 @@ export function ShelfBookCard({
             </OverlayButton>
           </div>
         </div>
+
+        {/* State pills — always visible, rendered above the overlay so the reveal
+            doesn't hide them. Non-interactive: taps pass through to the cover. */}
+        <div className="pointer-events-none absolute inset-0">
+          {(owned || want) && (
+            <div className="absolute top-1.5 left-1.5">
+              {/* Owned/Want are mutually exclusive — exactly one renders. Icon color
+                  (green/red) reinforces the label; the text keeps it WCAG-safe. */}
+              {owned ? (
+                <StatePill
+                  icon={
+                    <span className="text-emerald-400">
+                      <PillCheckIcon />
+                    </span>
+                  }
+                  label="Owned"
+                />
+              ) : (
+                <StatePill
+                  icon={
+                    <span className="text-red-400">
+                      <PillBookmarkIcon />
+                    </span>
+                  }
+                  label="Want"
+                />
+              )}
+            </div>
+          )}
+          {readingStatus && (
+            <div className="absolute bottom-1.5 left-1.5">
+              <StatePill icon={<PillBookIcon />} label={READING_LABEL[readingStatus]} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Book info */}
       <div className="px-0.5">
-        <p className="text-xs font-medium leading-snug line-clamp-2 min-h-[2.1rem] dark:text-white text-slate-900">
+        <Link
+          to={`/book/${isbn}`}
+          className="block text-xs font-medium leading-snug line-clamp-2 min-h-[2.1rem] dark:text-white text-slate-900 hover:underline"
+        >
           {title}
-        </p>
+        </Link>
         {authors.length > 0 && (
           <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate leading-tight">
             {authors.join(", ")}
@@ -368,6 +490,19 @@ export function ShelfBookCard({
         <p className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 truncate">
           {isbn}
         </p>
+        {tags.length > 0 && (
+          <div className="mt-1 flex items-center gap-1">
+            <span className="inline-flex min-w-0 items-center gap-0.5 rounded-full border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              <TagIcon />
+              <span className="truncate">{tags[0]}</span>
+            </span>
+            {tags.length > 1 && (
+              <span className="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
+                +{tags.length - 1}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
