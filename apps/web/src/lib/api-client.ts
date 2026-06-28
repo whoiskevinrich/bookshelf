@@ -188,6 +188,12 @@ export async function removeBookFromShelf(shelfId: string, isbn: string): Promis
   await throwIfError(res);
 }
 
+export async function fetchShelfBooks(shelfId: string): Promise<ShelfEntry[]> {
+  const res = await authedFetch(`/v1/shelves/${encodeURIComponent(shelfId)}/books`);
+  await throwIfError(res);
+  return res.json() as Promise<ShelfEntry[]>;
+}
+
 // ── Account API ───────────────────────────────────────────────────────────
 
 export async function deleteAccount(
@@ -212,7 +218,10 @@ export type AnalyticsEvent =
   | "scan_text_mode_suggested"
   | "scan_text_mode_accepted"
   | "scan_text_success"
-  | "scan_text_miss";
+  | "scan_text_miss"
+  | "shelf_opened"
+  | "shelf_renamed"
+  | "shelf_deleted";
 
 /**
  * Record a client analytics event (ADR-016). Resolves on 204; throws ApiError
