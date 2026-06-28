@@ -33,7 +33,6 @@ export function ShelfNameEditor({ shelfId, name, className }: ShelfNameEditorPro
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const pencilRef = useRef<HTMLButtonElement>(null);
   const updateMutation = useUpdateShelf();
 
@@ -100,7 +99,6 @@ export function ShelfNameEditor({ shelfId, name, className }: ShelfNameEditorPro
           </label>
           <input
             id={`shelf-name-input-${shelfId}`}
-            ref={inputRef}
             autoFocus
             type="text"
             value={draft}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useDeleteShelf } from "../../hooks/useShelves";
 import { track } from "../../lib/analytics";
@@ -14,7 +14,12 @@ interface DeleteShelfDialogProps {
 
 export function DeleteShelfDialog({ shelf, open, onClose, onDeleted }: DeleteShelfDialogProps) {
   const deleteMutation = useDeleteShelf();
+  const [error, setError] = useState<string | null>(null);
   const bookCount = shelf.bookIds.length;
+
+  useEffect(() => {
+    if (!open) setError(null);
+  }, [open]);
 
   // Escape to close.
   useEffect(() => {
@@ -29,13 +34,14 @@ export function DeleteShelfDialog({ shelf, open, onClose, onDeleted }: DeleteShe
   if (!open) return null;
 
   function handleDelete() {
+    setError(null);
     deleteMutation.mutate(shelf.shelfId, {
       onSuccess: () => {
         track("shelf_deleted", { shelfId: shelf.shelfId, bookCount });
         onDeleted();
       },
       onError: () => {
-        onClose();
+        setError("Couldn't delete shelf — please try again.");
       },
     });
   }
@@ -64,10 +70,15 @@ export function DeleteShelfDialog({ shelf, open, onClose, onDeleted }: DeleteShe
         >
           Delete &ldquo;{shelf.name}&rdquo;?
         </h2>
-        <p id="delete-shelf-body" className="text-sm text-slate-500 dark:text-zinc-400 mb-6">
+        <p id="delete-shelf-body" className="text-sm text-slate-500 dark:text-zinc-400 mb-4">
           This shelf has <strong>{bookLabel}</strong>. The books will remain in your library — only
           the shelf is removed.
         </p>
+        {error && (
+          <p role="alert" className="text-red-500 dark:text-red-400 text-xs mb-4">
+            {error}
+          </p>
+        )}
         <div className="flex justify-end gap-2">
           <Button autoFocus variant="ghost" size="sm" onClick={onClose}>
             Cancel

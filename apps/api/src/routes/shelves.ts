@@ -52,7 +52,13 @@ shelvesRouter.post("/", async (c) => {
 
   const trimmedName = name.trim();
 
-  const existing = await queryShelvesMeta(userId);
+  let existing;
+  try {
+    existing = await queryShelvesMeta(userId);
+  } catch (err) {
+    console.error("Shelf list error:", err);
+    return c.json({ error: "Failed to create shelf" }, 500);
+  }
   if (existing.some((s) => s.name.toLowerCase() === trimmedName.toLowerCase())) {
     return c.json({ error: "A shelf with this name already exists" }, 409);
   }
@@ -115,7 +121,13 @@ shelvesRouter.patch("/:shelfId", async (c) => {
 
   const trimmedName = name.trim();
 
-  const allShelves = await queryShelvesMeta(userId);
+  let allShelves;
+  try {
+    allShelves = await queryShelvesMeta(userId);
+  } catch (err) {
+    console.error("Shelf list error:", err);
+    return c.json({ error: "Failed to rename shelf" }, 500);
+  }
   if (
     allShelves.some(
       (s) => s.shelfId !== shelfId && s.name.toLowerCase() === trimmedName.toLowerCase(),
@@ -134,12 +146,10 @@ shelvesRouter.patch("/:shelfId", async (c) => {
     return c.json({ error: "Failed to rename shelf" }, 500);
   }
 
-  const [updated, bookIds] = await Promise.all([
-    getShelfMetaItem(userId, shelfId),
-    queryShelfMemberIsns(userId, shelfId),
-  ]);
-  if (!updated) return c.json({ error: "Shelf not found" }, 404);
-  return c.json({ ...updated, bookIds });
+  const target = allShelves.find((s) => s.shelfId === shelfId);
+  const bookIds = await queryShelfMemberIsns(userId, shelfId);
+  if (!target) return c.json({ error: "Shelf not found" }, 404);
+  return c.json({ ...target, name: trimmedName, bookIds });
 });
 
 // DELETE /v1/shelves/:shelfId

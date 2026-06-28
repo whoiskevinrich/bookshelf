@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
@@ -15,26 +15,9 @@ import {
   useRemoveBookFromShelf,
 } from "../hooks/useShelves";
 import { useMoveShelfEntry, useRemoveFromShelf } from "../hooks/useShelf";
+import { useHorizontalScrollOnWheel } from "../hooks/useHorizontalScrollOnWheel";
 import { track } from "../lib/analytics";
 import type { ShelfStatus } from "../lib/api-client";
-
-// Re-use the same horizontal scroll wheel hook from ShelfPage.
-function useHorizontalScrollOnWheel() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    function onWheel(e: WheelEvent) {
-      if (el!.scrollWidth <= el!.clientWidth) return;
-      if (e.deltaY === 0) return;
-      e.preventDefault();
-      el!.scrollLeft += e.deltaY;
-    }
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
-  return ref;
-}
 
 function ChevronLeftIcon() {
   return (
@@ -74,7 +57,6 @@ export function SingleShelfPage() {
   const { shelfId } = useParams<{ shelfId: string }>();
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const scrollRef = useHorizontalScrollOnWheel();
 
   const shelvesQuery = useShelves();
@@ -168,10 +150,7 @@ export function SingleShelfPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => {
-                  setDeleteError(null);
-                  setShowDeleteDialog(true);
-                }}
+                onClick={() => setShowDeleteDialog(true)}
                 aria-label={`Delete shelf ${shelf.name}`}
                 className="shrink-0 flex items-center gap-1.5"
               >
@@ -179,12 +158,6 @@ export function SingleShelfPage() {
                 Delete shelf
               </Button>
             </div>
-
-            {deleteError && (
-              <p role="alert" className="text-red-500 dark:text-red-400 text-xs mb-4">
-                {deleteError}
-              </p>
-            )}
 
             {bookCount === 0 ? (
               <ShelfEmptyState

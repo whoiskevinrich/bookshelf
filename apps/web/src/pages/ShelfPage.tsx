@@ -23,6 +23,7 @@ import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
 import { ShelfNameEditor } from "../components/shelf/ShelfNameEditor";
 import { DeleteShelfDialog } from "../components/shelf/DeleteShelfDialog";
 import { MobileScanHint } from "../components/shelf/MobileScanHint";
+import { useHorizontalScrollOnWheel } from "../hooks/useHorizontalScrollOnWheel";
 import { BookSearch } from "../components/BookSearch";
 import { Button } from "../components/ui/Button";
 import { ScanModal } from "../components/scanner/ScanModal";
@@ -163,26 +164,6 @@ function CreateShelfForm({ onClose }: { onClose: () => void }) {
       </Button>
     </form>
   );
-}
-
-// ── Wheel → horizontal scroll ─────────────────────────────────────────────
-// React's onWheel is passive; we need a non-passive listener to preventDefault.
-
-function useHorizontalScrollOnWheel() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    function onWheel(e: WheelEvent) {
-      if (el!.scrollWidth <= el!.clientWidth) return; // not scrollable — let page handle it
-      if (e.deltaY === 0) return; // pure horizontal trackpad delta — pass through
-      e.preventDefault();
-      el!.scrollLeft += e.deltaY;
-    }
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
-  return ref;
 }
 
 // ── Shelf section ──────────────────────────────────────────────────────────

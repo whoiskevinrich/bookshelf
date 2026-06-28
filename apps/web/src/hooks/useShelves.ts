@@ -37,6 +37,7 @@ export function useSingleShelfBooks(shelfId: string) {
   return useQuery<ShelfEntry[]>({
     queryKey: shelfBooksKey(shelfId),
     queryFn: () => fetchShelfBooks(shelfId),
+    enabled: !!shelfId,
   });
 }
 
