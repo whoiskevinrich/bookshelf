@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { authMiddleware } from "../middleware/auth.js";
 import {
+  querySmartShelves,
   querySmartShelvesWithCounts,
   getSmartShelf,
   putSmartShelf,
@@ -19,6 +20,10 @@ smartShelvesRouter.use("*", authMiddleware);
 
 const NAME_MAX_LENGTH = 100;
 const TAG_MAX_LENGTH = 50;
+const MAX_SMART_SHELVES = 50;
+
+// IDs are server-generated UUIDs; reject anything else before it reaches a key.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function validateName(name: unknown): name is string {
   return (
@@ -99,6 +104,17 @@ smartShelvesRouter.post("/", async (c) => {
     return c.json({ error: ruleOrErr.error }, 400);
   }
 
+  let existing;
+  try {
+    existing = await querySmartShelves(userId);
+  } catch (err) {
+    console.error("Smart shelf list error:", err);
+    return c.json({ error: "Failed to create smart shelf" }, 500);
+  }
+  if (existing.length >= MAX_SMART_SHELVES) {
+    return c.json({ error: `You can have at most ${MAX_SMART_SHELVES} smart shelves` }, 409);
+  }
+
   const smartShelfId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
 
@@ -116,6 +132,9 @@ smartShelvesRouter.post("/", async (c) => {
 smartShelvesRouter.patch("/:id", async (c) => {
   const { userId } = c.get("auth");
   const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "Invalid smart shelf id" }, 400);
+  }
 
   const bodyOrErr = await parseJsonBody(c);
   if (bodyOrErr instanceof Response) return bodyOrErr;
@@ -141,13 +160,15 @@ smartShelvesRouter.patch("/:id", async (c) => {
 smartShelvesRouter.delete("/:id", async (c) => {
   const { userId } = c.get("auth");
   const id = c.req.param("id");
-
-  const existing = await getSmartShelf(userId, id);
-  if (!existing) {
-    return c.json({ error: "Smart shelf not found" }, 404);
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "Invalid smart shelf id" }, 400);
   }
 
   try {
+    const existing = await getSmartShelf(userId, id);
+    if (!existing) {
+      return c.json({ error: "Smart shelf not found" }, 404);
+    }
     await deleteSmartShelf(userId, id);
   } catch (err) {
     console.error("Smart shelf delete error:", err);

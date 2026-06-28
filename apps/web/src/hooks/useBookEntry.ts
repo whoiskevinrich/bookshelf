@@ -72,11 +72,21 @@ export function useUpdateBookAttributes(isbn: string) {
   );
 }
 
+/** Mirror the server's tag normalization so the optimistic UI doesn't flash a raw value. */
+function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  for (const raw of tags) {
+    const t = raw.trim().toLowerCase().replace(/\s+/g, " ");
+    if (t) seen.add(t);
+  }
+  return [...seen].sort();
+}
+
 export function useUpdateBookTags(isbn: string) {
   return useEntryMutation<string[]>(
     isbn,
     (tags) => updateShelfTags(isbn, tags),
-    (prev, tags) => ({ ...prev, tags: [...tags].sort() }),
+    (prev, tags) => ({ ...prev, tags: normalizeTags(tags) }),
     true,
   );
 }

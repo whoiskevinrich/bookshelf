@@ -10,6 +10,7 @@ vi.mock("../../src/middleware/auth.js", () => ({
 vi.mock("../../src/lib/dynamo.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../src/lib/dynamo.js")>();
   return {
+    querySmartShelves: vi.fn(),
     querySmartShelvesWithCounts: vi.fn(),
     getSmartShelf: vi.fn(),
     putSmartShelf: vi.fn(),
@@ -23,12 +24,15 @@ vi.mock("../../src/lib/dynamo.js", async (importOriginal) => {
 import { Hono } from "hono";
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import {
+  querySmartShelves,
   querySmartShelvesWithCounts,
   getSmartShelf,
   putSmartShelf,
   updateSmartShelfName,
   deleteSmartShelf,
 } from "../../src/lib/dynamo.js";
+
+const UUID = "11111111-1111-4111-8111-111111111111";
 import { smartShelvesRouter } from "../../src/routes/smart-shelves.js";
 
 function makeApp() {
@@ -38,6 +42,7 @@ function makeApp() {
 }
 
 beforeEach(() => {
+  vi.mocked(querySmartShelves).mockReset();
   vi.mocked(querySmartShelvesWithCounts).mockReset();
   vi.mocked(getSmartShelf).mockReset();
   vi.mocked(putSmartShelf).mockReset();
@@ -66,6 +71,7 @@ describe("GET /v1/smart-shelves", () => {
 
 describe("POST /v1/smart-shelves", () => {
   it("creates a smart shelf from a valid rule (tag normalized)", async () => {
+    vi.mocked(querySmartShelves).mockResolvedValueOnce([]);
     vi.mocked(putSmartShelf).mockResolvedValueOnce(undefined);
     const app = makeApp();
     const res = await app.request("/v1/smart-shelves", {
@@ -116,13 +122,32 @@ describe("POST /v1/smart-shelves", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("returns 409 when the smart-shelf limit is reached", async () => {
+    vi.mocked(querySmartShelves).mockResolvedValueOnce(
+      Array.from({ length: 50 }, (_, i) => ({
+        smartShelfId: `id-${i}`,
+        name: `s${i}`,
+        rule: { owned: true },
+        createdAt: "2026-06-28T00:00:00.000Z",
+      })),
+    );
+    const app = makeApp();
+    const res = await app.request("/v1/smart-shelves", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "One too many", rule: { owned: true } }),
+    });
+    expect(res.status).toBe(409);
+    expect(vi.mocked(putSmartShelf)).not.toHaveBeenCalled();
+  });
 });
 
 describe("PATCH /v1/smart-shelves/:id", () => {
   it("renames a smart shelf", async () => {
     vi.mocked(updateSmartShelfName).mockResolvedValueOnce(undefined);
     const app = makeApp();
-    const res = await app.request("/v1/smart-shelves/a", {
+    const res = await app.request(`/v1/smart-shelves/${UUID}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "New name" }),
@@ -130,12 +155,23 @@ describe("PATCH /v1/smart-shelves/:id", () => {
     expect(res.status).toBe(204);
   });
 
+  it("returns 400 for an invalid (non-UUID) id", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/smart-shelves/not-a-uuid", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "New name" }),
+    });
+    expect(res.status).toBe(400);
+    expect(vi.mocked(updateSmartShelfName)).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when the shelf doesn't exist", async () => {
     vi.mocked(updateSmartShelfName).mockRejectedValueOnce(
       new ConditionalCheckFailedException({ message: "no", $metadata: {} }),
     );
     const app = makeApp();
-    const res = await app.request("/v1/smart-shelves/missing", {
+    const res = await app.request(`/v1/smart-shelves/${UUID}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "New name" }),
@@ -147,21 +183,28 @@ describe("PATCH /v1/smart-shelves/:id", () => {
 describe("DELETE /v1/smart-shelves/:id", () => {
   it("deletes an existing smart shelf", async () => {
     vi.mocked(getSmartShelf).mockResolvedValueOnce({
-      smartShelfId: "a",
+      smartShelfId: UUID,
       name: "X",
       rule: { owned: true },
       createdAt: "2026-06-28T00:00:00.000Z",
     });
     vi.mocked(deleteSmartShelf).mockResolvedValueOnce(undefined);
     const app = makeApp();
-    const res = await app.request("/v1/smart-shelves/a", { method: "DELETE" });
+    const res = await app.request(`/v1/smart-shelves/${UUID}`, { method: "DELETE" });
     expect(res.status).toBe(204);
+  });
+
+  it("returns 400 for an invalid (non-UUID) id", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/smart-shelves/not-a-uuid", { method: "DELETE" });
+    expect(res.status).toBe(400);
+    expect(vi.mocked(getSmartShelf)).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the shelf doesn't exist", async () => {
     vi.mocked(getSmartShelf).mockResolvedValueOnce(null);
     const app = makeApp();
-    const res = await app.request("/v1/smart-shelves/missing", { method: "DELETE" });
+    const res = await app.request(`/v1/smart-shelves/${UUID}`, { method: "DELETE" });
     expect(res.status).toBe(404);
   });
 });
