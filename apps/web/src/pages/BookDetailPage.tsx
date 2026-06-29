@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { BookCover } from "../components/BookCover";
 import { Button } from "../components/ui/Button";
@@ -225,6 +225,7 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
 
 export function BookDetailPage() {
   const { isbn = "" } = useParams<{ isbn: string }>();
+  const navigate = useNavigate();
   const entryQuery = useBookEntry(isbn);
   const shelvesQuery = useShelves();
 
@@ -239,7 +240,12 @@ export function BookDetailPage() {
   }, [entry?.book?.title]);
 
   const onShelves = (shelvesQuery.data ?? []).filter((s) => s.bookIds.includes(isbn));
-  const notFound = entryQuery.error instanceof ApiError && entryQuery.error.status === 404;
+  // Any 4xx (missing book / invalid ISBN) means we can't show this book — retrying
+  // won't help, so offer a way back rather than ShelfErrorState's "Try again".
+  const cannotShow =
+    entryQuery.error instanceof ApiError &&
+    entryQuery.error.status >= 400 &&
+    entryQuery.error.status < 500;
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
@@ -258,18 +264,21 @@ export function BookDetailPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {entryQuery.isLoading && <ShelfSkeleton sections={1} />}
 
-        {notFound && !entryQuery.isLoading && (
+        {cannotShow && !entryQuery.isLoading && (
           <div className="pt-12 text-center">
-            <p className="text-slate-500 dark:text-slate-400 mb-4">
-              This book isn&apos;t on your shelf.
+            <p className="mb-1 text-slate-500 dark:text-slate-400">
+              We couldn&apos;t find this book on your shelf.
             </p>
-            <Link to="/shelf" className="text-sm text-slate-900 dark:text-white underline">
+            <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+              It may have been removed.
+            </p>
+            <Button variant="app" onClick={() => navigate("/shelf")}>
               Back to My Library
-            </Link>
+            </Button>
           </div>
         )}
 
-        {entryQuery.isError && !notFound && !entryQuery.isLoading && (
+        {entryQuery.isError && !cannotShow && !entryQuery.isLoading && (
           <ShelfErrorState
             message="Couldn't load this book."
             onRetry={() => void entryQuery.refetch()}
