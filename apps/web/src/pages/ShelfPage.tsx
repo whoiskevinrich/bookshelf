@@ -42,6 +42,7 @@ import { MobileScanHint } from "../components/shelf/MobileScanHint";
 import { useHorizontalScrollOnWheel } from "../hooks/useHorizontalScrollOnWheel";
 import { BookSearch } from "../components/BookSearch";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ScanModal } from "../components/scanner/ScanModal";
 import { supportsCameraScan } from "../lib/device";
 import { getRuntimeConfig } from "../lib/runtime-config";
@@ -347,6 +348,7 @@ export function ShelfPage() {
   const [tag, setTag] = useState<string | null>(null);
   const [showBrowse, setShowBrowse] = useState(false);
   const [showSaveSmart, setShowSaveSmart] = useState(false);
+  const [smartShelfToDelete, setSmartShelfToDelete] = useState<SmartShelfWithCount | null>(null);
 
   const activeFilter = useMemo(() => buildFilter(facet, tag), [facet, tag]);
   const isFiltered = activeFilter !== null;
@@ -448,9 +450,7 @@ export function ShelfPage() {
   }
 
   function handleDeleteSmartShelf(shelf: SmartShelfWithCount) {
-    if (window.confirm(`Delete smart shelf “${shelf.name}”? This only removes the saved view.`)) {
-      deleteSmartShelf.mutate(shelf.smartShelfId);
-    }
+    setSmartShelfToDelete(shelf);
   }
 
   const smartShelfDefaultName = [facet ? facetLabel(facet) : null, tag ? `#${tag}` : null]
@@ -716,6 +716,22 @@ export function ShelfPage() {
           </>
         )}
       </main>
+
+      <ConfirmDialog
+        open={smartShelfToDelete !== null}
+        title={`Delete “${smartShelfToDelete?.name ?? ""}”?`}
+        message="This removes the saved smart shelf (the filter rule). Your books are untouched."
+        confirmLabel="Delete smart shelf"
+        destructive
+        pending={deleteSmartShelf.isPending}
+        onConfirm={() => {
+          if (!smartShelfToDelete) return;
+          deleteSmartShelf.mutate(smartShelfToDelete.smartShelfId, {
+            onSettled: () => setSmartShelfToDelete(null),
+          });
+        }}
+        onClose={() => setSmartShelfToDelete(null)}
+      />
     </div>
   );
 }

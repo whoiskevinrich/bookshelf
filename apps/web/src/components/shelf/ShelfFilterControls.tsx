@@ -264,6 +264,44 @@ function SparkleIcon() {
   );
 }
 
+function InfoIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="6.5" />
+      <path d="M8 7.25v3.25" strokeLinecap="round" />
+      <circle cx="8" cy="5" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Small info affordance with a hover/focus tooltip. */
+function InfoTooltip({ label, text }: { label: string; text: string }) {
+  return (
+    <span className="group/tip relative inline-flex">
+      <button
+        type="button"
+        aria-label={label}
+        className="grid h-5 w-5 place-items-center rounded-full text-slate-400 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:hover:text-slate-200 dark:focus:ring-slate-300"
+      >
+        <InfoIcon />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-60 rounded-lg border border-slate-200 bg-white p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-slate-600 shadow-lg group-hover/tip:block group-focus-within/tip:block dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function SmartShelvesGroup({
   shelves,
   onApply,
@@ -279,6 +317,10 @@ export function SmartShelvesGroup({
       <div className="mb-3 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <SparkleIcon />
         <span className="font-semibold uppercase tracking-wide text-xs">Smart shelves</span>
+        <InfoTooltip
+          label="About smart shelves"
+          text="Smart shelves are saved filters — they update automatically as your books change. Create one by applying a status or tag filter, then choosing “Save as smart shelf”. You can keep up to 50."
+        />
       </div>
       <div className="flex flex-wrap gap-2">
         {shelves.map((s) => (

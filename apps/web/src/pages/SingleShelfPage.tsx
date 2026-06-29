@@ -8,6 +8,7 @@ import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
 import { ShelfNameEditor } from "../components/shelf/ShelfNameEditor";
 import { DeleteShelfDialog } from "../components/shelf/DeleteShelfDialog";
 import { Button } from "../components/ui/Button";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import {
   useShelves,
   useSingleShelfBooks,
@@ -15,7 +16,6 @@ import {
   useRemoveBookFromShelf,
 } from "../hooks/useShelves";
 import { useMoveShelfEntry, useRemoveFromShelf } from "../hooks/useShelf";
-import { useHorizontalScrollOnWheel } from "../hooks/useHorizontalScrollOnWheel";
 import { track } from "../lib/analytics";
 import type { ShelfStatus } from "../lib/api-client";
 
@@ -57,7 +57,8 @@ export function SingleShelfPage() {
   const { shelfId } = useParams<{ shelfId: string }>();
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const scrollRef = useHorizontalScrollOnWheel();
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(0);
 
   const shelvesQuery = useShelves();
   const booksQuery = useSingleShelfBooks(shelfId ?? "");
@@ -89,6 +90,18 @@ export function SingleShelfPage() {
 
   const bookCount = books.length;
   const bookLabel = bookCount === 1 ? "1 book" : `${bookCount} books`;
+
+  // Reset to the first page when the shelf or page size changes.
+  useEffect(() => {
+    setPage(0);
+  }, [shelfId, pageSize]);
+
+  const pageCount = Math.max(1, Math.ceil(bookCount / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageStart = safePage * pageSize;
+  const pageBooks = books.slice(pageStart, pageStart + pageSize);
+  const rangeStart = bookCount === 0 ? 0 : pageStart + 1;
+  const rangeEnd = Math.min(pageStart + pageSize, bookCount);
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
@@ -167,16 +180,50 @@ export function SingleShelfPage() {
                 cta="Go to library →"
               />
             ) : (
-              <div
-                ref={scrollRef}
-                className="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6"
-                style={{
-                  scrollbarWidth: "thin",
-                  scrollbarColor: "rgb(148 163 184 / 0.4) transparent",
-                }}
-              >
-                <div className="flex gap-4 pb-3">
-                  {books.map((entry, index) => (
+              <>
+                {/* Sticky pagination toolbar — stays in view while the grid scrolls. */}
+                <div className="sticky top-0 z-10 -mx-4 mb-4 flex flex-wrap items-center gap-3 border-b border-slate-100 bg-white/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 dark:border-slate-800 dark:bg-slate-900/95">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Show</span>
+                  <SegmentedControl<string>
+                    label="Books per page"
+                    value={String(pageSize)}
+                    options={[
+                      { value: "20", label: "20" },
+                      { value: "50", label: "50" },
+                      { value: "100", label: "100" },
+                    ]}
+                    onChange={(v) => setPageSize(Number(v))}
+                  />
+                  <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+                    {rangeStart}–{rangeEnd} of {bookCount}
+                  </span>
+                  {pageCount > 1 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.max(0, p - 1))}
+                        disabled={safePage === 0}
+                      >
+                        Prev
+                      </Button>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {safePage + 1} / {pageCount}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                        disabled={safePage >= pageCount - 1}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-4">
+                  {pageBooks.map((entry, index) => (
                     <ShelfBookCard
                       key={entry.isbn}
                       entry={entry}
@@ -210,9 +257,8 @@ export function SingleShelfPage() {
                       }
                     />
                   ))}
-                  <div aria-hidden="true" className="shrink-0 w-2" />
                 </div>
-              </div>
+              </>
             )}
 
             <DeleteShelfDialog
