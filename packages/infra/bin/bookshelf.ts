@@ -67,7 +67,11 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     region: "us-west-2",
     allowSelfSignUp: false,
     apiThroughCloudFront: true,
-    googleEmailAllowlist: "whoiskevinrich@gmail.com",
+    // The +bookshelf-qa alias is a dedicated dev-only Playwright E2E user (delivers to the
+    // same inbox). The allowlist gates account creation, so it must include the QA email for
+    // `admin-create-user` to succeed when (re)provisioning the test user. See
+    // docs/handoffs/2026-06-29-e2e-unblock-qa-cognito.md.
+    googleEmailAllowlist: "whoiskevinrich@gmail.com,whoiskevinrich+bookshelf-qa@gmail.com",
     scannerEnabled: true,
     ocrScanEnabled: true,
     authPool: "green", // migrated 2026-06-13 (ADR-015)
