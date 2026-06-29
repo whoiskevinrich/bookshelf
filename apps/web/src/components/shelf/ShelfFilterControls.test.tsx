@@ -1,0 +1,185 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { makeSmartShelf } from "../../test/utils";
+import type { TagCount } from "../../lib/api-client";
+import {
+  facetLabel,
+  buildFilter,
+  ruleToActive,
+  FacetBar,
+  TagBrowsePanel,
+  ActiveFilterBar,
+  SmartShelvesGroup,
+} from "./ShelfFilterControls";
+
+describe("filter helpers", () => {
+  it("facetLabel maps facet values to display labels", () => {
+    expect(facetLabel("owned")).toBe("Owned");
+    expect(facetLabel("finished")).toBe("Read");
+    expect(facetLabel("unread")).toBe("Unread");
+  });
+
+  it("buildFilter returns null when neither facet nor tag is set", () => {
+    expect(buildFilter(null, null)).toBeNull();
+  });
+
+  it("buildFilter maps facets to the right query shape", () => {
+    expect(buildFilter("owned", null)).toEqual({ owned: true });
+    expect(buildFilter("want", null)).toEqual({ want: true });
+    expect(buildFilter("reading", null)).toEqual({ readingStatus: "reading" });
+    expect(buildFilter("finished", null)).toEqual({ readingStatus: "finished" });
+    expect(buildFilter("unread", null)).toEqual({ readingStatus: "unread" });
+  });
+
+  it("buildFilter combines a facet and a tag", () => {
+    expect(buildFilter("owned", "sci-fi")).toEqual({ owned: true, tag: "sci-fi" });
+  });
+
+  it("ruleToActive is the inverse of buildFilter", () => {
+    expect(ruleToActive({ owned: true })).toEqual({ facet: "owned", tag: null });
+    expect(ruleToActive({ readingStatus: "reading" })).toEqual({ facet: "reading", tag: null });
+    expect(ruleToActive({ want: true, tag: "fiction" })).toEqual({ facet: "want", tag: "fiction" });
+    expect(ruleToActive({ tag: "fiction" })).toEqual({ facet: null, tag: "fiction" });
+  });
+});
+
+describe("FacetBar", () => {
+  it("renders All + every facet as a status group", () => {
+    render(<FacetBar facet={null} onSelect={() => {}} />);
+    const group = screen.getByRole("group", { name: "Filter by status" });
+    expect(group).toBeInTheDocument();
+    for (const label of ["All", "Owned", "Want", "Reading", "Read", "Unread"]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it("marks the active facet with aria-pressed", () => {
+    render(<FacetBar facet="owned" onSelect={() => {}} />);
+    expect(screen.getByRole("button", { name: "Owned" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("selecting a facet reports it; re-selecting it toggles back to null", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const { rerender } = render(<FacetBar facet={null} onSelect={onSelect} />);
+
+    await user.click(screen.getByRole("button", { name: "Owned" }));
+    expect(onSelect).toHaveBeenLastCalledWith("owned");
+
+    rerender(<FacetBar facet="owned" onSelect={onSelect} />);
+    await user.click(screen.getByRole("button", { name: "Owned" }));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe("TagBrowsePanel", () => {
+  const tags: TagCount[] = [
+    { tag: "fiction", count: 12 },
+    { tag: "sci-fi", count: 5 },
+    { tag: "non-fiction", count: 3 },
+  ];
+
+  it("prompts to add tags when there are none", () => {
+    render(<TagBrowsePanel tags={[]} activeTag={null} onPick={() => {}} />);
+    expect(screen.getByText(/Add tags to your books/i)).toBeInTheDocument();
+  });
+
+  it("renders each tag with its count and reports picks", async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    render(<TagBrowsePanel tags={tags} activeTag={null} onPick={onPick} />);
+
+    expect(screen.getByRole("button", { name: /^fiction/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /sci-fi/ }));
+    expect(onPick).toHaveBeenCalledWith("sci-fi");
+  });
+
+  it("filters tags by the search box (case-insensitive substring)", async () => {
+    const user = userEvent.setup();
+    render(<TagBrowsePanel tags={tags} activeTag={null} onPick={() => {}} />);
+
+    await user.type(screen.getByRole("textbox", { name: "Filter by tag" }), "SCI");
+    expect(screen.getByRole("button", { name: /sci-fi/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^fiction/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a no-match message when the query matches nothing", async () => {
+    const user = userEvent.setup();
+    render(<TagBrowsePanel tags={tags} activeTag={null} onPick={() => {}} />);
+    await user.type(screen.getByRole("textbox", { name: "Filter by tag" }), "zzz");
+    expect(screen.getByText(/No tags match/)).toBeInTheDocument();
+  });
+});
+
+describe("ActiveFilterBar", () => {
+  const handlers = {
+    onRemoveFacet: vi.fn(),
+    onRemoveTag: vi.fn(),
+    onClear: vi.fn(),
+    onSave: vi.fn(),
+  };
+
+  it("renders facet + tag chips and a pluralized count", () => {
+    render(<ActiveFilterBar facet="owned" tag="sci-fi" count={3} {...handlers} canSave />);
+    expect(screen.getByText("Owned")).toBeInTheDocument();
+    expect(screen.getByText("#sci-fi")).toBeInTheDocument();
+    expect(screen.getByText("→ 3 books")).toBeInTheDocument();
+  });
+
+  it("singularizes the count for one book", () => {
+    render(<ActiveFilterBar facet="owned" tag={null} count={1} {...handlers} canSave={false} />);
+    expect(screen.getByText("→ 1 book")).toBeInTheDocument();
+  });
+
+  it("hides the save button when canSave is false", () => {
+    render(<ActiveFilterBar facet="owned" tag={null} count={2} {...handlers} canSave={false} />);
+    expect(screen.queryByRole("button", { name: "Save as smart shelf" })).not.toBeInTheDocument();
+  });
+
+  it("wires the remove/clear/save actions", async () => {
+    const user = userEvent.setup();
+    const fns = {
+      onRemoveFacet: vi.fn(),
+      onRemoveTag: vi.fn(),
+      onClear: vi.fn(),
+      onSave: vi.fn(),
+    };
+    render(<ActiveFilterBar facet="owned" tag="sci-fi" count={2} {...fns} canSave />);
+
+    await user.click(screen.getByRole("button", { name: "Remove Owned filter" }));
+    expect(fns.onRemoveFacet).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Remove tag sci-fi filter" }));
+    expect(fns.onRemoveTag).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save as smart shelf" }));
+    expect(fns.onSave).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    expect(fns.onClear).toHaveBeenCalled();
+  });
+});
+
+describe("SmartShelvesGroup", () => {
+  it("renders nothing when there are no smart shelves", () => {
+    const { container } = render(
+      <SmartShelvesGroup shelves={[]} onApply={() => {}} onDelete={() => {}} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("applies and deletes a smart shelf via its buttons", async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    const onDelete = vi.fn();
+    const shelf = makeSmartShelf({ name: "Currently reading", count: 4 });
+    render(<SmartShelvesGroup shelves={[shelf]} onApply={onApply} onDelete={onDelete} />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Open smart shelf Currently reading (4 books)" }),
+    );
+    expect(onApply).toHaveBeenCalledWith(shelf);
+
+    await user.click(screen.getByRole("button", { name: "Delete smart shelf Currently reading" }));
+    expect(onDelete).toHaveBeenCalledWith(shelf);
+  });
+});

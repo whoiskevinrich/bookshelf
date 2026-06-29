@@ -1,0 +1,207 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Routes, Route } from "react-router-dom";
+import { renderWithProviders, makeEntry } from "../test/utils";
+import type { Shelf, ShelfEntry, TagCount } from "../lib/api-client";
+
+// AppHeader pulls in the auth context / Amplify; stub it out for page tests.
+vi.mock("../components/AppHeader", () => ({
+  AppHeader: () => <header data-testid="app-header" />,
+}));
+vi.mock("../lib/api-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/api-client")>();
+  return {
+    ...actual,
+    fetchShelfEntry: vi.fn(),
+    fetchShelves: vi.fn(),
+    fetchTags: vi.fn(),
+    updateShelfAttributes: vi.fn(),
+    updateShelfTags: vi.fn(),
+    updateShelfNotes: vi.fn(),
+  };
+});
+
+import {
+  fetchShelfEntry,
+  fetchShelves,
+  fetchTags,
+  updateShelfAttributes,
+  updateShelfTags,
+  updateShelfNotes,
+  ApiError,
+} from "../lib/api-client";
+import { BookDetailPage } from "./BookDetailPage";
+
+const ISBN = "9780441013593";
+const mockFetchEntry = vi.mocked(fetchShelfEntry);
+const mockFetchShelves = vi.mocked(fetchShelves);
+const mockFetchTags = vi.mocked(fetchTags);
+const mockUpdateAttrs = vi.mocked(updateShelfAttributes);
+const mockUpdateTags = vi.mocked(updateShelfTags);
+const mockUpdateNotes = vi.mocked(updateShelfNotes);
+
+function renderPage() {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/book/:isbn" element={<BookDetailPage />} />
+      <Route path="/shelf" element={<div>Library page</div>} />
+    </Routes>,
+    { routerEntries: [`/book/${ISBN}`] },
+  );
+}
+
+function resolveEntry(overrides: Partial<ShelfEntry> = {}) {
+  mockFetchEntry.mockResolvedValue(makeEntry({ isbn: ISBN, ...overrides }));
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Sensible defaults; individual tests override as needed.
+  mockFetchShelves.mockResolvedValue([] as Shelf[]);
+  mockFetchTags.mockResolvedValue([] as TagCount[]);
+});
+
+describe("BookDetailPage — load states", () => {
+  it("renders the book once loaded", async () => {
+    resolveEntry({
+      book: {
+        title: "Dune",
+        authors: ["Frank Herbert"],
+        coverUrl: null,
+        publishedYear: 1965,
+        description: "A desert planet epic.",
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Dune" })).toBeInTheDocument();
+    // Metadata line combines author + year (distinct from the cover fallback label).
+    expect(screen.getByText(/Frank Herbert · 1965/)).toBeInTheDocument();
+    expect(screen.getByText("A desert planet epic.")).toBeInTheDocument();
+    expect(screen.getByText(ISBN)).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe("Dune — Bookshelf"));
+  });
+
+  it("shows a not-found message (no retry) on a 4xx", async () => {
+    mockFetchEntry.mockRejectedValue(new ApiError(404, "not found"));
+    renderPage();
+
+    expect(
+      await screen.findByText("We couldn't find this book on your shelf."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to My Library" })).toBeInTheDocument();
+  });
+
+  it("shows a retryable error state on a non-4xx failure", async () => {
+    mockFetchEntry.mockRejectedValue(new Error("network down"));
+    renderPage();
+
+    expect(await screen.findByText("Couldn't load this book.")).toBeInTheDocument();
+  });
+
+  it("lists the custom shelves the book is on", async () => {
+    resolveEntry();
+    mockFetchShelves.mockResolvedValue([
+      { shelfId: "s1", name: "Favorites", createdAt: "", bookIds: [ISBN] },
+      { shelfId: "s2", name: "Elsewhere", createdAt: "", bookIds: ["other"] },
+    ]);
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    const link = await screen.findByRole("link", { name: "Favorites" });
+    expect(link).toHaveAttribute("href", "/shelves/s1");
+    expect(screen.queryByRole("link", { name: "Elsewhere" })).not.toBeInTheDocument();
+  });
+});
+
+describe("BookDetailPage — Your copy panel (#82)", () => {
+  it("reflects owned status and switches to want", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ owned: true, want: false });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN, owned: false, want: true }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    const ownedRadio = screen.getByRole("radio", { name: "Owned" });
+    expect(ownedRadio).toHaveAttribute("aria-checked", "true");
+
+    await user.click(screen.getByRole("radio", { name: "Want" }));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { want: true });
+  });
+
+  it("sets reading status", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ readingStatus: null });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN, readingStatus: "reading" }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("radio", { name: "Reading" }));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { readingStatus: "reading" });
+  });
+
+  it("adds a tag through the add form", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ tags: ["sci-fi"] });
+    mockUpdateTags.mockResolvedValue(makeEntry({ isbn: ISBN, tags: ["fantasy", "sci-fi"] }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.type(screen.getByRole("textbox", { name: "Add a tag" }), "fantasy");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(mockUpdateTags).toHaveBeenCalledWith(ISBN, ["sci-fi", "fantasy"]);
+  });
+
+  it("removes a tag via its chip button", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ tags: ["sci-fi", "fantasy"] });
+    mockUpdateTags.mockResolvedValue(makeEntry({ isbn: ISBN, tags: ["fantasy"] }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("button", { name: "Remove tag sci-fi" }));
+    expect(mockUpdateTags).toHaveBeenCalledWith(ISBN, ["fantasy"]);
+  });
+
+  it("hides the add form and shows the limit message at 25 tags", async () => {
+    const tags = Array.from({ length: 25 }, (_, i) => `tag-${i}`);
+    resolveEntry({ tags });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getByText(/reached the 25-tag limit/)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Add a tag" })).not.toBeInTheDocument();
+  });
+
+  it("offers tag suggestions from the library and adds on click", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ tags: [] });
+    mockFetchTags.mockResolvedValue([
+      { tag: "fantasy", count: 3 },
+      { tag: "history", count: 1 },
+    ]);
+    mockUpdateTags.mockResolvedValue(makeEntry({ isbn: ISBN, tags: ["fantasy"] }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    const suggestion = await screen.findByRole("button", { name: "+ fantasy" });
+    await user.click(suggestion);
+    expect(mockUpdateTags).toHaveBeenCalledWith(ISBN, ["fantasy"]);
+  });
+
+  it("saves notes on blur", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ notes: null });
+    mockUpdateNotes.mockResolvedValue(makeEntry({ isbn: ISBN, notes: "Great read" }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    const notes = screen.getByLabelText("Notes");
+    await user.type(notes, "Great read");
+    await user.tab(); // blur
+
+    await waitFor(() => expect(mockUpdateNotes).toHaveBeenCalledWith(ISBN, "Great read"));
+  });
+});
