@@ -7,6 +7,8 @@ import { shelvesRouter } from "./routes/shelves.js";
 import { usersRouter } from "./routes/users.js";
 import { eventsRouter } from "./routes/events.js";
 import { scanRouter } from "./routes/scan.js";
+import { tagsRouter } from "./routes/tags.js";
+import { smartShelvesRouter } from "./routes/smart-shelves.js";
 
 /**
  * Shared Hono app instance — used by both the Lambda handler (index.ts)
@@ -49,6 +51,8 @@ app.route("/v1/shelves", shelvesRouter);
 app.route("/v1/users", usersRouter);
 app.route("/v1/events", eventsRouter);
 app.route("/v1/scan", scanRouter);
+app.route("/v1/tags", tagsRouter);
+app.route("/v1/smart-shelves", smartShelvesRouter);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 app.onError((err, c) => {

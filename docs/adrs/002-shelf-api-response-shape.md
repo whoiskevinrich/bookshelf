@@ -1,5 +1,13 @@
 # ADR-002: Shelf API Response Shape — Paginated Inline Book Metadata
 
+> **Amended by [ADR-019](019-book-attributes-tags-auto-shelves.md) (2026-06-28).** Each
+> entry's `status` enum is superseded by independent `owned` / `want` / `readingStatus`
+> attributes plus a `tags` string array, all returned inline (preserving the
+> single-call / MCP-inline property this ADR establishes). `status` is still emitted as
+> a **derived, deprecated** field for one transition release, then removed. The
+> paginated envelope (`entries` / `nextCursor` / `total`) and cursor semantics below are
+> unchanged.
+
 **Status:** Accepted  
 **Date:** 2026-05-15  
 **Deciders:** Solo developer  

@@ -12,6 +12,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "validate:covers": "node --import tsx/esm scripts/validate-covers.ts",
     "migrate:isbn13": "node --import tsx/esm scripts/migrate-isbn10-to-13.ts",
+    "migrate:attributes": "node --import tsx/esm scripts/migrate-status-to-attributes.ts",
     "test:coverage": "vitest run --coverage",
     "dev": "tsx watch src/server.ts",
     "db:seed": "node --env-file=.env.local --import tsx/esm scripts/seed-local.ts"

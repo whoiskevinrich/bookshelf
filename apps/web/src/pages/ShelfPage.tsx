@@ -4,11 +4,29 @@ import { AppHeader } from "../components/AppHeader";
 import { inputClass } from "../lib/form-styles";
 import {
   useShelf,
+  useFilteredShelf,
   useAddToShelf,
   useMoveShelfEntry,
   useRemoveFromShelf,
   flattenShelf,
 } from "../hooks/useShelf";
+import { useTags } from "../hooks/useBookEntry";
+import {
+  useSmartShelves,
+  useCreateSmartShelf,
+  useDeleteSmartShelf,
+} from "../hooks/useSmartShelves";
+import {
+  FacetBar,
+  TagBrowsePanel,
+  ActiveFilterBar,
+  SmartShelvesGroup,
+  buildFilter,
+  ruleToActive,
+  facetLabel,
+  type SystemFacet,
+} from "../components/shelf/ShelfFilterControls";
+import type { SmartShelfWithCount } from "../lib/api-client";
 import {
   useShelves,
   useCreateShelf,
@@ -20,12 +38,11 @@ import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
-import { ShelfNameEditor } from "../components/shelf/ShelfNameEditor";
-import { DeleteShelfDialog } from "../components/shelf/DeleteShelfDialog";
 import { MobileScanHint } from "../components/shelf/MobileScanHint";
 import { useHorizontalScrollOnWheel } from "../hooks/useHorizontalScrollOnWheel";
 import { BookSearch } from "../components/BookSearch";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ScanModal } from "../components/scanner/ScanModal";
 import { supportsCameraScan } from "../lib/device";
 import { getRuntimeConfig } from "../lib/runtime-config";
@@ -70,60 +87,42 @@ function ChevronRightIcon() {
 }
 
 function SectionHeader({
-  shelfId,
   title,
   count,
-  onDelete,
   onNavigate,
   onDragStart,
   onDragEnd,
 }: {
-  shelfId?: string;
   title: string;
   count: number;
-  onDelete?: () => void;
   onNavigate?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
 }) {
+  const titleClass =
+    "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 shrink-0";
   return (
     <div className="flex items-center gap-3 mb-4">
       {onDragStart && <DragHandle draggable onDragStart={onDragStart} onDragEnd={onDragEnd} />}
-      {shelfId ? (
-        <ShelfNameEditor
-          shelfId={shelfId}
-          name={title}
-          className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400"
-        />
+      {/* The title itself navigates to the shelf detail — users reach for it before
+          a chevron (QA feedback); rename/delete live on the detail page. */}
+      {onNavigate ? (
+        <button
+          type="button"
+          onClick={onNavigate}
+          aria-label={`Open shelf ${title}`}
+          className={`group/sh flex items-center gap-1 rounded ${titleClass} hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300 transition-colors`}
+        >
+          <span className="group-hover/sh:underline">{title}</span>
+          <ChevronRightIcon />
+        </button>
       ) : (
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 shrink-0">
-          {title}
-        </h2>
+        <h2 className={titleClass}>{title}</h2>
       )}
       <span className="flex-1 h-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
       <span className="text-xs text-slate-500 dark:text-zinc-400 bg-slate-200 dark:bg-slate-800 rounded-full px-2 py-0.5">
         {count}
       </span>
-      {onNavigate && (
-        <button
-          type="button"
-          onClick={onNavigate}
-          aria-label={`Open shelf ${title}`}
-          className="shrink-0 p-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300 transition-colors"
-        >
-          <ChevronRightIcon />
-        </button>
-      )}
-      {onDelete && (
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={onDelete}
-          aria-label={`Delete shelf ${title}`}
-        >
-          Delete shelf
-        </Button>
-      )}
     </div>
   );
 }
@@ -166,10 +165,58 @@ function CreateShelfForm({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Save smart shelf inline form ────────────────────────────────────────────
+
+function SaveSmartShelfForm({
+  defaultName,
+  onSave,
+  onCancel,
+  isPending,
+  error,
+}: {
+  defaultName: string;
+  onSave: (name: string) => void;
+  onCancel: () => void;
+  isPending: boolean;
+  error: string | null;
+}) {
+  const [name, setName] = useState(defaultName);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name.trim()) onSave(name.trim());
+      }}
+      className="space-y-2 rounded-xl border border-slate-100 dark:border-slate-700 p-4"
+    >
+      <label htmlFor="smart-shelf-name" className="text-xs text-slate-500 dark:text-slate-400">
+        Name this smart shelf — it updates automatically as your books change.
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          id="smart-shelf-name"
+          autoFocus
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={100}
+          className={`flex-1 text-sm ${inputClass}`}
+        />
+        <Button type="submit" variant="app" size="sm" disabled={!name.trim() || isPending}>
+          {isPending ? "Saving…" : "Save"}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+      {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+    </form>
+  );
+}
+
 // ── Shelf section ──────────────────────────────────────────────────────────
 
 interface ShelfSectionProps {
-  shelfId?: string;
   title: string;
   entries: ShelfEntry[];
   emptyMessage: string;
@@ -178,7 +225,6 @@ interface ShelfSectionProps {
   removeMutation: ReturnType<typeof useRemoveFromShelf>;
   addToShelfMutation: ReturnType<typeof useAddBookToShelf>;
   removeFromShelfMutation: ReturnType<typeof useRemoveBookFromShelf>;
-  onDelete?: () => void;
   onNavigate?: () => void;
   // Drag-and-drop
   onDragStart?: (e: React.DragEvent) => void;
@@ -190,7 +236,6 @@ interface ShelfSectionProps {
 }
 
 function ShelfSection({
-  shelfId,
   title,
   entries,
   emptyMessage,
@@ -199,7 +244,6 @@ function ShelfSection({
   removeMutation,
   addToShelfMutation,
   removeFromShelfMutation,
-  onDelete,
   onNavigate,
   onDragStart,
   onDragEnd,
@@ -226,8 +270,6 @@ function ShelfSection({
       <SectionHeader
         title={title}
         count={entries.length}
-        {...(shelfId ? { shelfId } : {})}
-        {...(onDelete ? { onDelete } : {})}
         {...(onNavigate ? { onNavigate } : {})}
         {...(onDragStart ? { onDragStart } : {})}
         {...(onDragEnd ? { onDragEnd } : {})}
@@ -286,7 +328,6 @@ export function ShelfPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [showCreateShelf, setShowCreateShelf] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [deletingShelf, setDeletingShelf] = useState<Shelf | null>(null);
   const searchPanelRef = useRef<HTMLDivElement>(null);
 
   // Show the Scan button only where it makes sense: the feature is enabled for
@@ -301,6 +342,24 @@ export function ShelfPage() {
   const addToShelfMutation = useAddBookToShelf();
   const removeFromShelfMutation = useRemoveBookFromShelf();
   const reorderMutation = useReorderShelves();
+
+  // Phase 3 — system-facet/tag filtering + smart shelves (ADR-019).
+  const [facet, setFacet] = useState<SystemFacet | null>(null);
+  const [tag, setTag] = useState<string | null>(null);
+  const [showBrowse, setShowBrowse] = useState(false);
+  const [showSaveSmart, setShowSaveSmart] = useState(false);
+  const [smartShelfToDelete, setSmartShelfToDelete] = useState<SmartShelfWithCount | null>(null);
+
+  const activeFilter = useMemo(() => buildFilter(facet, tag), [facet, tag]);
+  const isFiltered = activeFilter !== null;
+
+  const filteredQuery = useFilteredShelf(activeFilter);
+  // Only fetch the tag list once the browse panel is opened (it's the sole consumer
+  // here) — avoids a full entry scan on every shelf load.
+  const tagsQuery = useTags(showBrowse);
+  const smartShelvesQuery = useSmartShelves();
+  const createSmartShelf = useCreateSmartShelf();
+  const deleteSmartShelf = useDeleteSmartShelf();
 
   const isLoading = shelfQuery.isLoading || shelvesQuery.isLoading;
   const isError = shelfQuery.isError || shelvesQuery.isError;
@@ -375,6 +434,28 @@ export function ShelfPage() {
     addMutation.mutate({ isbn, status, book });
     setShowSearch(false);
   }
+
+  function clearFilter() {
+    setFacet(null);
+    setTag(null);
+    setShowSaveSmart(false);
+  }
+
+  function applySmartShelf(shelf: SmartShelfWithCount) {
+    const a = ruleToActive(shelf.rule);
+    setFacet(a.facet);
+    setTag(a.tag);
+    setShowBrowse(false);
+    setShowSaveSmart(false);
+  }
+
+  function handleDeleteSmartShelf(shelf: SmartShelfWithCount) {
+    setSmartShelfToDelete(shelf);
+  }
+
+  const smartShelfDefaultName = [facet ? facetLabel(facet) : null, tag ? `#${tag}` : null]
+    .filter(Boolean)
+    .join(" · ");
 
   function handleDragStart(idx: number) {
     setDraggingIdx(idx);
@@ -493,55 +574,141 @@ export function ShelfPage() {
             {isEmpty ? (
               <ShelfEmptyState onAdd={() => setShowSearch(true)} />
             ) : (
-              <div className="space-y-10">
-                {namedShelfEntries.map(({ shelf, entries }, idx) => (
-                  <ShelfSection
-                    key={shelf.shelfId}
-                    shelfId={shelf.shelfId}
-                    title={shelf.name}
-                    entries={entries}
-                    emptyMessage="No books on this shelf yet — add books and use the Shelves button to assign them."
-                    shelves={orderedShelves}
-                    moveMutation={moveMutation}
-                    removeMutation={removeMutation}
-                    addToShelfMutation={addToShelfMutation}
-                    removeFromShelfMutation={removeFromShelfMutation}
-                    onDelete={() => setDeletingShelf(shelf)}
-                    onNavigate={() => navigate(`/shelves/${shelf.shelfId}`)}
-                    onDragStart={(e) => {
-                      e.dataTransfer.effectAllowed = "move";
-                      handleDragStart(idx);
-                    }}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={(e) => handleDragOver(idx, e)}
-                    onDrop={() => handleDrop(idx)}
-                    isDragging={draggingIdx === idx}
-                    isDropTarget={dropTargetIdx === idx && draggingIdx !== idx}
-                  />
-                ))}
-
-                {(unshelved.length > 0 || namedShelfEntries.length === 0) && (
-                  <ShelfSection
-                    title={namedShelfEntries.length > 0 ? "Unshelved" : "All books"}
-                    entries={unshelved}
-                    emptyMessage="No books yet — add one above!"
-                    shelves={orderedShelves}
-                    moveMutation={moveMutation}
-                    removeMutation={removeMutation}
-                    addToShelfMutation={addToShelfMutation}
-                    removeFromShelfMutation={removeFromShelfMutation}
-                  />
-                )}
-
-                {shelfQuery.hasNextPage && (
-                  <div className="text-center">
-                    <Button
-                      variant="ghost"
-                      onClick={() => void shelfQuery.fetchNextPage()}
-                      disabled={shelfQuery.isFetchingNextPage}
-                    >
-                      {shelfQuery.isFetchingNextPage ? "Loading more…" : "Load more"}
+              <div className="space-y-6">
+                {/* Filter controls (Phase 3) */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <FacetBar facet={facet} onSelect={setFacet} />
+                    <Button variant="ghost" size="sm" onClick={() => setShowBrowse((v) => !v)}>
+                      {showBrowse ? "Close" : "Browse tags"}
                     </Button>
+                  </div>
+                  {showBrowse && (
+                    <TagBrowsePanel
+                      tags={tagsQuery.data ?? []}
+                      activeTag={tag}
+                      onPick={(t) => {
+                        setTag(t);
+                        setShowBrowse(false);
+                      }}
+                    />
+                  )}
+                </div>
+
+                {isFiltered ? (
+                  <div className="space-y-4">
+                    <ActiveFilterBar
+                      facet={facet}
+                      tag={tag}
+                      count={filteredQuery.data?.total ?? filteredQuery.data?.entries.length ?? 0}
+                      onRemoveFacet={() => setFacet(null)}
+                      onRemoveTag={() => setTag(null)}
+                      onClear={clearFilter}
+                      onSave={() => setShowSaveSmart(true)}
+                      canSave={!showSaveSmart}
+                    />
+                    {showSaveSmart && (
+                      <SaveSmartShelfForm
+                        defaultName={smartShelfDefaultName}
+                        isPending={createSmartShelf.isPending}
+                        error={
+                          createSmartShelf.isError
+                            ? (createSmartShelf.error as Error).message
+                            : null
+                        }
+                        onCancel={() => setShowSaveSmart(false)}
+                        onSave={(name) => {
+                          if (!activeFilter) return;
+                          createSmartShelf.mutate(
+                            { name, rule: activeFilter },
+                            { onSuccess: () => setShowSaveSmart(false) },
+                          );
+                        }}
+                      />
+                    )}
+                    {filteredQuery.isLoading ? (
+                      <ShelfSkeleton sections={1} />
+                    ) : (filteredQuery.data?.entries.length ?? 0) > 0 ? (
+                      <div className="flex flex-wrap gap-4">
+                        {filteredQuery.data!.entries.map((entry, index) => (
+                          <ShelfBookCard
+                            key={entry.isbn}
+                            entry={entry}
+                            shelves={orderedShelves}
+                            staggerIndex={index}
+                            onMove={(isbn, status) => moveMutation.mutate({ isbn, status })}
+                            onRemove={(isbn) => removeMutation.mutate(isbn)}
+                            onAddToShelf={(shelfId, isbn) =>
+                              addToShelfMutation.mutate({ shelfId, isbn })
+                            }
+                            onRemoveFromShelf={(shelfId, isbn) =>
+                              removeFromShelfMutation.mutate({ shelfId, isbn })
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        No books match this filter.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-10">
+                    <SmartShelvesGroup
+                      shelves={smartShelvesQuery.data ?? []}
+                      onApply={applySmartShelf}
+                      onDelete={handleDeleteSmartShelf}
+                    />
+
+                    {namedShelfEntries.map(({ shelf, entries }, idx) => (
+                      <ShelfSection
+                        key={shelf.shelfId}
+                        title={shelf.name}
+                        entries={entries}
+                        emptyMessage="No books on this shelf yet — add books from your library and use the Shelves button to assign them."
+                        shelves={orderedShelves}
+                        moveMutation={moveMutation}
+                        removeMutation={removeMutation}
+                        addToShelfMutation={addToShelfMutation}
+                        removeFromShelfMutation={removeFromShelfMutation}
+                        onNavigate={() => navigate(`/shelves/${shelf.shelfId}`)}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          handleDragStart(idx);
+                        }}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(idx, e)}
+                        onDrop={() => handleDrop(idx)}
+                        isDragging={draggingIdx === idx}
+                        isDropTarget={dropTargetIdx === idx && draggingIdx !== idx}
+                      />
+                    ))}
+
+                    {(unshelved.length > 0 || namedShelfEntries.length === 0) && (
+                      <ShelfSection
+                        title={namedShelfEntries.length > 0 ? "Unshelved" : "All books"}
+                        entries={unshelved}
+                        emptyMessage="No books yet — add one above!"
+                        shelves={orderedShelves}
+                        moveMutation={moveMutation}
+                        removeMutation={removeMutation}
+                        addToShelfMutation={addToShelfMutation}
+                        removeFromShelfMutation={removeFromShelfMutation}
+                      />
+                    )}
+
+                    {shelfQuery.hasNextPage && (
+                      <div className="text-center">
+                        <Button
+                          variant="ghost"
+                          onClick={() => void shelfQuery.fetchNextPage()}
+                          disabled={shelfQuery.isFetchingNextPage}
+                        >
+                          {shelfQuery.isFetchingNextPage ? "Loading more…" : "Load more"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -550,14 +717,21 @@ export function ShelfPage() {
         )}
       </main>
 
-      {deletingShelf && (
-        <DeleteShelfDialog
-          shelf={deletingShelf}
-          open={true}
-          onClose={() => setDeletingShelf(null)}
-          onDeleted={() => setDeletingShelf(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={smartShelfToDelete !== null}
+        title={`Delete “${smartShelfToDelete?.name ?? ""}”?`}
+        message="This removes the saved smart shelf (the filter rule). Your books are untouched."
+        confirmLabel="Delete smart shelf"
+        destructive
+        pending={deleteSmartShelf.isPending}
+        onConfirm={() => {
+          if (!smartShelfToDelete) return;
+          deleteSmartShelf.mutate(smartShelfToDelete.smartShelfId, {
+            onSettled: () => setSmartShelfToDelete(null),
+          });
+        }}
+        onClose={() => setSmartShelfToDelete(null)}
+      />
     </div>
   );
 }

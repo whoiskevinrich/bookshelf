@@ -33,6 +33,21 @@ export function isValidStatus(s: unknown): s is ShelfStatus {
   return s === "owned" || s === "want";
 }
 
+export type ReadingStatus = "unread" | "reading" | "finished";
+
+export function isValidReadingStatus(s: unknown): s is ReadingStatus {
+  return s === "unread" || s === "reading" || s === "finished";
+}
+
+/**
+ * The deprecated `status` enum derived from the `owned` attribute (ADR-019):
+ * owned → "owned", otherwise "want". Emitted for one transition release so legacy
+ * clients keep working; removed once the web client migrates (ADR-019 action item 8).
+ */
+export function derivedStatus(owned: boolean): ShelfStatus {
+  return owned ? "owned" : "want";
+}
+
 function userPk(userId: string): string {
   return `USER#${userId}`;
 }
@@ -49,6 +64,10 @@ function shelfMemberSk(shelfId: string, isbn: string): string {
   return `SMEMBER#${shelfId}#${isbn}`;
 }
 
+function smartShelfSk(smartShelfId: string): string {
+  return `SMARTSHELF#${smartShelfId}`;
+}
+
 function bookPk(isbn: string): string {
   return `BOOK#${isbn}`;
 }
@@ -59,9 +78,40 @@ const BOOK_SK = "METADATA";
 
 export interface ShelfEntry {
   isbn: string;
-  status: ShelfStatus;
+  /** Independent attribute (ADR-019). Was the `status === "owned"` enum branch. */
+  owned: boolean;
+  /** Independent attribute (ADR-019). Was the `status === "want"` enum branch. */
+  want: boolean;
+  readingStatus: ReadingStatus | null;
+  /** Normalized tags (ADR-019). Always present; empty when the entry has none. */
+  tags: string[];
   addedAt: string;
   notes: string | null;
+  /** @deprecated Derived from `owned`/`want` for one transition release (ADR-019). */
+  status: ShelfStatus;
+}
+
+/** Attributes accepted when creating a new entry. At least one of owned/want is true. */
+export interface NewEntryAttributes {
+  owned: boolean;
+  want: boolean;
+  readingStatus?: ReadingStatus | null;
+}
+
+/** Partial attribute update for an existing entry; only present fields are written. */
+export interface EntryAttributePatch {
+  owned?: boolean;
+  want?: boolean;
+  readingStatus?: ReadingStatus | null;
+}
+
+/** In-memory filter applied to the user's entries (ADR-019 — no GSI). */
+export interface EntryFilter {
+  owned?: boolean;
+  want?: boolean;
+  readingStatus?: ReadingStatus;
+  /** Normalized tag the entry must carry. */
+  tag?: string;
 }
 
 export interface BookMetadata {
@@ -95,12 +145,37 @@ const num = (v: unknown): number | null => (v != null ? Number(v) : null);
 
 // ── Item mappers ───────────────────────────────────────────────────────────
 
+/** Normalize a tag: trim, lowercase, collapse internal whitespace (Q2 anti-duplication). */
+export function normalizeTag(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Coerce a stored tags attribute (DynamoDB String Set → JS Set, or array) to a sorted string[]. */
+function toTags(v: unknown): string[] {
+  if (v instanceof Set) return [...(v as Set<string>)].sort();
+  if (Array.isArray(v)) return (v as unknown[]).map(String).sort();
+  return [];
+}
+
 function toShelfEntry(item: Record<string, unknown>): ShelfEntry {
+  // Dual-read (ADR-019): migrated items carry `owned`/`want` booleans; legacy
+  // items carry only the `status` enum. Derive from whichever is present so the
+  // API is correct before, during, and after the backfill.
+  const hasNewFields = item["owned"] !== undefined || item["want"] !== undefined;
+  const legacyStatus = item["status"];
+  const owned = hasNewFields ? Boolean(item["owned"]) : legacyStatus === "owned";
+  const want = hasNewFields ? Boolean(item["want"]) : legacyStatus === "want";
+  const readingStatus = isValidReadingStatus(item["readingStatus"]) ? item["readingStatus"] : null;
+
   return {
     isbn: String(item["isbn"]),
-    status: String(item["status"]) as ShelfStatus,
+    owned,
+    want,
+    readingStatus,
+    tags: toTags(item["tags"]),
     addedAt: String(item["addedAt"]),
     notes: str(item["notes"]),
+    status: derivedStatus(owned),
   };
 }
 
@@ -159,7 +234,7 @@ export function decodeCursor(cursor: string): Record<string, NativeAttributeValu
 
 export interface QueryBookEntriesOptions {
   userId: string;
-  status?: ShelfStatus;
+  filter?: EntryFilter;
   cursor?: string;
   limit?: number;
 }
@@ -168,6 +243,27 @@ export interface QueryBookEntriesResult {
   entries: ShelfEntryWithBook[];
   nextCursor: string | null;
   total: number;
+}
+
+/** True when the entry satisfies every present field of the filter. */
+export function matchesFilter(entry: ShelfEntry, filter: EntryFilter): boolean {
+  if (filter.owned !== undefined && entry.owned !== filter.owned) return false;
+  if (filter.want !== undefined && entry.want !== filter.want) return false;
+  if (filter.readingStatus !== undefined && entry.readingStatus !== filter.readingStatus) {
+    return false;
+  }
+  if (filter.tag !== undefined && !entry.tags.includes(filter.tag)) return false;
+  return true;
+}
+
+function hasAnyFilter(filter?: EntryFilter): filter is EntryFilter {
+  return (
+    filter !== undefined &&
+    (filter.owned !== undefined ||
+      filter.want !== undefined ||
+      filter.readingStatus !== undefined ||
+      filter.tag !== undefined)
+  );
 }
 
 async function fetchBookMetadataMap(isbns: string[]): Promise<Record<string, BookMetadata>> {
@@ -189,8 +285,8 @@ export async function queryBookEntries(
   const limit = Math.min(opts.limit ?? 20, 100);
   const pk = userPk(opts.userId);
 
-  // Without status filter: use DynamoDB-native pagination with cursor
-  if (!opts.status) {
+  // Unfiltered: DynamoDB-native cursor pagination (bounded response for large shelves).
+  if (!hasAnyFilter(opts.filter)) {
     const baseQuery = {
       TableName: TABLE_NAME,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
@@ -218,8 +314,12 @@ export async function queryBookEntries(
     };
   }
 
-  // With status filter: loop through all DynamoDB pages to ensure completeness.
+  // Filtered: loop all pages, then filter in memory on the *derived* attributes
+  // (ADR-019). A server-side FilterExpression on `owned`/`want` would miss legacy
+  // un-migrated items that still carry only the `status` enum; filtering after
+  // toShelfEntry's dual-read keeps results correct across the migration window.
   // Filtered queries return all matching items at once (no cursor pagination).
+  const filter = opts.filter;
   const allItems: Record<string, unknown>[] = [];
   let lastKey: Record<string, NativeAttributeValue> | undefined;
   do {
@@ -227,9 +327,7 @@ export async function queryBookEntries(
       new QueryCommand({
         TableName: TABLE_NAME,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
-        FilterExpression: "#status = :status",
-        ExpressionAttributeNames: { "#status": "status" },
-        ExpressionAttributeValues: { ":pk": pk, ":prefix": "ENTRY#", ":status": opts.status },
+        ExpressionAttributeValues: { ":pk": pk, ":prefix": "ENTRY#" },
         ExclusiveStartKey: lastKey,
       }),
     );
@@ -237,7 +335,7 @@ export async function queryBookEntries(
     lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
   } while (lastKey);
 
-  const entries = allItems.map(toShelfEntry);
+  const entries = allItems.map(toShelfEntry).filter((e) => matchesFilter(e, filter));
   const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
 
   return {
@@ -260,30 +358,66 @@ export async function getBookEntry(userId: string, isbn: string): Promise<ShelfE
 export async function putBookEntry(
   userId: string,
   isbn: string,
-  status: ShelfStatus,
+  attrs: NewEntryAttributes,
   addedAt: string,
 ): Promise<void> {
   await dynamo().send(
     new PutCommand({
       TableName: TABLE_NAME,
-      Item: { PK: userPk(userId), SK: entrySk(isbn), isbn, status, addedAt, notes: null },
+      Item: {
+        PK: userPk(userId),
+        SK: entrySk(isbn),
+        isbn,
+        owned: attrs.owned,
+        want: attrs.want,
+        readingStatus: attrs.readingStatus ?? null,
+        addedAt,
+        notes: null,
+      },
       ConditionExpression: "attribute_not_exists(PK)",
     }),
   );
 }
 
-export async function updateBookEntryStatus(
+/**
+ * Apply a partial attribute update (owned / want / readingStatus). Only the
+ * fields present in `patch` are written; `readingStatus: null` is stored as NULL
+ * (consistent with create), not removed. No-op if `patch` is empty.
+ */
+export async function updateBookEntryAttributes(
   userId: string,
   isbn: string,
-  newStatus: ShelfStatus,
+  patch: EntryAttributePatch,
 ): Promise<void> {
+  const sets: string[] = [];
+  const names: Record<string, string> = {};
+  const values: Record<string, NativeAttributeValue> = {};
+
+  if (patch.owned !== undefined) {
+    sets.push("#owned = :owned");
+    names["#owned"] = "owned";
+    values[":owned"] = patch.owned;
+  }
+  if (patch.want !== undefined) {
+    sets.push("#want = :want");
+    names["#want"] = "want";
+    values[":want"] = patch.want;
+  }
+  if (patch.readingStatus !== undefined) {
+    sets.push("#readingStatus = :readingStatus");
+    names["#readingStatus"] = "readingStatus";
+    values[":readingStatus"] = patch.readingStatus;
+  }
+
+  if (sets.length === 0) return;
+
   await dynamo().send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { PK: userPk(userId), SK: entrySk(isbn) },
-      UpdateExpression: "SET #status = :status",
-      ExpressionAttributeNames: { "#status": "status" },
-      ExpressionAttributeValues: { ":status": newStatus },
+      UpdateExpression: "SET " + sets.join(", "),
+      ExpressionAttributeNames: names,
+      ExpressionAttributeValues: values,
       ConditionExpression: "attribute_exists(PK)",
     }),
   );
@@ -303,6 +437,71 @@ export async function updateBookEntryNotes(
       ConditionExpression: "attribute_exists(PK)",
     }),
   );
+}
+
+/**
+ * Replace an entry's tag set (ADR-019). Caller passes the full normalized list.
+ * An empty list **removes** the `tags` attribute — DynamoDB cannot store an empty
+ * String Set, so we must `REMOVE` rather than write `new Set([])`.
+ */
+export async function updateBookEntryTags(
+  userId: string,
+  isbn: string,
+  tags: string[],
+): Promise<void> {
+  const base = {
+    TableName: TABLE_NAME,
+    Key: { PK: userPk(userId), SK: entrySk(isbn) },
+    ConditionExpression: "attribute_exists(PK)",
+  };
+  if (tags.length === 0) {
+    await dynamo().send(new UpdateCommand({ ...base, UpdateExpression: "REMOVE tags" }));
+    return;
+  }
+  await dynamo().send(
+    new UpdateCommand({
+      ...base,
+      UpdateExpression: "SET tags = :tags",
+      // A JS Set marshals to a DynamoDB String Set (SS) via the Document client.
+      ExpressionAttributeValues: { ":tags": new Set(tags) },
+    }),
+  );
+}
+
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+/**
+ * The user's distinct tags with usage counts, derived by scanning their `ENTRY#`
+ * items (ADR-019 — no separate tag registry). Sorted by count desc, then alpha.
+ * Stored tags are already normalized at the write boundary, so no re-normalization.
+ */
+export async function queryDistinctTags(userId: string): Promise<TagCount[]> {
+  const counts = new Map<string, number>();
+  let lastKey: Record<string, NativeAttributeValue> | undefined;
+  do {
+    const result = await dynamo().send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+        ExpressionAttributeValues: { ":pk": userPk(userId), ":prefix": "ENTRY#" },
+        ProjectionExpression: "tags",
+        ExclusiveStartKey: lastKey,
+      }),
+    );
+    for (const item of (result.Items ?? []) as Record<string, unknown>[]) {
+      for (const tag of toTags(item["tags"])) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
+  } while (lastKey);
+
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }
 
 export async function deleteBookEntry(userId: string, isbn: string): Promise<void> {
@@ -597,6 +796,139 @@ export async function putBookMetadata(
     new PutCommand({
       TableName: TABLE_NAME,
       Item: { PK: bookPk(isbn), SK: BOOK_SK, isbn, ...metadata, cachedAt },
+    }),
+  );
+}
+
+// ── Smart shelves (SMARTSHELF#<id>) — saved filter rules (ADR-019 §2) ────────
+
+/** A saved filter rule. Same shape as the in-memory {@link EntryFilter}. */
+export type SmartShelfRule = EntryFilter;
+
+export interface SmartShelf {
+  smartShelfId: string;
+  name: string;
+  rule: SmartShelfRule;
+  createdAt: string;
+}
+
+export interface SmartShelfWithCount extends SmartShelf {
+  /** Live count of entries matching the rule. */
+  count: number;
+}
+
+function toSmartShelf(item: Record<string, unknown>): SmartShelf {
+  return {
+    smartShelfId: String(item["smartShelfId"]),
+    name: String(item["name"]),
+    rule: (item["rule"] ?? {}) as SmartShelfRule,
+    createdAt: String(item["createdAt"]),
+  };
+}
+
+/** All of the user's `ENTRY#` items mapped to {@link ShelfEntry} (no book metadata). */
+export async function queryAllEntries(userId: string): Promise<ShelfEntry[]> {
+  const entries: ShelfEntry[] = [];
+  let lastKey: Record<string, NativeAttributeValue> | undefined;
+  do {
+    const result = await dynamo().send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+        ExpressionAttributeValues: { ":pk": userPk(userId), ":prefix": "ENTRY#" },
+        ExclusiveStartKey: lastKey,
+      }),
+    );
+    for (const item of (result.Items ?? []) as Record<string, unknown>[]) {
+      entries.push(toShelfEntry(item));
+    }
+    lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
+  } while (lastKey);
+  return entries;
+}
+
+export async function querySmartShelves(userId: string): Promise<SmartShelf[]> {
+  const result = await dynamo().send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+      ExpressionAttributeValues: { ":pk": userPk(userId), ":prefix": "SMARTSHELF#" },
+    }),
+  );
+  return (result.Items ?? [])
+    .map((i) => toSmartShelf(i as Record<string, unknown>))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** List smart shelves with a live match count, computed from a single entry scan. */
+export async function querySmartShelvesWithCounts(userId: string): Promise<SmartShelfWithCount[]> {
+  const shelves = await querySmartShelves(userId);
+  // Skip the full entry scan entirely when there are no rules to evaluate.
+  if (shelves.length === 0) return [];
+  const entries = await queryAllEntries(userId);
+  return shelves.map((s) => ({
+    ...s,
+    count: entries.filter((e) => matchesFilter(e, s.rule)).length,
+  }));
+}
+
+export async function getSmartShelf(
+  userId: string,
+  smartShelfId: string,
+): Promise<SmartShelf | null> {
+  const result = await dynamo().send(
+    new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: smartShelfSk(smartShelfId) },
+    }),
+  );
+  return result.Item ? toSmartShelf(result.Item as Record<string, unknown>) : null;
+}
+
+export async function putSmartShelf(
+  userId: string,
+  smartShelfId: string,
+  name: string,
+  rule: SmartShelfRule,
+  createdAt: string,
+): Promise<void> {
+  await dynamo().send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        PK: userPk(userId),
+        SK: smartShelfSk(smartShelfId),
+        smartShelfId,
+        name,
+        rule,
+        createdAt,
+      },
+    }),
+  );
+}
+
+export async function updateSmartShelfName(
+  userId: string,
+  smartShelfId: string,
+  name: string,
+): Promise<void> {
+  await dynamo().send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: smartShelfSk(smartShelfId) },
+      UpdateExpression: "SET #name = :name",
+      ExpressionAttributeNames: { "#name": "name" },
+      ExpressionAttributeValues: { ":name": name },
+      ConditionExpression: "attribute_exists(PK)",
+    }),
+  );
+}
+
+export async function deleteSmartShelf(userId: string, smartShelfId: string): Promise<void> {
+  await dynamo().send(
+    new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: userPk(userId), SK: smartShelfSk(smartShelfId) },
     }),
   );
 }

@@ -9,7 +9,7 @@ import { Footer } from "./components/Footer";
 import { AboutPage } from "./pages/AboutPage";
 import { ShelfPage } from "./pages/ShelfPage";
 import { SingleShelfPage } from "./pages/SingleShelfPage";
-import { WishlistPage } from "./pages/WishlistPage";
+import { BookDetailPage } from "./pages/BookDetailPage";
 import { AccountSettingsPage } from "./pages/account/AccountSettingsPage";
 import { ChangePasswordPage } from "./pages/account/ChangePasswordPage";
 import { DeleteAccountPage } from "./pages/account/DeleteAccountPage";
@@ -79,10 +79,10 @@ export function App() {
                 }
               />
               <Route
-                path="/wishlist"
+                path="/book/:isbn"
                 element={
                   <ProtectedRoute>
-                    <WishlistPage />
+                    <BookDetailPage />
                   </ProtectedRoute>
                 }
               />

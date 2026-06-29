@@ -1,6 +1,7 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
@@ -11,6 +12,7 @@ import {
   removeFromShelf,
   type BookMetadata,
   type ShelfEntry,
+  type ShelfFilter,
   type ShelfPage,
   type ShelfStatus,
 } from "../lib/api-client";
@@ -31,6 +33,19 @@ export function useShelf(opts?: { status?: ShelfStatus }) {
     },
     initialPageParam: null,
     getNextPageParam: (last) => last.nextCursor,
+  });
+}
+
+/**
+ * Fetch all entries matching a filter (system facet and/or tag). The server's
+ * filtered query returns the full match set in one page (no cursor), so a plain
+ * query is enough. Disabled until a filter is active.
+ */
+export function useFilteredShelf(filter: ShelfFilter | null) {
+  return useQuery<ShelfPage>({
+    queryKey: ["shelf", "filtered", filter],
+    queryFn: () => fetchShelf({ ...(filter ?? {}), limit: 100 }),
+    enabled: !!filter,
   });
 }
 
@@ -64,7 +79,13 @@ export function useMoveShelfEntry() {
           ...old,
           pages: old.pages.map((page) => ({
             ...page,
-            entries: page.entries.map((e) => (e.isbn === isbn ? { ...e, status } : e)),
+            // Keep the derived booleans in sync so the card's state pills update
+            // optimistically too (status auto-clears want on owned — ADR-019 Q1).
+            entries: page.entries.map((e) =>
+              e.isbn === isbn
+                ? { ...e, status, owned: status === "owned", want: status === "want" }
+                : e,
+            ),
           })),
         };
       });
