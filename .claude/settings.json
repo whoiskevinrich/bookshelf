@@ -1,4 +1,7 @@
 {
+  "permissions": {
+    "allow": ["mcp__f12d29f1-7911-4d01-b15d-14d731852426__createJiraIssue"]
+  },
   "enabledPlugins": {
     "feature-dev@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,

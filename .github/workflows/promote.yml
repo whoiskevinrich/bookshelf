@@ -1,13 +1,20 @@
 name: Promote to Production
 
+# Ships a cut release to prod (ADR-020). Called automatically by release-please.yml
+# the moment the release PR merges and a release is cut — the PR review IS the gate,
+# so past it promotion is automatic. We chain via `workflow_call` (not an
+# `on: release` trigger) because a GitHub Release created by the default GITHUB_TOKEN
+# does NOT trigger other workflows. `workflow_dispatch` stays for manual re-promotes
+# and hotfixes (promote an existing `v{version}` tag on demand).
+
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       version:
-        description: "Version to promote (e.g. 1.2.3) — must exist as a git tag v{version}"
+        description: "Version to promote (e.g. 1.2.3 or v1.2.3) — must exist as a git tag"
         required: true
         type: string
-  workflow_call:
+  workflow_dispatch:
     inputs:
       version:
         description: "Version to promote (e.g. 1.2.3) — must exist as a git tag v{version}"
@@ -19,7 +26,7 @@ concurrency:
   cancel-in-progress: false # never cancel an in-flight deploy
 
 permissions:
-  contents: write # create GitHub release
+  contents: read # release already exists (Release Please created it); no writes here
   id-token: write # OIDC for AWS
 
 jobs:
@@ -28,27 +35,35 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
-      - name: Log promotion target
+      - name: Resolve version
+        id: resolve
+        # Both triggers (workflow_call from release-please.yml, and manual
+        # workflow_dispatch) supply inputs.version. release-please passes a tag like
+        # "v1.2.3"; a human dispatch passes "1.2.3". Strip any leading "v".
         run: |
-          echo "Promoting version: v${{ inputs.version }}"
+          set -euo pipefail
+          V="${{ inputs.version }}"
+          V="${V#v}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Promoting v$V"
 
       - uses: actions/checkout@v6
         with:
-          ref: v${{ inputs.version }}
+          ref: v${{ steps.resolve.outputs.version }}
 
       - name: Confirm promotion target
-        # The release identity is the git tag, not package.json (ADR-017). We are
-        # checked out at `v${inputs.version}`, so the tree is exactly what was
-        # deployed to dev. Verify the tag resolves; package.json carries no version.
+        # The release identity is the git tag (ADR-017/020). We are checked out at
+        # `v${version}`, so the tree is exactly what Release Please tagged. Verify
+        # the tag resolves; package.json carries no version.
         run: |
           set -euo pipefail
           echo "=================================================="
-          echo "  Promoting version : v${{ inputs.version }}"
+          echo "  Promoting version : v${{ steps.resolve.outputs.version }}"
           echo "  Target environment: prod"
           echo "  Commit            : $(git rev-parse HEAD)"
           echo "=================================================="
           if ! git describe --tags --exact-match >/dev/null 2>&1; then
-            echo "::error::HEAD is not at tag v${{ inputs.version }} — refusing to promote an untagged commit"
+            echo "::error::HEAD is not at tag v${{ steps.resolve.outputs.version }} — refusing to promote an untagged commit"
             exit 1
           fi
 
@@ -123,7 +138,7 @@ jobs:
               && mv /tmp/cdk.context.json "$CTX_FILE"
 
             pnpm --filter @bookshelf/infra run cdk deploy BookshelfDns \
-              --require-approval never -c env=prod -c version=v${{ inputs.version }}
+              --require-approval never -c env=prod -c version=v${{ steps.resolve.outputs.version }}
 
             # Fetch the real zone ID and NS values from the CloudFormation output.
             ZONE_ID=$(aws cloudformation describe-stacks \
@@ -228,7 +243,7 @@ jobs:
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy \
             BookshelfCdnCert BookshelfAuth BookshelfApi BookshelfMcp \
-            --require-approval never -c env=prod -c version=v${{ inputs.version }}
+            --require-approval never -c env=prod -c version=v${{ steps.resolve.outputs.version }}
 
       - name: Resolve stack outputs (prod)
         id: outputs
@@ -260,27 +275,9 @@ jobs:
         # CloudFront — no separate sync or invalidation steps needed.
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
-            --require-approval never -c env=prod -c version=v${{ inputs.version }}
+            --require-approval never -c env=prod -c version=v${{ steps.resolve.outputs.version }}
 
       - name: Smoke tests (prod)
         env:
           API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
-
-      - name: Create GitHub Release
-        # Idempotent (ADR-017): a re-run, or promoting an already-released version,
-        # is a no-op instead of an HTTP 422. The release — not package.json — is the
-        # immutable record that this version shipped.
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TAG="v${{ inputs.version }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::notice::Release $TAG already exists — skipping creation (idempotent)."
-            exit 0
-          fi
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --generate-notes \
-            --verify-tag
