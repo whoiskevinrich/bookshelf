@@ -134,3 +134,31 @@ jobs:
       # so the full checkout history is unnecessary but the repo must be present.
       - name: QA guards
         run: node scripts/qa-guards.mjs
+
+  pr-title:
+    name: PR Title (conventional)
+    runs-on: ubuntu-latest
+    # The squash-merge subject = the PR title, and that is the commit Release Please
+    # parses for the changelog + semver bump (ADR-020). We enforce Conventional
+    # Commits here, but AUTO-FIX instead of blocking: an invalid title is prefixed
+    # `chore: ` rather than failing the check, so there is no manual churn. A `chore`
+    # yields a patch / no release — correct the type/scope before merge if it should
+    # be a feat or fix. (Fork PRs get a read-only token and can't be auto-edited;
+    # this repo's PRs are same-repo branches, so that path doesn't apply.)
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Validate and auto-fix PR title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          PATTERN='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z0-9 ._/-]+\))?!?: .+'
+          if [[ "$PR_TITLE" =~ $PATTERN ]]; then
+            echo "PR title is conventional: $PR_TITLE"
+            exit 0
+          fi
+          echo "::warning::PR title '$PR_TITLE' is not a Conventional Commit — auto-prefixing 'chore: ' (ADR-020). Edit to feat/fix with the right scope before merge if this should trigger a release."
+          gh pr edit "$PR_NUMBER" --title "chore: $PR_TITLE"

@@ -1,5 +1,10 @@
 name: Deploy to dev
 
+# Continuous deployment to dev on every merge to main (ADR-020). Dev is the
+# manual-test surface; it deploys under the short commit SHA and never creates a
+# semver tag. Promotion to PROD is a separate, gated path: the Release Please PR
+# (release-please.yml) cuts the tag + GitHub Release, and promote.yml ships it.
+
 on:
   push:
     branches: [main]
@@ -9,7 +14,7 @@ concurrency:
   cancel-in-progress: false # never cancel an in-flight deploy
 
 permissions:
-  contents: write # push git tag
+  contents: read # dev no longer pushes tags (ADR-020) — read is enough
   id-token: write # OIDC for AWS
 
 jobs:
@@ -17,12 +22,10 @@ jobs:
     name: CDK Deploy → dev
     runs-on: ubuntu-latest
     environment: dev
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-tags: true # required for "Capture last good version tag"
+          fetch-depth: 0 # full history so the rollback step can check out an older SHA
 
       - uses: pnpm/action-setup@v6
         with:
@@ -42,38 +45,25 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Capture last good version tag
-        id: last-good
-        run: |
-          TAG=$(git tag --sort=-version:refname | head -1)
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Last good tag: $TAG"
-
-      - name: Compute next version
+      - name: Resolve dev version
         id: version
-        # The release version is derived from the immutable tag ledger, never from
-        # package.json (ADR-017). The deploy-dev concurrency group serializes main
-        # builds, so each run reads max+1 *after* the previous run pushed its tag —
-        # the computed number is always fresh and collisions are impossible.
+        # Dev deploys under the short commit SHA, never a semver tag (ADR-020). The
+        # SHA threads through the S3 build prefix, CloudFront originPath, the
+        # /bookshelf/web/active-version SSM param, and the Version stack tag.
         run: |
-          set -euo pipefail
-          git fetch --tags --force
-          LATEST=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
-          LATEST=${LATEST:-v0.0.0}
-          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
-          PATCH=$((PATCH + 1))
-          NEXT="v${MAJOR}.${MINOR}.${PATCH}"
-          # Paranoia: skip any number that already exists as a tag or a release.
-          while git rev-parse -q --verify "refs/tags/${NEXT}" >/dev/null \
-            || gh release view "${NEXT}" >/dev/null 2>&1; do
-            PATCH=$((PATCH + 1))
-            NEXT="v${MAJOR}.${MINOR}.${PATCH}"
-          done
-          echo "Next version: ${NEXT} (previous: ${LATEST})"
-          echo "tag=${NEXT}" >> "$GITHUB_OUTPUT"
-          echo "version=${NEXT#v}" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
+          echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "Dev version: dev-${GITHUB_SHA::7}"
+
+      - name: Read last good dev SHA
+        id: last-good
+        # Rollback target is the last dev deploy whose smoke tests passed (ADR-020),
+        # tracked in SSM instead of the tag ledger. Empty on the first ever run —
+        # the rollback step is skipped in that case.
+        run: |
+          SHA=$(aws ssm get-parameter --name /bookshelf/web/last-good-dev \
+            --query Parameter.Value --output text 2>/dev/null || echo "")
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Last good dev SHA: ${SHA:-<none>}"
 
       - name: Build API bundle
         run: pnpm --filter @bookshelf/api run build
@@ -90,7 +80,7 @@ jobs:
       - name: Deploy Auth, API, and MCP stacks
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi BookshelfMcp \
-            --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }}
+            --require-approval never -c env=dev -c version=${{ steps.version.outputs.version }}
 
       - name: Resolve stack outputs
         id: outputs
@@ -122,7 +112,7 @@ jobs:
         # CloudFront — no separate sync or invalidation steps needed.
         run: |
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
-            --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }}
+            --require-approval never -c env=dev -c version=${{ steps.version.outputs.version }}
 
       - name: Post CloudFront URL to run summary
         run: |
@@ -136,7 +126,7 @@ jobs:
             echo "| | |"
             echo "| --- | --- |"
             echo "| **CloudFront URL** | [$CF_URL]($CF_URL) |"
-            echo "| **Version** | \`${{ steps.version.outputs.tag }}\` |"
+            echo "| **Version** | \`${{ steps.version.outputs.version }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Register CloudFront domain in Auth callbacks
@@ -151,7 +141,7 @@ jobs:
             --output text)
           CF_DOMAIN="${CF_URL#https://}"
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth \
-            --require-approval never -c env=dev -c version=${{ steps.version.outputs.tag }} \
+            --require-approval never -c env=dev -c version=${{ steps.version.outputs.version }} \
             -c cloudfront-domain="${CF_DOMAIN}"
 
       - name: Smoke tests
@@ -161,45 +151,33 @@ jobs:
           API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
 
-      - name: Rollback to last good version
-        if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.tag != ''
+      - name: Rollback to last good dev SHA
+        if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.sha != ''
         run: |
-          echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.tag }}"
-          git checkout ${{ steps.last-good.outputs.tag }}
+          echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.sha }}"
+          git checkout ${{ steps.last-good.outputs.sha }}
           pnpm install --frozen-lockfile
           pnpm --filter @bookshelf/api run build
           pnpm --filter @bookshelf/mcp run build 2>/dev/null || mkdir -p apps/mcp/dist
           mkdir -p apps/web/dist
+          ROLLBACK_VERSION="dev-$(git rev-parse --short=7 HEAD)"
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfAuth BookshelfApi \
-            --require-approval never -c env=dev -c version=${{ steps.last-good.outputs.tag }}
+            --require-approval never -c env=dev -c version="$ROLLBACK_VERSION"
           pnpm --filter @bookshelf/web run build
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
-            --require-approval never -c env=dev -c version=${{ steps.last-good.outputs.tag }}
+            --require-approval never -c env=dev -c version="$ROLLBACK_VERSION"
 
       - name: Fail job after rollback
         if: steps.smoke.outcome == 'failure'
         run: |
-          echo "Smoke tests failed. Rolled back to ${{ steps.last-good.outputs.tag }}."
+          echo "Smoke tests failed. Rolled back to ${{ steps.last-good.outputs.sha }}."
           exit 1
 
-      - name: Tag deployed version
+      - name: Record last good dev SHA
         if: steps.smoke.outcome != 'failure'
+        # Smoke passed — this commit becomes the rollback target for the next deploy
+        # (ADR-020). Replaces the per-merge version tag the old design pushed here.
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          echo "Tagging commit as $TAG"
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Non-forced: a version tag is immutable (ADR-017). If this somehow
-          # collides, fail here — before promote — rather than after prod deploy.
-          git tag "$TAG"
-          git push origin "$TAG"
-
-  promote:
-    name: Promote → prod
-    needs: deploy
-    uses: ./.github/workflows/promote.yml
-    with:
-      version: ${{ needs.deploy.outputs.version }}
-    permissions:
-      id-token: write
-      contents: write
+          aws ssm put-parameter --name /bookshelf/web/last-good-dev \
+            --type String --overwrite --value "$GITHUB_SHA"
+          echo "Recorded last good dev SHA: $GITHUB_SHA"
