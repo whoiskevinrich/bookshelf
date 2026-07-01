@@ -46,10 +46,16 @@ function loadTestEnv(relPath: string): void {
 loadTestEnv("./.env.test.local");
 
 const APP_BASE_URL = (process.env.APP_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const API_BASE_URL = (process.env.API_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // All signed-in specs mutate ONE shared QA account's shelf, so they must run
+  // serially — parallel workers race on the same data (a book one test adds shows
+  // up in another; a cleanup empties the shelf mid-add). One worker, no in-file
+  // parallelism. The suite is small, so the wall-clock cost is a few dozen seconds.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
@@ -57,6 +63,30 @@ export default defineConfig({
     baseURL: APP_BASE_URL,
     trace: "on-first-retry",
   },
+
+  /**
+   * Boot the API + web dev servers for the run. Locally, `reuseExistingServer`
+   * latches onto the servers you already have up (from `/dev`) instead of starting
+   * duplicates; in CI it always starts fresh. Both talk to the REAL dev backend —
+   * the API needs AWS credentials in the environment (OIDC in CI, `assume` locally)
+   * and both read their `.env.local` for Cognito/table config (no mock auth).
+   */
+  webServer: [
+    {
+      command: "pnpm --filter @bookshelf/api dev",
+      url: `${API_BASE_URL}/health`,
+      reuseExistingServer: !process.env.CI,
+      stdout: "pipe",
+      timeout: 90_000,
+    },
+    {
+      command: "pnpm --filter @bookshelf/web dev",
+      url: APP_BASE_URL,
+      reuseExistingServer: !process.env.CI,
+      stdout: "pipe",
+      timeout: 90_000,
+    },
+  ],
 
   projects: [
     // 1. Sign in once via the real login page; saves Amplify localStorage tokens
