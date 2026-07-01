@@ -1,0 +1,115 @@
+name: E2E (dev)
+
+# Playwright E2E runs against the REAL dev Cognito + DynamoDB, so it's slower and
+# flakier than the pure-unit PR checks — by design it is NOT part of PR Checks.
+# Instead it runs post-merge (push to main) and nightly, validating the merged code
+# end-to-end against the live dev backend. Manual runs via workflow_dispatch.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 9 * * *" # 09:00 UTC ≈ 02:00 PT, nightly
+  workflow_dispatch:
+
+# One shared QA user owns the test shelf, so never let two E2E runs mutate it at
+# once — queue them instead of cancelling (a cancelled run can leave stray books).
+concurrency:
+  group: e2e-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # OIDC for AWS (dev DynamoDB + Cognito)
+
+jobs:
+  e2e:
+    name: Playwright → dev
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Resolve dev config from CloudFormation outputs
+        id: cfg
+        # The API + web dev servers read these from their .env.local (written below),
+        # exactly like local dev. Cognito values come from BookshelfAuth, the table
+        # name from BookshelfApi — same describe-stacks pattern as deploy.yml.
+        run: |
+          set -euo pipefail
+          auth() {
+            aws cloudformation describe-stacks --stack-name BookshelfAuth \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          api() {
+            aws cloudformation describe-stacks --stack-name BookshelfApi \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          {
+            echo "user_pool_id=$(auth UserPoolIdOutput)"
+            echo "client_id=$(auth UserPoolClientIdOutput)"
+            echo "mcp_client_id=$(auth McpClientIdOutput)"
+            echo "issuer=$(auth UserPoolIssuerOutput)"
+            echo "oauth_domain=$(auth HostedUiDomainOutput)"
+            echo "table_name=$(api TableNameOutput)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write apps/api/.env.local
+        run: |
+          cat > apps/api/.env.local <<EOF
+          COGNITO_ISSUER=${{ steps.cfg.outputs.issuer }}
+          COGNITO_CLIENT_ID=${{ steps.cfg.outputs.client_id }}
+          COGNITO_MCP_CLIENT_ID=${{ steps.cfg.outputs.mcp_client_id }}
+          COGNITO_USER_POOL_ID=${{ steps.cfg.outputs.user_pool_id }}
+          DYNAMODB_TABLE_NAME=${{ steps.cfg.outputs.table_name }}
+          AWS_REGION=${{ vars.AWS_REGION }}
+          BOOK_PROVIDER=google-books
+          GOOGLE_BOOKS_API_KEY=${{ secrets.GOOGLE_BOOKS_API_KEY }}
+          EOF
+
+      - name: Write apps/web/.env.local
+        run: |
+          cat > apps/web/.env.local <<EOF
+          VITE_COGNITO_USER_POOL_ID=${{ steps.cfg.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID=${{ steps.cfg.outputs.client_id }}
+          VITE_COGNITO_REGION=${{ vars.AWS_REGION }}
+          VITE_COGNITO_OAUTH_DOMAIN=${{ steps.cfg.outputs.oauth_domain }}
+          VITE_API_BASE_URL=http://localhost:3001
+          EOF
+
+      - name: Install Playwright browser (chromium)
+        run: pnpm --filter @bookshelf/web exec playwright install --with-deps chromium
+
+      - name: Run E2E
+        # playwright.config.ts starts the API + web dev servers itself (webServer);
+        # AWS creds from the OIDC step above flow through to the API dev server.
+        run: pnpm --filter @bookshelf/web run test:e2e
+        env:
+          CI: "true"
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14
