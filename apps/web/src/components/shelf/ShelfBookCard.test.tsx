@@ -24,15 +24,15 @@ function renderCard(
 }
 
 describe("ShelfBookCard — state pills (#82)", () => {
-  it("shows the Owned pill (and not Want) for an owned book", () => {
+  it("shows the Owned pill (and not Wishlist) for an owned book", () => {
     renderCard({ owned: true, want: false });
     expect(screen.getByText("Owned")).toBeInTheDocument();
-    expect(screen.queryByText("Want")).not.toBeInTheDocument();
+    expect(screen.queryByText("Wishlist")).not.toBeInTheDocument();
   });
 
-  it("shows the Want pill (and not Owned) for a wishlisted book", () => {
+  it("shows the Wishlist pill (and not Owned) for a wishlisted book", () => {
     renderCard({ owned: false, want: true });
-    expect(screen.getByText("Want")).toBeInTheDocument();
+    expect(screen.getByText("Wishlist")).toBeInTheDocument();
     expect(screen.queryByText("Owned")).not.toBeInTheDocument();
   });
 

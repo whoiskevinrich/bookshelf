@@ -9,7 +9,7 @@ export type SystemFacet = "owned" | "want" | "reading" | "finished" | "unread";
 
 const FACETS: { value: SystemFacet; label: string }[] = [
   { value: "owned", label: "Owned" },
-  { value: "want", label: "Want" },
+  { value: "want", label: "Wishlist" },
   { value: "reading", label: "Reading" },
   { value: "finished", label: "Read" },
   { value: "unread", label: "Unread" },

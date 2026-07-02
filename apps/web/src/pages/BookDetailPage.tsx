@@ -87,7 +87,7 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
         Your copy
       </h2>
 
-      {/* Owned / Want — mutually exclusive */}
+      {/* Owned / Wishlist — mutually exclusive (wire value stays `want`, ADR-021) */}
       <div className="space-y-2">
         <span className={labelClass}>Status</span>
         <div>
@@ -96,7 +96,7 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
             value={entry.owned ? "owned" : "want"}
             options={[
               { value: "owned", label: "Owned" },
-              { value: "want", label: "Want" },
+              { value: "want", label: "Wishlist" },
             ]}
             onChange={(v) => attrMutation.mutate(v === "owned" ? { owned: true } : { want: true })}
           />
