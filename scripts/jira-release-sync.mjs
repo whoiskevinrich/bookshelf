@@ -49,7 +49,9 @@ const missing = Object.entries({
   JIRA_BASE_URL,
   JIRA_USER_EMAIL,
   JIRA_API_TOKEN,
-}).filter(([, v]) => !v).map(([k]) => k);
+})
+  .filter(([, v]) => !v)
+  .map(([k]) => k);
 if (missing.length) bailSoft(`missing required env: ${missing.join(", ")} — skipping Jira sync`);
 
 const jiraBase = JIRA_BASE_URL.replace(/\/+$/, "");
@@ -69,7 +71,10 @@ async function getReleaseBody() {
       "X-GitHub-Api-Version": "2022-11-28",
     },
   });
-  if (!res.ok) throw new Error(`GitHub release lookup for ${RELEASE_TAG} failed: ${res.status} ${res.statusText}`);
+  if (!res.ok)
+    throw new Error(
+      `GitHub release lookup for ${RELEASE_TAG} failed: ${res.status} ${res.statusText}`,
+    );
   const json = await res.json();
   return json.body ?? "";
 }
@@ -82,7 +87,9 @@ function extractKeys(body) {
 }
 
 async function currentStatus(key) {
-  const res = await fetch(`${jiraBase}/rest/api/3/issue/${key}?fields=status`, { headers: jiraHeaders });
+  const res = await fetch(`${jiraBase}/rest/api/3/issue/${key}?fields=status`, {
+    headers: jiraHeaders,
+  });
   if (res.status === 404) return { missing: true };
   if (!res.ok) throw new Error(`GET issue ${key} failed: ${res.status} ${res.statusText}`);
   const json = await res.json();
@@ -90,8 +97,11 @@ async function currentStatus(key) {
 }
 
 async function findTransitionId(key) {
-  const res = await fetch(`${jiraBase}/rest/api/3/issue/${key}/transitions`, { headers: jiraHeaders });
-  if (!res.ok) throw new Error(`GET transitions for ${key} failed: ${res.status} ${res.statusText}`);
+  const res = await fetch(`${jiraBase}/rest/api/3/issue/${key}/transitions`, {
+    headers: jiraHeaders,
+  });
+  if (!res.ok)
+    throw new Error(`GET transitions for ${key} failed: ${res.status} ${res.statusText}`);
   const json = await res.json();
   const target = JIRA_TARGET_STATUS.toLowerCase();
   // Match on the transition's destination status name (robust to transition
@@ -106,7 +116,10 @@ async function transition(key, transitionId) {
     headers: jiraHeaders,
     body: JSON.stringify({ transition: { id: transitionId } }),
   });
-  if (!res.ok) throw new Error(`POST transition ${transitionId} on ${key} failed: ${res.status} ${res.statusText}`);
+  if (!res.ok)
+    throw new Error(
+      `POST transition ${transitionId} on ${key} failed: ${res.status} ${res.statusText}`,
+    );
 }
 
 async function syncOne(key) {
@@ -117,7 +130,9 @@ async function syncOne(key) {
   }
   const id = await findTransitionId(key);
   if (!id) {
-    return warn(`${key}: no transition to "${JIRA_TARGET_STATUS}" available from "${cur.status}" — skipping`);
+    return warn(
+      `${key}: no transition to "${JIRA_TARGET_STATUS}" available from "${cur.status}" — skipping`,
+    );
   }
   await transition(key, id);
   info(`${key}: "${cur.status}" → "${JIRA_TARGET_STATUS}" (${RELEASE_TAG})`);
