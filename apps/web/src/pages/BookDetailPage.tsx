@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { BookCover } from "../components/BookCover";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
@@ -14,8 +15,9 @@ import {
   useUpdateBookTags,
   useUpdateBookNotes,
 } from "../hooks/useBookEntry";
-import { useShelves } from "../hooks/useShelves";
-import { ApiError, type ReadingStatus, type ShelfEntry } from "../lib/api-client";
+import { useRemoveFromShelf } from "../hooks/useShelf";
+import { useShelves, useAddBookToShelf, useRemoveBookFromShelf } from "../hooks/useShelves";
+import { ApiError, type ReadingStatus, type Shelf, type ShelfEntry } from "../lib/api-client";
 
 const NOTES_MAX_LENGTH = 2000;
 const TAGS_MAX_COUNT = 25;
@@ -221,6 +223,97 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
   );
 }
 
+// ── Shelves panel ────────────────────────────────────────────────────────────
+
+/** Shelf membership checkboxes — the card's ShelfPicker equivalent for this page,
+    and the only shelf-management surface reachable on touch devices. */
+function ShelvesPanel({ isbn, shelves }: { isbn: string; shelves: Shelf[] }) {
+  const addMutation = useAddBookToShelf();
+  const removeMutation = useRemoveBookFromShelf();
+  const busy = addMutation.isPending || removeMutation.isPending;
+
+  if (shelves.length === 0) return null;
+
+  return (
+    <section className="border-t border-paper-400 dark:border-slate-700 pt-6 mt-6 space-y-2">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+        Shelves
+      </h2>
+      <div className="space-y-1">
+        {shelves.map((shelf) => {
+          const checked = shelf.bookIds.includes(isbn);
+          return (
+            <label
+              key={shelf.shelfId}
+              className="flex w-fit cursor-pointer items-center gap-2 py-1 text-sm text-slate-700 dark:text-slate-200"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                disabled={busy}
+                onChange={() =>
+                  checked
+                    ? removeMutation.mutate({ shelfId: shelf.shelfId, isbn })
+                    : addMutation.mutate({ shelfId: shelf.shelfId, isbn })
+                }
+                className="accent-slate-700 dark:accent-slate-300 disabled:opacity-50"
+              />
+              <span className="truncate">{shelf.name}</span>
+            </label>
+          );
+        })}
+      </div>
+      {(addMutation.isError || removeMutation.isError) && (
+        <p className="text-xs text-red-500 dark:text-red-400">
+          Couldn&apos;t update shelves — please try again.
+        </p>
+      )}
+    </section>
+  );
+}
+
+// ── Remove panel ─────────────────────────────────────────────────────────────
+
+/** Confirmed removal — the safe home for deletion now that cards navigate on tap. */
+function RemovePanel({ isbn, title }: { isbn: string; title: string }) {
+  const navigate = useNavigate();
+  const removeMutation = useRemoveFromShelf();
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <section className="border-t border-paper-400 dark:border-slate-700 pt-6 mt-6">
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={() => setConfirming(true)}
+        disabled={removeMutation.isPending}
+      >
+        {removeMutation.isPending ? "Removing…" : "Remove from library"}
+      </Button>
+      {removeMutation.isError && (
+        <p className="mt-2 text-xs text-red-500 dark:text-red-400">
+          Couldn&apos;t remove this book — please try again.
+        </p>
+      )}
+      <ConfirmDialog
+        open={confirming}
+        title="Remove book?"
+        message={`"${title}" will be removed from your library, along with its tags and notes.`}
+        confirmLabel="Remove"
+        destructive
+        pending={removeMutation.isPending}
+        onConfirm={() =>
+          removeMutation.mutate(isbn, {
+            onSuccess: () => navigate("/shelf"),
+            onSettled: () => setConfirming(false),
+          })
+        }
+        onClose={() => setConfirming(false)}
+      />
+    </section>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function BookDetailPage() {
@@ -331,6 +424,8 @@ export function BookDetailPage() {
             </div>
 
             <YourCopyPanel entry={entry} isbn={isbn} />
+            <ShelvesPanel isbn={isbn} shelves={shelvesQuery.data ?? []} />
+            <RemovePanel isbn={isbn} title={title} />
           </>
         )}
       </main>

@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toIsbn13 } from "../../lib/isbn";
-import { getBookByIsbn, type BookSearchResult, type ShelfStatus } from "../../lib/api-client";
+import {
+  getBookByIsbn,
+  isConflictError,
+  type BookSearchResult,
+  type ShelfStatus,
+} from "../../lib/api-client";
 import { useAddToShelf, useRemoveFromShelf } from "../../hooks/useShelf";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner";
 import { useScannerPreferences } from "../../context/ScannerPreferencesContext";
@@ -64,7 +69,11 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
   const [added, setAdded] = useState<AddedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState<{ item: AddedItem; key: number } | null>(null);
+  const [flash, setFlash] = useState<{
+    item: AddedItem;
+    key: number;
+    kind: "added" | "duplicate";
+  } | null>(null);
 
   // OCR text-scan state
   const [ocrBusy, setOcrBusy] = useState(false);
@@ -125,10 +134,10 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     setAdded((prev) => [item, ...prev]);
   }
 
-  function flashSuccess(item: AddedItem) {
+  function showFlash(item: AddedItem, kind: "added" | "duplicate") {
     flashKey.current += 1;
-    setFlash({ item, key: flashKey.current });
-    if (typeof navigator.vibrate === "function") navigator.vibrate(40);
+    setFlash({ item, key: flashKey.current, kind });
+    if (kind === "added" && typeof navigator.vibrate === "function") navigator.vibrate(40);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setFlash(null), FLASH_MS);
   }
@@ -152,7 +161,14 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  async function commitAdd(isbn: string, status: ShelfStatus, book: BookSearchResult | null) {
+  async function commitAdd(
+    isbn: string,
+    status: ShelfStatus,
+    book: BookSearchResult | null,
+    // "sheet" adds have a visible confirm/not-found sheet to show errors in;
+    // "auto" adds happen mid-scan, so their feedback must go through the flash pill.
+    source: "sheet" | "auto" = "sheet",
+  ) {
     setBusy(true);
     setError(null);
     try {
@@ -163,12 +179,24 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         setView("added");
         if (typeof navigator.vibrate === "function") navigator.vibrate(40);
       } else {
-        flashSuccess(item);
+        showFlash(item, "added");
         resumeScanning();
       }
     } catch (err) {
       if (import.meta.env.DEV) console.error(`[ScanModal] add to shelf failed for ${isbn}`, err);
-      setError("Couldn't add that book — try again.");
+      if (isConflictError(err)) {
+        // Already in the library from before this session — remember it so a
+        // re-scan of the same barcode doesn't loop through the duplicate again.
+        addedIsbns.current.add(isbn);
+        if (source === "auto") {
+          showFlash(buildAddedItem(isbn, status, book), "duplicate");
+          resumeScanning();
+        } else {
+          setError("That book is already on your shelf.");
+        }
+      } else {
+        setError("Couldn't add that book — try again.");
+      }
     } finally {
       setBusy(false);
     }
@@ -184,7 +212,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         console.error(`[ScanModal] metadata lookup failed for ${isbn}; adding bare ISBN`, err);
       book = null;
     }
-    await commitAdd(isbn, "owned", book);
+    await commitAdd(isbn, "owned", book, "auto");
   }
 
   function handleDecode(raw: string) {
@@ -344,25 +372,39 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         ocrMissHint={ocrMissHint}
         onOcrScan={() => void handleOcrScan()}
       >
-        {/* Continuous-scan success flash */}
+        {/* Mid-scan feedback flash: green for an add, amber for a duplicate */}
         {flash && view === "scanning" && (
           <>
-            <div
-              key={flash.key}
-              aria-hidden="true"
-              className="animate-success-flash pointer-events-none absolute inset-0 ring-4 ring-inset ring-emerald-400/70"
-            />
+            {flash.kind === "added" && (
+              <div
+                key={flash.key}
+                aria-hidden="true"
+                className="animate-success-flash pointer-events-none absolute inset-0 ring-4 ring-inset ring-emerald-400/70"
+              />
+            )}
             <div className="absolute inset-x-0 top-4 flex justify-center px-4">
-              <div className="animate-fade-up flex max-w-full items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm font-medium text-emerald-300">
-                <CheckIcon />
-                <span className="truncate">Added "{flash.item.title}"</span>
-                <button
-                  type="button"
-                  onClick={() => undo(flash.item.isbn)}
-                  className="ml-1 underline underline-offset-2 hover:no-underline"
-                >
-                  Undo
-                </button>
+              <div
+                className={`animate-fade-up flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium ${
+                  flash.kind === "added"
+                    ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
+                    : "border-amber-400/40 bg-amber-500/15 text-amber-300"
+                }`}
+              >
+                {flash.kind === "added" ? <CheckIcon /> : <InfoIcon />}
+                <span className="truncate">
+                  {flash.kind === "added"
+                    ? `Added "${flash.item.title}"`
+                    : `Already on your shelf — "${flash.item.title}"`}
+                </span>
+                {flash.kind === "added" && (
+                  <button
+                    type="button"
+                    onClick={() => undo(flash.item.isbn)}
+                    className="ml-1 underline underline-offset-2 hover:no-underline"
+                  >
+                    Undo
+                  </button>
+                )}
               </div>
             </div>
           </>
@@ -411,7 +453,10 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {cameraUnavailable && (
+        {/* Only while idle-scanning: kept mounted through confirm/added, this panel's
+            input stole [data-autofocus] focus from the confirm sheet, so Enter re-ran
+            the lookup instead of adding the found book. */}
+        {cameraUnavailable && view === "scanning" && (
           <ManualPanel
             heading="Camera unavailable"
             subheading={
@@ -475,7 +520,11 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           {view === "confirm" && foundBook ? `Found ${foundBook.title}` : ""}
           {view === "not-found" ? "No matching book found" : ""}
           {view === "added" && added[0] ? `Added ${added[0].title}` : ""}
-          {flash ? `Added ${flash.item.title}` : ""}
+          {flash
+            ? flash.kind === "added"
+              ? `Added ${flash.item.title}`
+              : `${flash.item.title} is already on your shelf`
+            : ""}
           {showFallbackCallout
             ? "Can't find a barcode? This book may only have a printed ISBN. Try Text mode."
             : ""}
@@ -556,11 +605,7 @@ function ConfirmSheet({
   onScanAgain: () => void;
 }) {
   return (
-    <div
-      className="animate-fade-up absolute inset-x-0 bottom-0 outline-none"
-      data-autofocus
-      tabIndex={-1}
-    >
+    <div className="animate-fade-up absolute inset-x-0 bottom-0">
       <div className="m-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
         <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-emerald-400">
           <CheckIcon /> Barcode found · {isbn}
@@ -584,7 +629,14 @@ function ConfirmSheet({
         </div>
         {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
         <div className="mb-1 flex gap-2">
-          <Button variant="app" className="flex-1" disabled={busy} onClick={() => onAdd("owned")}>
+          {/* autoFocus so Enter adds right after an Enter-submitted manual lookup */}
+          <Button
+            variant="app"
+            className="flex-1"
+            disabled={busy}
+            onClick={() => onAdd("owned")}
+            autoFocus
+          >
             Add owned
           </Button>
           <Button
@@ -622,11 +674,7 @@ function AddedSheet({
   onDone: () => void;
 }) {
   return (
-    <div
-      className="animate-fade-up absolute inset-x-0 bottom-0 outline-none"
-      data-autofocus
-      tabIndex={-1}
-    >
+    <div className="animate-fade-up absolute inset-x-0 bottom-0">
       <div className="m-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
         <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-emerald-400">
           <CheckIcon /> Added to {item.status === "owned" ? "your shelf" : "wishlist"}
@@ -646,7 +694,7 @@ function AddedSheet({
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="app" className="flex-1" onClick={onScanAnother}>
+          <Button variant="app" className="flex-1" onClick={onScanAnother} autoFocus>
             Scan another
           </Button>
           <Button variant="secondary" onClick={onDone}>
@@ -834,6 +882,16 @@ function CheckIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 flex-shrink-0" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.4" />
+      <path d="M8 7v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <circle cx="8" cy="4.75" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   );
 }

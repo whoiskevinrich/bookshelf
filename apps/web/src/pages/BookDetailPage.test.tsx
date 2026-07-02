@@ -19,6 +19,9 @@ vi.mock("../lib/api-client", async (importOriginal) => {
     updateShelfAttributes: vi.fn(),
     updateShelfTags: vi.fn(),
     updateShelfNotes: vi.fn(),
+    removeFromShelf: vi.fn(),
+    addBookToShelf: vi.fn(),
+    removeBookFromShelf: vi.fn(),
   };
 });
 
@@ -29,6 +32,9 @@ import {
   updateShelfAttributes,
   updateShelfTags,
   updateShelfNotes,
+  removeFromShelf,
+  addBookToShelf,
+  removeBookFromShelf,
   ApiError,
 } from "../lib/api-client";
 import { BookDetailPage } from "./BookDetailPage";
@@ -40,6 +46,9 @@ const mockFetchTags = vi.mocked(fetchTags);
 const mockUpdateAttrs = vi.mocked(updateShelfAttributes);
 const mockUpdateTags = vi.mocked(updateShelfTags);
 const mockUpdateNotes = vi.mocked(updateShelfNotes);
+const mockRemoveEntry = vi.mocked(removeFromShelf);
+const mockAddBookToShelf = vi.mocked(addBookToShelf);
+const mockRemoveBookFromShelf = vi.mocked(removeBookFromShelf);
 
 function renderPage() {
   return renderWithProviders(
@@ -203,5 +212,71 @@ describe("BookDetailPage — Your copy panel (#82)", () => {
     await user.tab(); // blur
 
     await waitFor(() => expect(mockUpdateNotes).toHaveBeenCalledWith(ISBN, "Great read"));
+  });
+});
+
+describe("BookDetailPage — shelves panel", () => {
+  it("toggles shelf membership from the Shelves checkboxes", async () => {
+    const user = userEvent.setup();
+    resolveEntry();
+    mockFetchShelves.mockResolvedValue([
+      { shelfId: "s1", name: "Favorites", createdAt: "", bookIds: [ISBN] },
+      { shelfId: "s2", name: "To donate", createdAt: "", bookIds: [] },
+    ]);
+    mockAddBookToShelf.mockResolvedValue(undefined as never);
+    mockRemoveBookFromShelf.mockResolvedValue(undefined as never);
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    // Favorites contains the book → checked → toggling removes.
+    const favorites = await screen.findByRole("checkbox", { name: "Favorites" });
+    expect(favorites).toBeChecked();
+    await user.click(favorites);
+    expect(mockRemoveBookFromShelf).toHaveBeenCalledWith("s1", ISBN);
+
+    // To donate does not → toggling adds (wait out the in-flight disable first).
+    const toDonate = screen.getByRole("checkbox", { name: "To donate" });
+    await waitFor(() => expect(toDonate).toBeEnabled());
+    await user.click(toDonate);
+    expect(mockAddBookToShelf).toHaveBeenCalledWith("s2", ISBN);
+  });
+
+  it("hides the Shelves panel when there are no shelves", async () => {
+    resolveEntry();
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByText("Shelves")).not.toBeInTheDocument();
+  });
+});
+
+describe("BookDetailPage — remove from library", () => {
+  it("removes only after confirmation, then navigates back to the library", async () => {
+    const user = userEvent.setup();
+    resolveEntry();
+    mockRemoveEntry.mockResolvedValue(undefined as never);
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("button", { name: "Remove from library" }));
+    // The dialog gates the destructive action — nothing removed yet.
+    expect(mockRemoveEntry).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(mockRemoveEntry).toHaveBeenCalledWith(ISBN);
+    expect(await screen.findByText("Library page")).toBeInTheDocument();
+  });
+
+  it("keeps the book when the removal is cancelled", async () => {
+    const user = userEvent.setup();
+    resolveEntry();
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("button", { name: "Remove from library" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(mockRemoveEntry).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

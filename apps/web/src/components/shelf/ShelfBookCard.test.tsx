@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Routes, Route } from "react-router-dom";
 import { renderWithProviders, makeEntry } from "../../test/utils";
 import { ShelfBookCard } from "./ShelfBookCard";
 import type { Shelf } from "../../lib/api-client";
@@ -80,11 +81,23 @@ describe("ShelfBookCard — overlay actions", () => {
     expect(screen.queryByRole("button", { name: "Mark as Owned" })).not.toBeInTheDocument();
   });
 
-  it("calls onRemove from the remove button", async () => {
+  it("asks for confirmation before removing, then calls onRemove", async () => {
     const user = userEvent.setup();
     const handlers = renderCard({ isbn: "9780441013593" });
     await user.click(screen.getByRole("button", { name: "Remove from library" }));
+    // The dialog gates the destructive action — nothing removed yet.
+    expect(handlers.onRemove).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Remove" }));
     expect(handlers.onRemove).toHaveBeenCalledWith("9780441013593");
+  });
+
+  it("does not remove when the confirmation is cancelled", async () => {
+    const user = userEvent.setup();
+    const handlers = renderCard({ isbn: "9780441013593" });
+    await user.click(screen.getByRole("button", { name: "Remove from library" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(handlers.onRemove).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows a working spinner and disables remove while removing", () => {
@@ -95,6 +108,35 @@ describe("ShelfBookCard — overlay actions", () => {
 });
 
 describe("ShelfBookCard — links, shelves and error", () => {
+  it("navigates to the book-detail route when the cover is clicked", async () => {
+    const user = userEvent.setup();
+    const handlers = {
+      onMove: vi.fn(),
+      onRemove: vi.fn(),
+      onAddToShelf: vi.fn(),
+      onRemoveFromShelf: vi.fn(),
+    };
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <ShelfBookCard
+              entry={makeEntry({ isbn: "9780441013593" })}
+              shelves={[]}
+              {...handlers}
+            />
+          }
+        />
+        <Route path="/book/:isbn" element={<div>Detail route</div>} />
+      </Routes>,
+    );
+
+    await user.click(screen.getByRole("img", { name: "Dune" }));
+    expect(screen.getByText("Detail route")).toBeInTheDocument();
+    expect(handlers.onRemove).not.toHaveBeenCalled();
+  });
+
   it("links the title to the book-detail route", () => {
     renderCard({
       isbn: "9780441013593",
