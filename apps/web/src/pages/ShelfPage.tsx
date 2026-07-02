@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { inputClass } from "../lib/form-styles";
 import {
@@ -20,9 +20,12 @@ import {
   FacetBar,
   TagBrowsePanel,
   ActiveFilterBar,
+  ReadingListBar,
   SmartShelvesGroup,
   buildFilter,
   ruleToActive,
+  parseFacet,
+  isReadingListEntry,
   facetLabel,
   type SystemFacet,
 } from "../components/shelf/ShelfFilterControls";
@@ -345,11 +348,52 @@ export function ShelfPage() {
   const reorderMutation = useReorderShelves();
 
   // Phase 3 — system-facet/tag filtering + smart shelves (ADR-019).
-  const [facet, setFacet] = useState<SystemFacet | null>(null);
-  const [tag, setTag] = useState<string | null>(null);
+  // Filter/view state lives in the URL so views are deep-linkable and shareable
+  // (ADR-021): `?facet=want`, `?tag=sci-fi`, `?view=reading-list`. Facet/tag drive
+  // the server-side filter; `reading-list` is a client-computed composite.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const facet = parseFacet(searchParams.get("facet"));
+  const tag = searchParams.get("tag");
+  const view = searchParams.get("view") === "reading-list" ? "reading-list" : null;
+
   const [showBrowse, setShowBrowse] = useState(false);
   const [showSaveSmart, setShowSaveSmart] = useState(false);
   const [smartShelfToDelete, setSmartShelfToDelete] = useState<SmartShelfWithCount | null>(null);
+
+  // Replace history (not push) so tweaking filters doesn't stack up back-nav.
+  const updateParams = useCallback(
+    (mutate: (p: URLSearchParams) => void) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          mutate(next);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Selecting a facet or tag exits any named view (they're mutually exclusive).
+  const setFacet = useCallback(
+    (f: SystemFacet | null) =>
+      updateParams((p) => {
+        p.delete("view");
+        if (f) p.set("facet", f);
+        else p.delete("facet");
+      }),
+    [updateParams],
+  );
+  const setTag = useCallback(
+    (t: string | null) =>
+      updateParams((p) => {
+        p.delete("view");
+        if (t) p.set("tag", t);
+        else p.delete("tag");
+      }),
+    [updateParams],
+  );
 
   const activeFilter = useMemo(() => buildFilter(facet, tag), [facet, tag]);
   const isFiltered = activeFilter !== null;
@@ -392,6 +436,14 @@ export function ShelfPage() {
   }, [serverShelves, shelfOrder]);
 
   const allEntries = useMemo(() => flattenShelf(shelfQuery.data), [shelfQuery.data]);
+
+  // Reading List is a client-computed composite over the loaded library (ADR-021),
+  // not a server filter — its union (reading OR owned-and-unread) isn't expressible
+  // as a single ShelfFilter.
+  const readingListEntries = useMemo(
+    () => (view === "reading-list" ? allEntries.filter(isReadingListEntry) : []),
+    [view, allEntries],
+  );
 
   const { namedShelfEntries, unshelved } = useMemo(() => {
     const allShelvedIsbns = new Set(orderedShelves.flatMap((s) => s.bookIds));
@@ -437,15 +489,23 @@ export function ShelfPage() {
   }
 
   function clearFilter() {
-    setFacet(null);
-    setTag(null);
+    updateParams((p) => {
+      p.delete("facet");
+      p.delete("tag");
+      p.delete("view");
+    });
     setShowSaveSmart(false);
   }
 
   function applySmartShelf(shelf: SmartShelfWithCount) {
     const a = ruleToActive(shelf.rule);
-    setFacet(a.facet);
-    setTag(a.tag);
+    updateParams((p) => {
+      p.delete("view");
+      if (a.facet) p.set("facet", a.facet);
+      else p.delete("facet");
+      if (a.tag) p.set("tag", a.tag);
+      else p.delete("tag");
+    });
     setShowBrowse(false);
     setShowSaveSmart(false);
   }
@@ -598,7 +658,36 @@ export function ShelfPage() {
                   )}
                 </div>
 
-                {isFiltered ? (
+                {view === "reading-list" ? (
+                  <div className="space-y-4">
+                    <ReadingListBar count={readingListEntries.length} onClear={clearFilter} />
+                    {readingListEntries.length > 0 ? (
+                      <div className="flex flex-wrap gap-4">
+                        {readingListEntries.map((entry, index) => (
+                          <ShelfBookCard
+                            key={entry.isbn}
+                            entry={entry}
+                            shelves={orderedShelves}
+                            staggerIndex={index}
+                            onMove={(isbn, status) => moveMutation.mutate({ isbn, status })}
+                            onRemove={(isbn) => removeMutation.mutate(isbn)}
+                            onAddToShelf={(shelfId, isbn) =>
+                              addToShelfMutation.mutate({ shelfId, isbn })
+                            }
+                            onRemoveFromShelf={(shelfId, isbn) =>
+                              removeFromShelfMutation.mutate({ shelfId, isbn })
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Your reading list is empty — books you&apos;re reading, or own but
+                        haven&apos;t finished, show up here.
+                      </p>
+                    )}
+                  </div>
+                ) : isFiltered ? (
                   <div className="space-y-4">
                     <ActiveFilterBar
                       facet={facet}
