@@ -38,7 +38,7 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen bg-paper-100 dark:bg-slate-900 transition-colors">
       <AppHeader />
       <main className="max-w-lg mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold dark:text-white mb-8">Change password</h1>
@@ -111,7 +111,7 @@ export function ChangePasswordPage() {
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400">
           <Link
             to="/account/settings"
             className="underline underline-offset-2 hover:no-underline hover:text-slate-700 dark:hover:text-slate-200"

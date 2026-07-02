@@ -32,7 +32,7 @@ export function ShelfEmptyState({
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       </svg>
       <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">{heading}</h2>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">{body}</p>
+      <p className="text-sm text-slate-600 dark:text-slate-400 mb-8">{body}</p>
       <Button variant="app" onClick={onAdd}>
         {cta}
       </Button>

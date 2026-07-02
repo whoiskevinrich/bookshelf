@@ -62,7 +62,7 @@ export function DeleteShelfDialog({ shelf, open, onClose, onDeleted }: DeleteShe
         aria-modal="true"
         aria-labelledby="delete-shelf-title"
         aria-describedby="delete-shelf-body"
-        className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6"
+        className="bg-paper-50 dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6"
       >
         <h2
           id="delete-shelf-title"
@@ -70,7 +70,7 @@ export function DeleteShelfDialog({ shelf, open, onClose, onDeleted }: DeleteShe
         >
           Delete &ldquo;{shelf.name}&rdquo;?
         </h2>
-        <p id="delete-shelf-body" className="text-sm text-slate-500 dark:text-zinc-400 mb-4">
+        <p id="delete-shelf-body" className="text-sm text-slate-600 dark:text-zinc-400 mb-4">
           This shelf has <strong>{bookLabel}</strong>. The books will remain in your library — only
           the shelf is removed.
         </p>

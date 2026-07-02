@@ -104,14 +104,14 @@ export function SingleShelfPage() {
   const rangeEnd = Math.min(pageStart + pageSize, bookCount);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen bg-paper-100 dark:bg-slate-900 transition-colors">
       <AppHeader />
 
       {/* Breadcrumb */}
-      <div className="border-b border-slate-100 dark:border-slate-800 px-4 sm:px-6 py-3">
+      <div className="border-b border-paper-300 dark:border-slate-800 px-4 sm:px-6 py-3">
         <Link
           to="/shelf"
-          className="text-sm text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white flex items-center gap-1.5 w-fit"
+          className="text-sm text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white flex items-center gap-1.5 w-fit"
         >
           <ChevronLeftIcon />
           My Library
@@ -141,7 +141,7 @@ export function SingleShelfPage() {
         {/* Shelf not found */}
         {!isLoading && !isError && !shelf && (
           <div className="pt-16 text-center">
-            <p className="text-slate-500 dark:text-zinc-400 mb-4">This shelf doesn&apos;t exist.</p>
+            <p className="text-slate-600 dark:text-zinc-400 mb-4">This shelf doesn&apos;t exist.</p>
             <Link to="/shelf" className="text-sm text-slate-900 dark:text-white underline">
               Back to My Library
             </Link>
@@ -157,7 +157,7 @@ export function SingleShelfPage() {
                 name={shelf.name}
                 className="text-xl font-semibold text-slate-900 dark:text-white"
               />
-              <span className="shrink-0 text-xs text-slate-500 dark:text-zinc-400 bg-slate-200 dark:bg-slate-800 rounded-full px-2 py-0.5">
+              <span className="shrink-0 text-xs text-slate-600 dark:text-zinc-400 bg-paper-300 dark:bg-slate-800 rounded-full px-2 py-0.5">
                 {bookLabel}
               </span>
               <Button
@@ -182,8 +182,8 @@ export function SingleShelfPage() {
             ) : (
               <>
                 {/* Sticky pagination toolbar — stays in view while the grid scrolls. */}
-                <div className="sticky top-0 z-10 -mx-4 mb-4 flex flex-wrap items-center gap-3 border-b border-slate-100 bg-white/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 dark:border-slate-800 dark:bg-slate-900/95">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">Show</span>
+                <div className="sticky top-0 z-10 -mx-4 mb-4 flex flex-wrap items-center gap-3 border-b border-paper-300 bg-paper-100/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 dark:border-slate-800 dark:bg-slate-900/95">
+                  <span className="text-xs text-slate-600 dark:text-slate-400">Show</span>
                   <SegmentedControl<string>
                     label="Books per page"
                     value={String(pageSize)}
@@ -194,7 +194,7 @@ export function SingleShelfPage() {
                     ]}
                     onChange={(v) => setPageSize(Number(v))}
                   />
-                  <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+                  <span className="ml-auto text-xs text-slate-600 dark:text-slate-400">
                     {rangeStart}–{rangeEnd} of {bookCount}
                   </span>
                   {pageCount > 1 && (
@@ -207,7 +207,7 @@ export function SingleShelfPage() {
                       >
                         Prev
                       </Button>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                      <span className="text-xs text-slate-600 dark:text-slate-400">
                         {safePage + 1} / {pageCount}
                       </span>
                       <Button

@@ -35,10 +35,10 @@ export function Callout({
   return (
     <div
       role="note"
-      className={`relative rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800/50 ${className}`}
+      className={`relative rounded-2xl border border-paper-400 bg-paper-200 p-5 dark:border-slate-700 dark:bg-slate-800/50 ${className}`}
     >
       <div className={`flex gap-4 ${onDismiss ? "pr-8" : ""}`}>
-        {icon && <div className="shrink-0 text-slate-500 dark:text-slate-400">{icon}</div>}
+        {icon && <div className="shrink-0 text-slate-600 dark:text-slate-400">{icon}</div>}
         <div className="min-w-0 flex-1">
           {title && (
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
@@ -53,7 +53,7 @@ export function Callout({
           type="button"
           onClick={onDismiss}
           aria-label={dismissLabel}
-          className="absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
+          className="absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-paper-300/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

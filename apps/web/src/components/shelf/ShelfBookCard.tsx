@@ -304,7 +304,7 @@ function ShelfPicker({
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[200] min-w-[160px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1"
+            className="fixed z-[200] min-w-[160px] bg-paper-50 dark:bg-slate-800 border border-paper-400 dark:border-slate-700 rounded-lg shadow-lg py-1"
             style={{ top: pos.top, left: pos.left }}
           >
             {shelves.map((shelf) => {
@@ -312,7 +312,7 @@ function ShelfPicker({
               return (
                 <label
                   key={shelf.shelfId}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/60"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-paper-200 dark:hover:bg-slate-700/60"
                 >
                   <input
                     type="checkbox"
@@ -483,7 +483,7 @@ export function ShelfBookCard({
           {title}
         </Link>
         {authors.length > 0 && (
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate leading-tight">
+          <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate leading-tight">
             {authors.join(", ")}
           </p>
         )}
@@ -492,7 +492,7 @@ export function ShelfBookCard({
         </p>
         {tags.length > 0 && (
           <div className="mt-1 flex items-center gap-1">
-            <span className="inline-flex min-w-0 items-center gap-0.5 rounded-full border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
+            <span className="inline-flex min-w-0 items-center gap-0.5 rounded-full border border-paper-400 px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
               <TagIcon />
               <span className="truncate">{tags[0]}</span>
             </span>

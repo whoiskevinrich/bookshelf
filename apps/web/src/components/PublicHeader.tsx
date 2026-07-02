@@ -8,7 +8,7 @@ const navLinkClass =
 
 export function PublicHeader() {
   return (
-    <header className="relative border-b border-slate-100 dark:border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between bg-white dark:bg-slate-900 transition-colors">
+    <header className="relative border-b border-paper-300 dark:border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between bg-paper-100 dark:bg-slate-900 transition-colors">
       <Link
         to="/"
         className="font-semibold text-lg tracking-tight text-slate-900 dark:text-white hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
@@ -45,7 +45,7 @@ export function PublicHeader() {
           </Link>
           <Link
             to="/auth/signup"
-            className={`${mobileMenuRowClass} font-medium text-slate-900 dark:text-white border-t border-slate-100 dark:border-slate-800`}
+            className={`${mobileMenuRowClass} font-medium text-slate-900 dark:text-white border-t border-paper-300 dark:border-slate-800`}
           >
             Sign up
           </Link>

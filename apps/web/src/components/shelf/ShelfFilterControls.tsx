@@ -57,7 +57,7 @@ const chipBase =
   "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors";
 const chipSelected = "bg-slate-900 text-white dark:bg-white dark:text-slate-900";
 const chipUnselected =
-  "border border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300";
+  "border border-paper-400 text-slate-600 hover:border-paper-500 dark:border-slate-700 dark:text-slate-300";
 
 function XIcon() {
   return (
@@ -128,7 +128,7 @@ export function TagBrowsePanel({
   const matches = tags.filter((t) => (query ? t.tag.includes(query) : true)).slice(0, 24);
 
   return (
-    <div className="rounded-xl border border-slate-100 dark:border-slate-700 p-4 space-y-3">
+    <div className="rounded-xl border border-paper-300 dark:border-slate-700 p-4 space-y-3">
       <input
         type="text"
         value={q}
@@ -138,11 +138,11 @@ export function TagBrowsePanel({
         aria-label="Filter by tag"
       />
       {tags.length === 0 ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Add tags to your books (from a book&apos;s page) to browse by tag.
         </p>
       ) : matches.length === 0 ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No tags match “{q}”.</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">No tags match “{q}”.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {matches.map((t) => (
@@ -199,7 +199,7 @@ export function ActiveFilterBar({
     <div
       role="group"
       aria-label="Active filters"
-      className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3"
+      className="flex flex-wrap items-center gap-2 rounded-xl bg-paper-200 dark:bg-slate-800/50 p-3"
     >
       {facet && (
         <span className={`${chipBase} ${chipSelected}`}>
@@ -227,7 +227,7 @@ export function ActiveFilterBar({
           </button>
         </span>
       )}
-      <span className="text-xs text-slate-500 dark:text-slate-400">
+      <span className="text-xs text-slate-600 dark:text-slate-400">
         → {count} {count === 1 ? "book" : "books"}
       </span>
       <div className="ml-auto flex items-center gap-2">
@@ -294,7 +294,7 @@ function InfoTooltip({ label, text }: { label: string; text: string }) {
       </button>
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-60 rounded-lg border border-slate-200 bg-white p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-slate-600 shadow-lg group-hover/tip:block group-focus-within/tip:block dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+        className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-60 rounded-lg border border-paper-400 bg-paper-50 p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-slate-600 shadow-lg group-hover/tip:block group-focus-within/tip:block dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
       >
         {text}
       </span>
@@ -313,8 +313,8 @@ export function SmartShelvesGroup({
 }) {
   if (shelves.length === 0) return null;
   return (
-    <section className="rounded-xl border border-slate-100 dark:border-slate-700 p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+    <section className="rounded-xl border border-paper-300 dark:border-slate-700 p-4">
+      <div className="mb-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
         <SparkleIcon />
         <span className="font-semibold uppercase tracking-wide text-xs">Smart shelves</span>
         <InfoTooltip
@@ -338,7 +338,7 @@ export function SmartShelvesGroup({
               type="button"
               onClick={() => onDelete(s)}
               aria-label={`Delete smart shelf ${s.name}`}
-              className="grid h-5 w-5 place-items-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
+              className="grid h-5 w-5 place-items-center rounded-full text-slate-400 hover:bg-paper-300 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
             >
               <XIcon />
             </button>

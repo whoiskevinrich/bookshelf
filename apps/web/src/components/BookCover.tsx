@@ -14,14 +14,14 @@ export function BookCover({ coverUrl, title, authors, className = "" }: BookCove
     const authorLine = authors.length ? authors.join(", ") : null;
     return (
       <div
-        className={`flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-700 overflow-hidden p-1.5 gap-0.5 aspect-[2/3] ${className}`}
+        className={`flex flex-col items-center justify-center bg-paper-200 dark:bg-slate-700 overflow-hidden p-1.5 gap-0.5 aspect-[2/3] ${className}`}
         aria-label={authorLine ? `${title} by ${authorLine}` : title}
       >
         <p className="text-[0.6rem] font-semibold text-slate-700 dark:text-slate-200 text-center leading-tight line-clamp-3 w-full">
           {title}
         </p>
         {authorLine && (
-          <p className="text-[0.55rem] text-slate-500 dark:text-slate-400 text-center leading-tight line-clamp-2 w-full">
+          <p className="text-[0.55rem] text-slate-600 dark:text-slate-400 text-center leading-tight line-clamp-2 w-full">
             {authorLine}
           </p>
         )}

@@ -45,11 +45,11 @@ export function DeleteAccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen bg-paper-100 dark:bg-slate-900 transition-colors">
       <AppHeader />
       <main className="max-w-lg mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold dark:text-white mb-2">Delete account</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-8">
           This will permanently erase your account and all books on your shelf. There is no undo.
         </p>
 
@@ -57,7 +57,7 @@ export function DeleteAccountPage() {
           <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
             You will permanently lose:
           </p>
-          <ul className="text-sm text-slate-500 dark:text-slate-400 list-disc list-inside space-y-1">
+          <ul className="text-sm text-slate-600 dark:text-slate-400 list-disc list-inside space-y-1">
             <li>Your account and login access</li>
             <li>All books on your shelf and wishlist</li>
           </ul>
@@ -115,7 +115,7 @@ export function DeleteAccountPage() {
             </Button>
             <Link
               to="/account/settings"
-              className="text-sm text-slate-500 dark:text-slate-400 underline underline-offset-2 hover:no-underline hover:text-slate-700 dark:hover:text-slate-200"
+              className="text-sm text-slate-600 dark:text-slate-400 underline underline-offset-2 hover:no-underline hover:text-slate-700 dark:hover:text-slate-200"
             >
               Cancel
             </Link>
