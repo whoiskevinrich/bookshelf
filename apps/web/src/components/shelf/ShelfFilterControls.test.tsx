@@ -7,9 +7,12 @@ import {
   facetLabel,
   buildFilter,
   ruleToActive,
+  parseFacet,
+  isReadingListEntry,
   FacetBar,
   TagBrowsePanel,
   ActiveFilterBar,
+  ReadingListBar,
   SmartShelvesGroup,
 } from "./ShelfFilterControls";
 
@@ -41,6 +44,34 @@ describe("filter helpers", () => {
     expect(ruleToActive({ readingStatus: "reading" })).toEqual({ facet: "reading", tag: null });
     expect(ruleToActive({ want: true, tag: "fiction" })).toEqual({ facet: "want", tag: "fiction" });
     expect(ruleToActive({ tag: "fiction" })).toEqual({ facet: null, tag: "fiction" });
+  });
+
+  it("parseFacet accepts known facets and rejects anything else", () => {
+    expect(parseFacet("want")).toBe("want");
+    expect(parseFacet("finished")).toBe("finished");
+    expect(parseFacet(null)).toBeNull();
+    expect(parseFacet(undefined)).toBeNull();
+    expect(parseFacet("")).toBeNull();
+    expect(parseFacet("bogus")).toBeNull();
+    expect(parseFacet("reading-list")).toBeNull(); // the composite view is not a facet
+  });
+});
+
+describe("isReadingListEntry", () => {
+  it("includes anything currently being read (owned or not)", () => {
+    expect(isReadingListEntry({ owned: true, readingStatus: "reading" })).toBe(true);
+    expect(isReadingListEntry({ owned: false, readingStatus: "reading" })).toBe(true);
+  });
+
+  it("includes owned books that aren't finished", () => {
+    expect(isReadingListEntry({ owned: true, readingStatus: "unread" })).toBe(true);
+    expect(isReadingListEntry({ owned: true, readingStatus: null })).toBe(true);
+  });
+
+  it("excludes finished books and unowned wishlist books", () => {
+    expect(isReadingListEntry({ owned: true, readingStatus: "finished" })).toBe(false);
+    expect(isReadingListEntry({ owned: false, readingStatus: "unread" })).toBe(false);
+    expect(isReadingListEntry({ owned: false, readingStatus: null })).toBe(false);
   });
 });
 
@@ -156,6 +187,24 @@ describe("ActiveFilterBar", () => {
     expect(fns.onSave).toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Clear" }));
     expect(fns.onClear).toHaveBeenCalled();
+  });
+});
+
+describe("ReadingListBar", () => {
+  it("labels the view and pluralizes the count", () => {
+    const { rerender } = render(<ReadingListBar count={3} onClear={() => {}} />);
+    expect(screen.getByRole("group", { name: "Reading list" })).toBeInTheDocument();
+    expect(screen.getByText("→ 3 books")).toBeInTheDocument();
+    rerender(<ReadingListBar count={1} onClear={() => {}} />);
+    expect(screen.getByText("→ 1 book")).toBeInTheDocument();
+  });
+
+  it("wires the clear action", async () => {
+    const user = userEvent.setup();
+    const onClear = vi.fn();
+    render(<ReadingListBar count={2} onClear={onClear} />);
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    expect(onClear).toHaveBeenCalled();
   });
 });
 

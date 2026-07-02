@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "../ui/Button";
 import { inputClass } from "../../lib/form-styles";
-import type { ShelfFilter, SmartShelfWithCount, TagCount } from "../../lib/api-client";
+import type { ShelfEntry, ShelfFilter, SmartShelfWithCount, TagCount } from "../../lib/api-client";
 
 // ── Facet model ──────────────────────────────────────────────────────────────
 
@@ -49,6 +49,22 @@ export function ruleToActive(rule: ShelfFilter): { facet: SystemFacet | null; ta
   else if (rule.readingStatus === "finished") facet = "finished";
   else if (rule.readingStatus === "unread") facet = "unread";
   return { facet, tag: rule.tag ?? null };
+}
+
+/** Narrow an untrusted string (e.g. a URL query param) to a known SystemFacet, or null. */
+export function parseFacet(raw: string | null | undefined): SystemFacet | null {
+  return raw && FACETS.some((f) => f.value === raw) ? (raw as SystemFacet) : null;
+}
+
+/**
+ * Reading List membership (ADR-021): a book is on the reading list if it's
+ * currently being read, or it's owned and not yet finished (the "read next from
+ * what I own" queue). Deliberately excludes wishlist-only books so it never
+ * overlaps the Wishlist view.
+ */
+export function isReadingListEntry(entry: Pick<ShelfEntry, "owned" | "readingStatus">): boolean {
+  if (entry.readingStatus === "reading") return true;
+  return entry.owned && entry.readingStatus !== "finished";
 }
 
 // ── Shared chip styles ───────────────────────────────────────────────────────
@@ -236,6 +252,28 @@ export function ActiveFilterBar({
             Save as smart shelf
           </Button>
         )}
+        <Button variant="ghost" size="sm" onClick={onClear}>
+          Clear
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Reading List bar (named composite view; not a saveable rule) ─────────────
+
+export function ReadingListBar({ count, onClear }: { count: number; onClear: () => void }) {
+  return (
+    <div
+      role="group"
+      aria-label="Reading list"
+      className="flex flex-wrap items-center gap-2 rounded-xl bg-paper-200 dark:bg-slate-800/50 p-3"
+    >
+      <span className={`${chipBase} ${chipSelected}`}>Reading list</span>
+      <span className="text-xs text-slate-600 dark:text-slate-400">
+        → {count} {count === 1 ? "book" : "books"}
+      </span>
+      <div className="ml-auto">
         <Button variant="ghost" size="sm" onClick={onClear}>
           Clear
         </Button>
