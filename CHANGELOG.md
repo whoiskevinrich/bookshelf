@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/whoiskevinrich/bookshelf/compare/v0.2.0...v0.2.1) (2026-07-02)
+
+
+### Bug Fixes
+
+* **ci:** drop package-name so release-please can tag its merged release PR ([#90](https://github.com/whoiskevinrich/bookshelf/issues/90)) ([3ff87ba](https://github.com/whoiskevinrich/bookshelf/commit/3ff87ba64b2e2e1e5b56727d720d4331c87af527))
+
 ## [0.2.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.1.57...v0.2.0) (2026-07-02)
 
 ### Features
