@@ -80,7 +80,7 @@ describe("FacetBar", () => {
     render(<FacetBar facet={null} onSelect={() => {}} />);
     const group = screen.getByRole("group", { name: "Filter by status" });
     expect(group).toBeInTheDocument();
-    for (const label of ["All", "Owned", "Want", "Reading", "Read", "Unread"]) {
+    for (const label of ["All", "Owned", "Wishlist", "Reading", "Read", "Unread"]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
   });

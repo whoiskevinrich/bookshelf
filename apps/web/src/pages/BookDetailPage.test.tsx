@@ -135,7 +135,7 @@ describe("BookDetailPage — Your copy panel (#82)", () => {
     const ownedRadio = screen.getByRole("radio", { name: "Owned" });
     expect(ownedRadio).toHaveAttribute("aria-checked", "true");
 
-    await user.click(screen.getByRole("radio", { name: "Want" }));
+    await user.click(screen.getByRole("radio", { name: "Wishlist" }));
     expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { want: true });
   });
 

@@ -436,7 +436,7 @@ export function ShelfBookCard({
         <div className="pointer-events-none absolute inset-0">
           {(owned || want) && (
             <div className="absolute top-1.5 left-1.5">
-              {/* Owned/Want are mutually exclusive — exactly one renders. Icon color
+              {/* Owned/Wishlist are mutually exclusive — exactly one renders. Icon color
                   (green/red) reinforces the label; the text keeps it WCAG-safe. */}
               {owned ? (
                 <StatePill
@@ -454,7 +454,7 @@ export function ShelfBookCard({
                       <PillBookmarkIcon />
                     </span>
                   }
-                  label="Want"
+                  label="Wishlist"
                 />
               )}
             </div>
