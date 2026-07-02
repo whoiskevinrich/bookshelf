@@ -14,8 +14,6 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 const panelLinkClass = ({ isActive }: { isActive: boolean }) =>
   `${mobileMenuRowClass}${isActive ? " font-medium text-slate-900 dark:text-white" : ""}`;
 
-const panelActiveClass = " font-medium text-slate-900 dark:text-white";
-
 // The three shelf views (My Library / Wishlist / Reading list) all live at
 // `/shelf`, so NavLink's path-only matching would mark all three active (and set
 // aria-current on all three) at once. Distinguish them by query param (ADR-021)
@@ -41,41 +39,29 @@ export function AppHeader() {
     navigate("/", { replace: true });
   }
 
-  // Shelf deep-links: one row of view links rendered for both the inline nav and
-  // the mobile panel (different base classes, same active-by-query-param logic).
+  // Shelf deep-links rendered for both the inline nav and the mobile panel. They
+  // share the active-by-query-param logic and differ only in their base styling,
+  // so each surface passes its existing link-class fn (navLinkClass / panelLinkClass).
   const shelfLinks: { to: string; label: string; view: ShelfView }[] = [
     { to: "/shelf", label: "My Library", view: "library" },
     { to: "/shelf?facet=want", label: "Wishlist", view: "wishlist" },
     { to: "/shelf?view=reading-list", label: "Reading list", view: "reading-list" },
   ];
 
-  const inlineShelfLinks = shelfLinks.map(({ to, label, view }) => {
-    const isActive = shelfView === view;
-    return (
-      <Link
-        key={view}
-        to={to}
-        className={isActive ? activeLinkClass : inactiveLinkClass}
-        aria-current={isActive ? "page" : undefined}
-      >
-        {label}
-      </Link>
-    );
-  });
-
-  const panelShelfLinks = shelfLinks.map(({ to, label, view }) => {
-    const isActive = shelfView === view;
-    return (
-      <Link
-        key={view}
-        to={to}
-        className={`${mobileMenuRowClass}${isActive ? panelActiveClass : ""}`}
-        aria-current={isActive ? "page" : undefined}
-      >
-        {label}
-      </Link>
-    );
-  });
+  const renderShelfLinks = (linkClass: (state: { isActive: boolean }) => string) =>
+    shelfLinks.map(({ to, label, view }) => {
+      const isActive = shelfView === view;
+      return (
+        <Link
+          key={view}
+          to={to}
+          className={linkClass({ isActive })}
+          aria-current={isActive ? "page" : undefined}
+        >
+          {label}
+        </Link>
+      );
+    });
 
   return (
     <header className="relative border-b border-paper-300 dark:border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between bg-paper-100 dark:bg-slate-900 transition-colors">
@@ -83,7 +69,7 @@ export function AppHeader() {
 
       {/* Inline nav — sm and up */}
       <nav className="hidden sm:flex items-center gap-4">
-        {inlineShelfLinks}
+        {renderShelfLinks(navLinkClass)}
         <NavLink to="/about" className={navLinkClass}>
           About
         </NavLink>
@@ -104,7 +90,7 @@ export function AppHeader() {
       <div className="flex items-center gap-1 sm:hidden">
         <ThemeToggle />
         <MobileMenu>
-          {panelShelfLinks}
+          {renderShelfLinks(panelLinkClass)}
           <NavLink to="/about" className={panelLinkClass}>
             About
           </NavLink>
