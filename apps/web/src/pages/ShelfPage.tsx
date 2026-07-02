@@ -46,6 +46,7 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ScanModal } from "../components/scanner/ScanModal";
 import { supportsCameraScan } from "../lib/device";
 import { getRuntimeConfig } from "../lib/runtime-config";
+import { isConflictError } from "../lib/api-client";
 import type { ShelfEntry, ShelfStatus, BookSearchResult, Shelf } from "../lib/api-client";
 
 // ── Section header ─────────────────────────────────────────────────────────
@@ -553,7 +554,9 @@ export function ShelfPage() {
 
         {addMutation.isError && (
           <p className="text-sm text-red-500 mb-4">
-            Couldn't add book — {addMutation.error.message}
+            {isConflictError(addMutation.error)
+              ? "That book is already on your shelf."
+              : `Couldn't add book — ${addMutation.error.message}`}
           </p>
         )}
 
