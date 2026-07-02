@@ -21,6 +21,8 @@
 //   JIRA_API_TOKEN     required — Atlassian API token
 //   JIRA_KEY_PREFIX    optional — issue-key project prefix (default "BOOKSHELF")
 //   JIRA_TARGET_STATUS optional — status to move issues to (default "Done")
+//   DRY_RUN            optional — "true" to validate + log without POSTing the
+//                      transition (for local pre-flight checks; no tickets move)
 
 const warn = (msg) => console.log(`::warning::[jira-sync] ${msg}`);
 const info = (msg) => console.log(`[jira-sync] ${msg}`);
@@ -34,7 +36,10 @@ const {
   JIRA_API_TOKEN,
   JIRA_KEY_PREFIX = "BOOKSHELF",
   JIRA_TARGET_STATUS = "Done",
+  DRY_RUN,
 } = process.env;
+
+const dryRun = DRY_RUN === "true";
 
 // Never fail the promote: any missing config is a warning + clean exit.
 function bailSoft(msg) {
@@ -134,6 +139,11 @@ async function syncOne(key) {
       `${key}: no transition to "${JIRA_TARGET_STATUS}" available from "${cur.status}" — skipping`,
     );
   }
+  if (dryRun) {
+    return info(
+      `${key}: [dry-run] would transition "${cur.status}" → "${JIRA_TARGET_STATUS}" (id ${id})`,
+    );
+  }
   await transition(key, id);
   info(`${key}: "${cur.status}" → "${JIRA_TARGET_STATUS}" (${RELEASE_TAG})`);
 }
@@ -151,7 +161,9 @@ async function main() {
     info(`no ${JIRA_KEY_PREFIX}-* keys in ${RELEASE_TAG} release notes — nothing to sync`);
     return;
   }
-  info(`syncing ${keys.length} ticket(s) for ${RELEASE_TAG}: ${keys.join(", ")}`);
+  info(
+    `${dryRun ? "[dry-run] " : ""}syncing ${keys.length} ticket(s) for ${RELEASE_TAG}: ${keys.join(", ")}`,
+  );
 
   let failures = 0;
   for (const key of keys) {
