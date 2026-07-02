@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { BookCover } from "../BookCover";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import type { ShelfEntry, ShelfStatus, ReadingStatus, Shelf } from "../../lib/api-client";
 
 const MAX_STAGGER_INDEX = 9;
@@ -358,18 +359,11 @@ export function ShelfBookCard({
 
   const navigate = useNavigate();
 
-  // Touch devices have no hover, so the action overlay can't reveal on hover and
-  // its invisible buttons would otherwise be blind-tappable. On coarse pointers,
-  // tapping the cover toggles the overlay; on hover-capable pointers, clicking the
-  // cover opens the book-detail view (the title link is the explicit affordance).
-  const [revealed, setRevealed] = useState(false);
-  function handleCoverClick() {
-    if (typeof window !== "undefined" && window.matchMedia?.("(hover: none)").matches) {
-      setRevealed((v) => !v);
-    } else {
-      navigate(`/book/${isbn}`);
-    }
-  }
+  // The cover is a convenience click-target for the title link: every pointer type
+  // goes to the book-detail view. The action overlay reveals on hover or keyboard
+  // focus only — on touch, those actions (and remove) live in the detail view, so
+  // a stray tap on a card can never fire a destructive action.
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   return (
     <div
@@ -383,8 +377,8 @@ export function ShelfBookCard({
       {/* Cover + hover overlay — w-fit + mx-auto so the rounded corners and overlay hug the
           image exactly (not the wider column), and the cover sits centered in the column. */}
       <div
-        className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200 w-fit max-w-full mx-auto"
-        onClick={handleCoverClick}
+        className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200 w-fit max-w-full mx-auto cursor-pointer"
+        onClick={() => navigate(`/book/${isbn}`)}
       >
         <BookCover
           key={book?.coverUrl ?? "no-cover"}
@@ -394,17 +388,16 @@ export function ShelfBookCard({
           className="h-[195px]"
         />
 
-        {/* Action overlay — hover (mouse), focus-within (keyboard), or tap (touch).
+        {/* Action overlay — hover (mouse) or focus-within (keyboard) only.
             pointer-events follow visibility so the buttons can't be blind-tapped while hidden. */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-end pb-2
+          className="absolute inset-0 flex flex-col items-center justify-end pb-2
                      bg-gradient-to-t from-black/75 via-black/20 to-transparent
-                     transition-opacity duration-200
+                     transition-opacity duration-200 opacity-0 pointer-events-none
                      group-hover/card:opacity-100 group-hover/card:pointer-events-auto
-                     focus-within:opacity-100 focus-within:pointer-events-auto
-                     ${revealed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+                     focus-within:opacity-100 focus-within:pointer-events-auto"
         >
-          {/* Stop button taps from bubbling to the cover's toggle handler. */}
+          {/* Stop button clicks from bubbling to the cover's navigate handler. */}
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {/* One-directional quick action: wishlist → owned ("Mark as Owned").
                 Wishlisting an owned book is the confusing direction — that lives in
@@ -428,7 +421,7 @@ export function ShelfBookCard({
             />
 
             <OverlayButton
-              onClick={() => onRemove(isbn)}
+              onClick={() => setConfirmRemove(true)}
               {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
               title={isRemoving ? "Removing…" : "Remove from library"}
               danger
@@ -508,6 +501,19 @@ export function ShelfBookCard({
       {error && (
         <p className="text-[10px] text-red-500 dark:text-red-400 leading-tight px-0.5">{error}</p>
       )}
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove book?"
+        message={`"${title}" will be removed from your library.`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => {
+          setConfirmRemove(false);
+          onRemove(isbn);
+        }}
+        onClose={() => setConfirmRemove(false)}
+      />
     </div>
   );
 }

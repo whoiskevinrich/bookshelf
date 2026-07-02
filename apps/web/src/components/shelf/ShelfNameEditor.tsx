@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useUpdateShelf } from "../../hooks/useShelves";
-import { ApiError } from "../../lib/api-client";
+import { isConflictError } from "../../lib/api-client";
 import { track } from "../../lib/analytics";
 import { inputClass } from "../../lib/form-styles";
 import { Button } from "../ui/Button";
@@ -73,7 +73,7 @@ export function ShelfNameEditor({ shelfId, name, className }: ShelfNameEditorPro
           track("shelf_renamed", { shelfId });
         },
         onError: (err) => {
-          if (err instanceof ApiError && err.status === 409) {
+          if (isConflictError(err)) {
             setError("You already have a shelf with this name.");
           } else {
             setEditing(false);

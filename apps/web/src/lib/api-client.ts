@@ -66,6 +66,11 @@ export class ApiError extends Error {
   }
 }
 
+/** True when the server rejected a write as a duplicate/conflict (409). */
+export function isConflictError(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.status === 409;
+}
+
 // ── Internal ───────────────────────────────────────────────────────────────
 
 async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
