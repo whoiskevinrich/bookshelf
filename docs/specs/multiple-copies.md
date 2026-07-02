@@ -10,25 +10,27 @@
 
 A user's relationship to a book is one DynamoDB item keyed `USER#<userId>` / `ENTRY#<isbn>` — **exactly one entry per ISBN per user**. A user who owns two physical copies of the same book (one to lend, one to keep; a spare gifted copy) can't represent it. Adding the same ISBN again returns **409 Conflict** (duplicate detection), so the second copy is simply refused.
 
-User feedback (2026-07-01, rank 14): *"Options for adding different editions or multiple copies."*
+User feedback (2026-07-01, rank 14): _"Options for adding different editions or multiple copies."_
 
 ## Scope
 
-**In scope — multiple copies of one ISBN, as a count.** Track *how many* copies of a given book the user owns.
+**In scope — multiple copies of one ISBN, as a count.** Track _how many_ copies of a given book the user owns.
 
-**Out of scope (deferred) — edition grouping.** Showing hardcover + paperback + audiobook of one *work* together is a separate concern: different editions already have different ISBNs and can be added today (they just appear as unrelated books). Work-level grouping needs a `WORK#`-style entity and metadata we don't store, and is tracked separately (see Out of Scope). This spec deliberately does **not** change the key schema, so it does not foreclose that future work.
+**Out of scope (deferred) — edition grouping.** Showing hardcover + paperback + audiobook of one _work_ together is a separate concern: different editions already have different ISBNs and can be added today (they just appear as unrelated books). Work-level grouping needs a `WORK#`-style entity and metadata we don't store, and is tracked separately (see Out of Scope). This spec deliberately does **not** change the key schema, so it does not foreclose that future work.
 
 ## Goals / Non-goals
 
 **Goals**
+
 - Represent owning N copies of the same ISBN without a second entry.
 - Turn a duplicate add into a helpful "add another copy" action instead of a dead-end 409.
 - Keep the change additive and reversible — no key-schema change, no migration.
 
 **Non-goals**
+
 - Per-copy attributes (condition, location, acquired date, per-copy notes). Explicitly rejected for v1 (decision below) — that would require a per-copy sort key.
 - Edition/format grouping across ISBNs.
-- Copies of *wishlist* books (a count only makes sense for owned; see Data model).
+- Copies of _wishlist_ books (a count only makes sense for owned; see Data model).
 
 ## Decision — a `copies` count, key unchanged
 

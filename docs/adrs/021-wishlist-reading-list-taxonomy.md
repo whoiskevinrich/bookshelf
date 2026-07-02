@@ -13,7 +13,7 @@ Three items from the 2026-07-01 user-feedback batch all touch the same surface �
 - **BOOKSHELF-54** — users want a **"Reading List"**. Reading-status facets shipped (ADR-019 / PR #82), but nothing called "Reading List" exists out of the box and the bare facet doesn't read as one.
 - **BOOKSHELF-57** — users want **sort** (title, author, release date, date added). No sorting exists today; a sort control needs a home for its persisted choice.
 
-ADR-019 set the governing constraint: **auto-shelves are computed rules and a facet is never auto-promoted to a standing shelf.** System facets live in a filter bar; smart shelves are *human-created* `SMARTSHELF#` rule items (cap 50). Any "built-in shelf" solution must respect that principle rather than special-casing new stored shelf entities.
+ADR-019 set the governing constraint: **auto-shelves are computed rules and a facet is never auto-promoted to a standing shelf.** System facets live in a filter bar; smart shelves are _human-created_ `SMARTSHELF#` rule items (cap 50). Any "built-in shelf" solution must respect that principle rather than special-casing new stored shelf entities.
 
 ## Decision
 
@@ -33,7 +33,7 @@ This keeps ADR-019 intact: facets stay filters, nothing is promoted to a standin
 
 **Enabling change:** `ShelfPage` currently holds `facet`/`tag` in `useState` only. To honor a deep link it must **initialize filter state from the URL** (e.g. `?facet=want` or `?view=reading-list`) on mount and keep the URL in sync. This is the one shelf-page change the entry points require.
 
-### 3. Reading List — a client-computed composite view: *currently reading + unread you own*
+### 3. Reading List — a client-computed composite view: _currently reading + unread you own_
 
 "Reading list" = `readingStatus === "reading"` **OR** (`owned === true` **AND** not finished, i.e. `readingStatus` is `"unread"` or null). It is the "what to read next from books I already have" queue — deliberately **distinct from Wishlist** (books you don't own yet), so the two never overlap.
 
@@ -47,7 +47,7 @@ The sort choice (field + direction) persists **per user, across devices**, not p
 
 - Storage: one item per user, `PK = USER#<userId>`, `SK = PREF#SHELF` (a singleton), holding `{ sortField, sortDir }`. No GSI; single-item read, mirrors ADR-019's cost posture.
 - API: `GET /v1/preferences` + `PUT /v1/preferences` (or `PATCH`), behind router-level `authMiddleware`. Per the CLAUDE.md **new-endpoint checklist**: validate `sortField` against an allowlist (`title | author | releaseDate | addedAt`), `sortDir` ∈ `asc | desc`; reject anything else with **400**; generic 500 strings.
-- Sort execution stays client-side over the loaded library (like the facets), so only the *preference* round-trips — not the sorted data.
+- Sort execution stays client-side over the loaded library (like the facets), so only the _preference_ round-trips — not the sorted data.
 
 ## Consequences
 
