@@ -7,7 +7,7 @@ const sectionHeadingClass =
 
 export function AboutPage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen bg-paper-100 dark:bg-slate-900 transition-colors">
       <AppHeader />
 
       <main className="max-w-2xl mx-auto px-6 py-16">
@@ -15,7 +15,7 @@ export function AboutPage() {
           <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white mb-4">
             About Bookshelf
           </h1>
-          <p className="text-lg text-slate-500 dark:text-slate-400 mb-12 max-w-xl">
+          <p className="text-lg text-slate-600 dark:text-slate-400 mb-12 max-w-xl">
             Bookshelf is two things at once: a real, usable app for tracking the books you own and
             want to read — and a live experiment in how far you can get building a web app almost
             entirely through conversation with Claude Code.
@@ -54,8 +54,8 @@ export function AboutPage() {
             </p>
           </section>
 
-          <footer className="mt-16 pt-6 border-t border-slate-100 dark:border-slate-800">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+          <footer className="mt-16 pt-6 border-t border-paper-300 dark:border-slate-800">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               Built by{" "}
               <a
                 href="https://whoiskevinrich.com"

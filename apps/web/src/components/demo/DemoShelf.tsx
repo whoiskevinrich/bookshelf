@@ -118,10 +118,10 @@ const STAGGER_STEP_MS = 50;
 function SectionHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 shrink-0">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 shrink-0">
         {title}
       </h3>
-      <span className="flex-1 h-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+      <span className="flex-1 h-px bg-paper-300 dark:bg-slate-700" aria-hidden="true" />
     </div>
   );
 }
@@ -132,7 +132,7 @@ function BookGrid({ books, indexOffset = 0 }: { books: DemoBook[]; indexOffset?:
       {books.map((book, index) => (
         <div
           key={book.isbn}
-          className="group flex flex-col gap-2 rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors duration-200 animate-fade-up"
+          className="group flex flex-col gap-2 rounded-lg p-2 hover:bg-paper-200 dark:hover:bg-slate-700/50 transition-colors duration-200 animate-fade-up"
           style={{
             animationDelay: `${Math.min(indexOffset + index, MAX_STAGGER_INDEX) * STAGGER_STEP_MS}ms`,
           }}
@@ -146,7 +146,7 @@ function BookGrid({ books, indexOffset = 0 }: { books: DemoBook[]; indexOffset?:
           />
           <div>
             <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{book.authors.join(", ")}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">{book.authors.join(", ")}</p>
           </div>
         </div>
       ))}

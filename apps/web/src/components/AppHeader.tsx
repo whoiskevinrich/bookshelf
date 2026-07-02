@@ -6,7 +6,7 @@ import { MobileMenu, mobileMenuRowClass } from "./MobileMenu";
 
 const activeLinkClass = "text-sm font-medium text-slate-900 dark:text-white";
 const inactiveLinkClass =
-  "text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
+  "text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   isActive ? activeLinkClass : inactiveLinkClass;
@@ -24,7 +24,7 @@ export function AppHeader() {
   }
 
   return (
-    <header className="relative border-b border-slate-100 dark:border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between bg-white dark:bg-slate-900 transition-colors">
+    <header className="relative border-b border-paper-300 dark:border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between bg-paper-100 dark:bg-slate-900 transition-colors">
       <span className="font-semibold text-lg tracking-tight dark:text-white">Bookshelf</span>
 
       {/* Inline nav — sm and up */}
@@ -66,7 +66,7 @@ export function AppHeader() {
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
-                className={`${mobileMenuRowClass} border-t border-slate-100 dark:border-slate-800`}
+                className={`${mobileMenuRowClass} border-t border-paper-300 dark:border-slate-800`}
               >
                 Sign out
               </button>

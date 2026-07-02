@@ -26,7 +26,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5"
+      className="inline-flex rounded-lg border border-paper-400 dark:border-slate-700 bg-paper-200 dark:bg-slate-800 p-0.5"
     >
       {options.map((opt) => {
         const selected = opt.value === value;
@@ -39,8 +39,8 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(opt.value)}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               selected
-                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                ? "bg-paper-50 dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             }`}
           >
             <svg

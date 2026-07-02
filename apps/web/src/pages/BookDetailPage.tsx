@@ -82,8 +82,8 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
     .slice(0, MAX_SUGGESTIONS);
 
   return (
-    <section className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-6 space-y-6">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+    <section className="border-t border-paper-400 dark:border-slate-700 pt-6 mt-6 space-y-6">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
         Your copy
       </h2>
 
@@ -128,14 +128,14 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
             {entry.tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 py-1 pl-3 pr-1 text-sm text-slate-700 dark:text-slate-200"
+                className="inline-flex items-center gap-1 rounded-full border border-paper-500 dark:border-slate-600 bg-paper-200 dark:bg-slate-800 py-1 pl-3 pr-1 text-sm text-slate-700 dark:text-slate-200"
               >
                 {tag}
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
                   aria-label={`Remove tag ${tag}`}
-                  className="grid h-7 w-7 place-items-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white transition-colors"
+                  className="grid h-7 w-7 place-items-center rounded-full text-slate-400 hover:bg-paper-300 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white transition-colors"
                 >
                   <svg
                     viewBox="0 0 16 16"
@@ -176,7 +176,7 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
           </form>
         )}
         {atTagLimit && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             You&apos;ve reached the {TAGS_MAX_COUNT}-tag limit for this book.
           </p>
         )}
@@ -188,13 +188,13 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
 
         {suggestions.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Suggested:</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">Suggested:</span>
             {suggestions.map((tag) => (
               <button
                 key={tag}
                 type="button"
                 onClick={() => addTag(tag)}
-                className="rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                className="rounded-full bg-paper-200 dark:bg-slate-800 px-3 py-1 text-xs text-slate-700 dark:text-slate-200 hover:bg-paper-300 dark:hover:bg-slate-700 transition-colors"
               >
                 + {tag}
               </button>
@@ -235,8 +235,8 @@ function ShelvesPanel({ isbn, shelves }: { isbn: string; shelves: Shelf[] }) {
   if (shelves.length === 0) return null;
 
   return (
-    <section className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-6 space-y-2">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+    <section className="border-t border-paper-400 dark:border-slate-700 pt-6 mt-6 space-y-2">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
         Shelves
       </h2>
       <div className="space-y-1">
@@ -281,7 +281,7 @@ function RemovePanel({ isbn, title }: { isbn: string; title: string }) {
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <section className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-6">
+    <section className="border-t border-paper-400 dark:border-slate-700 pt-6 mt-6">
       <Button
         variant="destructive"
         size="sm"
@@ -341,13 +341,13 @@ export function BookDetailPage() {
     entryQuery.error.status < 500;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen bg-paper-100 dark:bg-slate-900 transition-colors">
       <AppHeader />
 
-      <div className="border-b border-slate-100 dark:border-slate-800 px-4 sm:px-6 py-3">
+      <div className="border-b border-paper-300 dark:border-slate-800 px-4 sm:px-6 py-3">
         <Link
           to="/shelf"
-          className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1.5 w-fit"
+          className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1.5 w-fit"
         >
           <ChevronLeftIcon />
           My Library
@@ -359,10 +359,10 @@ export function BookDetailPage() {
 
         {cannotShow && !entryQuery.isLoading && (
           <div className="pt-12 text-center">
-            <p className="mb-1 text-slate-500 dark:text-slate-400">
+            <p className="mb-1 text-slate-600 dark:text-slate-400">
               We couldn&apos;t find this book on your shelf.
             </p>
-            <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
               It may have been removed.
             </p>
             <Button variant="app" onClick={() => navigate("/shelf")}>
@@ -405,7 +405,7 @@ export function BookDetailPage() {
                 )}
                 <p className="mt-3 font-mono text-xs text-slate-400 dark:text-slate-500">{isbn}</p>
                 {onShelves.length > 0 && (
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
                     On shelves:{" "}
                     {onShelves.map((s, i) => (
                       <span key={s.shelfId}>

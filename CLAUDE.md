@@ -146,7 +146,7 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 - Buttons: always use `<Button>` from `src/components/ui/Button.tsx` — never inline `bg-indigo-600` or `bg-gray-900` button classes on a raw `<button>`
 - Informational callouts/tips: use `<Callout>` from `src/components/ui/Callout.tsx` (not for form validation — use inline red/green); QR codes via `<QrCode>` (lazy-loaded, always dark-on-white). See `docs/design-system.md`
 - Auth form inputs/labels: import `inputClass`/`labelClass` from `src/lib/form-styles.ts` — never redeclare locally
-- Muted/secondary text: minimum `text-gray-500 dark:text-zinc-400` for any visible text content on light backgrounds (`text-gray-400` fails WCAG AA contrast)
+- Muted/secondary text: minimum `text-slate-600 dark:text-slate-400` for any visible text on the light `paper-*` surfaces (`slate-500` is only 4.16:1 on `paper-100`; `text-gray-400` is guard-banned) — see `docs/design-system.md`
 - Interactive elements: no hover-only affordances (e.g. `opacity-0 group-hover:opacity-100`) — touch users can't hover
 - Loading spinners (`animate-spin`): must include `role="status"` and `aria-label`
 - State communicated by color alone (e.g. checklists, badges): must also use a shape/icon distinction for color-blind users

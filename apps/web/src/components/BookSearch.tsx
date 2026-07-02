@@ -139,11 +139,11 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleInputKeyDown}
         placeholder="Search by title, author, or paste an ISBN…"
-        className="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300"
+        className="w-full border border-paper-400 dark:border-slate-600 bg-paper-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300"
       />
 
       <div role="status" aria-live="polite" aria-atomic="true">
-        {loading && <p className="text-sm text-slate-500 dark:text-slate-400">Searching…</p>}
+        {loading && <p className="text-sm text-slate-600 dark:text-slate-400">Searching…</p>}
         {error && (
           <p className="text-sm text-red-500 dark:text-red-400">
             {error}{" "}
@@ -156,7 +156,7 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
           </p>
         )}
         {results.length === 0 && !loading && !error && query.trim().length > 0 && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No results found.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">No results found.</p>
         )}
       </div>
 
@@ -180,8 +180,8 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
               onKeyDown={(e) => handleResultKeyDown(e, index, book)}
               className={`flex gap-3 items-start border rounded-lg p-3 outline-none cursor-default transition-colors duration-100 ${
                 activeIndex === index
-                  ? "border-slate-400 dark:border-slate-500 bg-slate-50 dark:bg-slate-700/50 ring-1 ring-slate-400 dark:ring-slate-500"
-                  : "border-slate-100 dark:border-slate-700"
+                  ? "border-slate-400 dark:border-slate-500 bg-paper-200 dark:bg-slate-700/50 ring-1 ring-slate-400 dark:ring-slate-500"
+                  : "border-paper-300 dark:border-slate-700"
               }`}
             >
               <BookCover
@@ -194,12 +194,12 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium leading-tight dark:text-white">{book.title}</p>
                 {book.authors.length > 0 && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
                     {book.authors.join(", ")}
                   </p>
                 )}
                 {book.publishedYear && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{book.publishedYear}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">{book.publishedYear}</p>
                 )}
               </div>
               <div className="flex flex-col gap-1.5 flex-shrink-0">

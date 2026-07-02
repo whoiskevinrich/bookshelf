@@ -129,7 +129,7 @@ export function LoginPage() {
           <div className="flex items-center justify-between">
             <Link
               to="/auth/forgot-password"
-              className="text-sm text-slate-500 dark:text-slate-400 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white hover:no-underline"
+              className="text-sm text-slate-600 dark:text-slate-400 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white hover:no-underline"
             >
               Forgot password?
             </Link>
@@ -142,10 +142,10 @@ export function LoginPage() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200 dark:border-slate-700" />
+            <div className="w-full border-t border-paper-400 dark:border-slate-700" />
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-slate-50 dark:bg-slate-900 px-3 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            <span className="bg-paper-100 dark:bg-slate-900 px-3 text-slate-600 dark:text-slate-400 uppercase tracking-wide">
               or
             </span>
           </div>

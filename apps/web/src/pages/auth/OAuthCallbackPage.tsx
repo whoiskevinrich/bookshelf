@@ -66,7 +66,7 @@ export function OAuthCallbackPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-paper-100 dark:bg-slate-900 px-4">
         <div className="text-center space-y-4 max-w-sm">
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           <a
@@ -81,7 +81,7 @@ export function OAuthCallbackPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-paper-100 dark:bg-slate-900">
       <div
         role="status"
         aria-label="Completing sign-in"

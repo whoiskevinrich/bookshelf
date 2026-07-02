@@ -50,7 +50,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-body"
-        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800"
+        className="w-full max-w-sm rounded-xl bg-paper-50 p-6 shadow-xl dark:bg-slate-800"
       >
         <h2
           id="confirm-dialog-title"
@@ -58,7 +58,7 @@ export function ConfirmDialog({
         >
           {title}
         </h2>
-        <p id="confirm-dialog-body" className="mb-4 text-sm text-slate-500 dark:text-zinc-400">
+        <p id="confirm-dialog-body" className="mb-4 text-sm text-slate-600 dark:text-zinc-400">
           {message}
         </p>
         <div className="flex justify-end gap-2">

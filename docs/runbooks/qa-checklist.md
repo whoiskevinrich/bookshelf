@@ -39,8 +39,9 @@ Run the auto checks locally any time with `pnpm qa:guards` (also part of `pnpm p
 
 - **[auto]** No raw `bg-indigo-600` / `bg-gray-900` button classes in `apps/web/src`
   — use `<Button>` from `src/components/ui/Button.tsx`.
-- **[auto]** No `text-gray-400` for muted text (fails WCAG AA) — minimum
-  `text-gray-500 dark:text-zinc-400`.
+- **[auto]** No `text-gray-400` for muted text (fails WCAG AA) — the light-mode muted
+  floor on `paper-*` surfaces is `text-slate-600 dark:text-slate-400`
+  (see `docs/design-system.md` → "Muted text floor on paper").
 - **[attest]** No hover-only affordances — pair any `group-hover:` reveal with a
   `focus-within:` / `focus:` fallback so touch and keyboard users get it too.
 - **[attest]** Auth form inputs/labels import `inputClass` / `labelClass` from `src/lib/form-styles.ts`.

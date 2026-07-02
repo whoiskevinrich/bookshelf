@@ -2,6 +2,19 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Warm paper surfaces (light theme) ──────────────────────
+   Softened light-mode neutrals — pure white was too abrasive.
+   50 = raised (cards, dialogs, inputs) · 100 = page · 200 = inset
+   300–500 = hairline → strong borders. Dark mode stays slate. */
+@theme {
+  --color-paper-50: #fdfbf5;
+  --color-paper-100: #f4f0e6;
+  --color-paper-200: #eae4d4;
+  --color-paper-300: #e5dfd0;
+  --color-paper-400: #ddd5c1;
+  --color-paper-500: #d3ccba;
+}
+
 /* ── Animations ─────────────────────────────────────────── */
 
 @keyframes fadeUp {
@@ -63,9 +76,9 @@
 .shimmer {
   background: linear-gradient(
     90deg,
-    var(--color-slate-200) 25%,
-    var(--color-slate-100) 50%,
-    var(--color-slate-200) 75%
+    var(--color-paper-300) 25%,
+    var(--color-paper-100) 50%,
+    var(--color-paper-300) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
@@ -98,7 +111,7 @@
 
   .shimmer {
     animation: none;
-    background: var(--color-slate-200);
+    background: var(--color-paper-300);
   }
 
   :where(.dark, .dark *) .shimmer {

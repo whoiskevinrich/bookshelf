@@ -101,7 +101,7 @@ function SectionHeader({
   onDragEnd?: () => void;
 }) {
   const titleClass =
-    "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 shrink-0";
+    "text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-zinc-400 shrink-0";
   return (
     <div className="flex items-center gap-3 mb-4">
       {onDragStart && <DragHandle draggable onDragStart={onDragStart} onDragEnd={onDragEnd} />}
@@ -120,8 +120,8 @@ function SectionHeader({
       ) : (
         <h2 className={titleClass}>{title}</h2>
       )}
-      <span className="flex-1 h-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-      <span className="text-xs text-slate-500 dark:text-zinc-400 bg-slate-200 dark:bg-slate-800 rounded-full px-2 py-0.5">
+      <span className="flex-1 h-px bg-paper-300 dark:bg-slate-700" aria-hidden="true" />
+      <span className="text-xs text-slate-600 dark:text-zinc-400 bg-paper-300 dark:bg-slate-800 rounded-full px-2 py-0.5">
         {count}
       </span>
     </div>
@@ -188,9 +188,9 @@ function SaveSmartShelfForm({
         e.preventDefault();
         if (name.trim()) onSave(name.trim());
       }}
-      className="space-y-2 rounded-xl border border-slate-100 dark:border-slate-700 p-4"
+      className="space-y-2 rounded-xl border border-paper-300 dark:border-slate-700 p-4"
     >
-      <label htmlFor="smart-shelf-name" className="text-xs text-slate-500 dark:text-slate-400">
+      <label htmlFor="smart-shelf-name" className="text-xs text-slate-600 dark:text-slate-400">
         Name this smart shelf — it updates automatically as your books change.
       </label>
       <div className="flex items-center gap-2">
@@ -276,7 +276,7 @@ function ShelfSection({
         {...(onDragEnd ? { onDragEnd } : {})}
       />
       {entries.length === 0 ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">{emptyMessage}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">{emptyMessage}</p>
       ) : (
         <div
           ref={scrollRef}
@@ -493,7 +493,7 @@ export function ShelfPage() {
   const isEmpty = allEntries.length === 0;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen bg-paper-100 dark:bg-slate-900 transition-colors">
       <AppHeader />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
@@ -538,7 +538,7 @@ export function ShelfPage() {
         <MobileScanHint page="shelf" />
 
         {showCreateShelf && (
-          <div className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl">
+          <div className="mb-8 p-4 border border-paper-300 dark:border-slate-700 rounded-xl">
             <CreateShelfForm onClose={() => setShowCreateShelf(false)} />
           </div>
         )}
@@ -546,7 +546,7 @@ export function ShelfPage() {
         {showSearch && (
           <div
             ref={searchPanelRef}
-            className="mb-8 p-4 border border-slate-100 dark:border-slate-700 rounded-xl"
+            className="mb-8 p-4 border border-paper-300 dark:border-slate-700 rounded-xl"
           >
             <BookSearch onAdd={handleAdd} isAdding={addMutation.isPending} />
           </div>
@@ -651,7 +651,7 @@ export function ShelfPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
                         No books match this filter.
                       </p>
                     )}

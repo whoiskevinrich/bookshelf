@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 /** Shared row styling for items placed inside the mobile menu panel. */
 export const mobileMenuRowClass =
   "block w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 " +
-  "hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors";
+  "hover:bg-paper-200 dark:hover:bg-slate-800/60 transition-colors";
 
 function HamburgerIcon() {
   return (
@@ -104,7 +104,7 @@ export function MobileMenu({ children, label = "Menu" }: { children: ReactNode; 
           id="mobile-nav"
           ref={panelRef}
           onClick={() => setOpen(false)}
-          className="absolute left-0 right-0 top-full z-50 flex flex-col bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shadow-sm animate-fade-up"
+          className="absolute left-0 right-0 top-full z-50 flex flex-col bg-paper-100 dark:bg-slate-900 border-b border-paper-300 dark:border-slate-800 shadow-sm animate-fade-up"
         >
           {children}
         </div>

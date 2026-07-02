@@ -6,26 +6,37 @@ This document records all design decisions for the Bookshelf web app. It is the 
 
 ## Neutral Palette
 
-The app uses **Tailwind's `slate-*` scale exclusively** as the neutral palette. Do not use `gray-*`, `zinc-*`, or other neutral scales — mixing them creates subtle visual noise.
+Light-mode **surfaces** use the custom warm `paper-*` scale (BOOKSHELF-55 — pure white was abrasive at full-viewport scale). **Text, borders-on-dark, and all dark-mode colors stay on Tailwind's `slate-*` scale.** Do not use `gray-*`, `zinc-*`, or other neutral scales — mixing them creates subtle visual noise.
 
-| Token       | Light     | Dark             | Usage                                                    |
-| ----------- | --------- | ---------------- | -------------------------------------------------------- |
-| `slate-50`  | bg        | —                | Auth layout background                                   |
-| `slate-100` | bg        | —                | Subtle dividers, fallback book cover                     |
-| `slate-200` | border/bg | —                | Section rule, count badge bg                             |
-| `slate-300` | border    | —                | Form input border, secondary button border               |
-| `slate-400` | text      | —                | Placeholder text, muted metadata                         |
-| `slate-500` | text      | `dark:slate-400` | Secondary body text, nav inactive                        |
-| `slate-600` | text      | `dark:slate-300` | Auth subtitles, supporting copy                          |
-| `slate-700` | text      | `dark:slate-300` | Secondary button text                                    |
-| `slate-800` | bg        | —                | Book cover fallback bg, secondary button hover bg (dark) |
-| `slate-900` | text/bg   | —                | Primary text, primary button bg                          |
-| `white`     | bg        | `dark:slate-900` | Page background                                          |
-| `white`     | bg        | `dark:white`     | Primary button bg in dark mode                           |
+### Paper surfaces (light mode)
 
-### When is `white` a neutral?
+Defined as `@theme` tokens in `apps/web/src/index.css`. Lower = lighter/raised, higher = deeper/border.
 
-`white` is used as the primary page background in light mode and as the primary button background in dark mode (the inverted button pattern). It is not a "color choice" — it is part of the monochromatic inversion system.
+| Token       | Hex       | Usage                                                                                |
+| ----------- | --------- | ------------------------------------------------------------------------------------ |
+| `paper-50`  | `#FDFBF5` | Raised surfaces — dialogs, dropdown menus, inputs, tooltips, segmented-control thumb |
+| `paper-100` | `#F4F0E6` | Page background, header/footer chrome, auth layout                                   |
+| `paper-200` | `#EAE4D4` | Insets — Callout, demo section, filter bar, hover rows, fallback book cover          |
+| `paper-300` | `#E5DFD0` | Hairline borders (header/footer), badge fills, hover on insets                       |
+| `paper-400` | `#DDD5C1` | Default borders — Callout, search input, segmented control                           |
+| `paper-500` | `#D3CCBA` | Strong borders — form inputs, secondary buttons                                      |
+
+Elevation reads _lighter = closer_: cream `paper-50` cards sit on the deeper `paper-100` page.
+
+### Slate (text + dark mode)
+
+| Token       | Light   | Dark             | Usage                                                                                 |
+| ----------- | ------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `slate-400` | text    | —                | Placeholder text, disabled-ish icon affordances                                       |
+| `slate-600` | text    | `dark:slate-400` | Muted/secondary body text, nav inactive (floor on paper surfaces — see Accessibility) |
+| `slate-600` | text    | `dark:slate-300` | Auth subtitles, supporting copy                                                       |
+| `slate-700` | text    | `dark:slate-300` | Secondary button text                                                                 |
+| `slate-800` | bg      | —                | Book cover fallback bg (dark), secondary button hover bg (dark)                       |
+| `slate-900` | text/bg | —                | Primary text, primary button bg, dark page bg                                         |
+
+### When is `white` allowed?
+
+`bg-white` no longer appears on light-mode surfaces. It remains in exactly three places: the primary button background in **dark** mode (the inverted button pattern), the QR code tile (scanners expect dark-on-light), and `white/N` alpha overlays on top of book-cover imagery and scanner surfaces.
 
 ### Semantic colors
 
@@ -163,14 +174,14 @@ import { inputClass, labelClass } from "../../lib/form-styles";
 
 | Part         | Light                                                       | Dark                                                                |
 | ------------ | ----------------------------------------------------------- | ------------------------------------------------------------------- |
-| Container bg | `bg-slate-50`                                               | `dark:bg-slate-800/50`                                              |
-| Border       | `border border-slate-200`                                   | `dark:border-slate-700`                                             |
+| Container bg | `bg-paper-200`                                              | `dark:bg-slate-800/50`                                              |
+| Border       | `border border-paper-400`                                   | `dark:border-slate-700`                                             |
 | Radius       | `rounded-2xl`                                               | —                                                                   |
 | Padding      | `p-5`                                                       | —                                                                   |
 | Title        | `text-sm font-semibold slate-900`                           | `dark:text-white`                                                   |
 | Body         | `text-sm text-slate-600`                                    | `dark:text-slate-300`                                               |
-| Icon         | `text-slate-500`                                            | `dark:text-slate-400`                                               |
-| Dismiss btn  | `text-slate-500 hover:bg-slate-200/70 hover:text-slate-900` | `dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white` |
+| Icon         | `text-slate-600`                                            | `dark:text-slate-400`                                               |
+| Dismiss btn  | `text-slate-600 hover:bg-paper-300/70 hover:text-slate-900` | `dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white` |
 
 **Rules:**
 
@@ -213,7 +224,7 @@ Use `underline` to make links perceivable without relying on color alone (WCAG 1
 | Role                                                   | Classes                                                                                                                         |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | Primary CTA link (Sign up, Sign in)                    | `font-medium underline underline-offset-2 text-slate-900 dark:text-white hover:no-underline`                                    |
-| Secondary nav link (Forgot password?, Back to sign in) | `text-slate-500 dark:text-slate-400 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white hover:no-underline` |
+| Secondary nav link (Forgot password?, Back to sign in) | `text-slate-600 dark:text-slate-400 underline underline-offset-2 hover:text-slate-900 dark:hover:text-white hover:no-underline` |
 
 ### In-app links (WishlistPage empty state, etc.)
 
@@ -260,6 +271,10 @@ Dynamic regions (search results, error messages, status updates) must be wrapped
 </div>
 ```
 
+### Muted text floor on paper
+
+`text-slate-500` measures **4.16:1 on `paper-100`** — below WCAG AA (4.5:1) for normal text. The light-mode muted floor is therefore **`text-slate-600`** for any text sitting on `paper-100`/`paper-200` surfaces. On `paper-50` raised surfaces `slate-500` still passes (4.59:1), but use `slate-600` everywhere for consistency. Dark mode keeps `dark:text-slate-400`.
+
 ### Color-only information
 
 Never communicate state by color alone. Use shape/icon/text alongside color:
@@ -280,12 +295,12 @@ No hover-only affordances. If an element is interactive, it must be visible with
 
 ## Animations
 
-| Name                 | Class                                          | Trigger | Duration         | Usage                                            |
-| -------------------- | ---------------------------------------------- | ------- | ---------------- | ------------------------------------------------ |
-| Card mount           | `animate-fade-up`                              | Mount   | CSS-defined      | `ShelfBookCard` — staggered via `animationDelay` |
-| Cover lift           | `group-hover:scale-105 group-hover:shadow-md`  | Hover   | `duration-200`   | Book cover inside card                           |
-| Card hover bg        | `hover:bg-slate-50 dark:hover:bg-slate-800/50` | Hover   | `duration-200`   | Card container                                   |
-| All color/bg changes | `transition-colors`                            | State   | Tailwind default | Buttons, links, headers                          |
+| Name                 | Class                                           | Trigger | Duration         | Usage                                            |
+| -------------------- | ----------------------------------------------- | ------- | ---------------- | ------------------------------------------------ |
+| Card mount           | `animate-fade-up`                               | Mount   | CSS-defined      | `ShelfBookCard` — staggered via `animationDelay` |
+| Cover lift           | `group-hover:scale-105 group-hover:shadow-md`   | Hover   | `duration-200`   | Book cover inside card                           |
+| Card hover bg        | `hover:bg-paper-200 dark:hover:bg-slate-800/50` | Hover   | `duration-200`   | Card container                                   |
+| All color/bg changes | `transition-colors`                             | State   | Tailwind default | Buttons, links, headers                          |
 
 Stagger cap: `MAX_STAGGER_INDEX = 9` at `STAGGER_STEP_MS = 50ms` steps. Cards beyond index 9 share the same delay to avoid long waits on large shelves.
 
@@ -417,7 +432,7 @@ This component has no new design tokens. All visual states (confirmation card, s
 - [ ] Links use `underline` — no color-only link affordance
 - [ ] No `opacity-0 group-hover:opacity-100` — all interactive elements visible without hover
 - [ ] Touch targets: no `py-1` or smaller on interactive elements
-- [ ] Neutral colors use `slate-*` only — no `gray-*` or `zinc-*`
+- [ ] Light-mode surfaces use `paper-*`; text and dark mode use `slate-*` — no `gray-*`, `zinc-*`, or raw `bg-white` (outside the three documented exceptions)
 - [ ] Scanner internals have no `dark:` prefixes — the surface is unconditionally dark
 - [ ] Text-mode reticle uses `variant="text"` prop — no ad-hoc width/height overrides inline
 - [ ] Scan button (`variant="app"`, label "Scan" / "Scanning…") lives inside `ScannerViewfinder`, not the modal footer
