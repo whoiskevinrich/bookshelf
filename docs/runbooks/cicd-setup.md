@@ -137,6 +137,27 @@ If `GH_PAT` is not set, the workflow falls back to `GITHUB_TOKEN` and version bu
 
 ---
 
+## 5. Jira release sync (ADR-022)
+
+After a prod promote smoke-passes, `promote.yml` runs `scripts/jira-release-sync.mjs`, which reads the release notes, extracts `BOOKSHELF-*` keys, and transitions each ticket to `Done` via the Jira REST API. The interactive Atlassian MCP connector can't run in CI, so this uses a static API token.
+
+Set one variable and two secrets (the promote job reads them; the step soft-fails with a `::warning::` if any are absent, so the deploy is never blocked):
+
+```bash
+REPO="whoiskevinrich/bookshelf"
+
+# Non-secret site URL (repo-level is fine; the prod environment inherits it)
+gh variable set JIRA_BASE_URL --body "https://YOUR-SITE.atlassian.net" --repo "$REPO"
+
+# Atlassian account email + API token (https://id.atlassian.com/manage-profile/security/api-tokens)
+gh secret set JIRA_USER_EMAIL --repo "$REPO"   # paste the email
+gh secret set JIRA_API_TOKEN  --repo "$REPO"   # paste the token
+```
+
+Optional overrides (env vars on the `promote.yml` step): `JIRA_TARGET_STATUS` (default `Done`), `JIRA_KEY_PREFIX` (default `BOOKSHELF`). The script only ever moves a ticket **forward** to the target status and skips tickets already there.
+
+---
+
 ## 5. GitHub Environments
 
 The deploy and promote workflows reference GitHub Environments (`dev` and `prod`) for audit trail and optional protection rules.

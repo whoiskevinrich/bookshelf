@@ -281,3 +281,18 @@ jobs:
         env:
           API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
+
+      - name: Sync Jira tickets → Done
+        # Only after prod is deployed AND smoke-passed — a ticket moves to Done
+        # solely when its code is verifiably live in prod (ADR-022). The script
+        # reads this release's notes, extracts BOOKSHELF-* keys, and transitions
+        # each. It soft-fails (logs ::warning:: and exits 0), so a Jira hiccup
+        # never red-builds a prod deploy that already succeeded.
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          RELEASE_TAG: v${{ steps.resolve.outputs.version }}
+        run: node scripts/jira-release-sync.mjs
