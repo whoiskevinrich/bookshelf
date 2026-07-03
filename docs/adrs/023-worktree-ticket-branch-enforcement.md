@@ -29,7 +29,7 @@ A husky `pre-commit`/`pre-push` would be tool-agnostic and catch the user's own 
 ## Alternatives considered
 
 - **Convention only** (put the key in the PR title by hand). That's the status quo whose 1-in-4 hit rate motivated this. Rejected.
-- **Broaden the sync's key source** (scan commit bodies / the PR compare range, not just the title). Complementary, not a substitute — still relies on the key being written *somewhere*; the branch is the most reliable somewhere. Kept as an option.
+- **Broaden the sync's key source** (scan commit bodies / the PR compare range, not just the title). Complementary, not a substitute — still relies on the key being written _somewhere_; the branch is the most reliable somewhere. Kept as an option.
 - **Auto-rename at session start.** Can't — the ticket number isn't derivable without human input. Hence detect-and-require, not auto-fix.
 - **Loosest rule** (any non-`claude/*` name). Stops random names but doesn't guarantee a key reaches the release. Rejected in favour of requiring `BOOKSHELF-<n>`.
 

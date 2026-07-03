@@ -188,16 +188,16 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 These are the hooks **actually configured** in `.claude/settings.json` and via hookify rules
 (`.claude/hookify.*.local.md`):
 
-| Hook              | Source / Event               | Trigger                      | Action                                               |
-| ----------------- | ---------------------------- | ---------------------------- | ---------------------------------------------------- |
-| Worktree env copy | settings.json / SessionStart | New session (`startup`)      | Copy `.env.local` into worktree, then `pnpm install` |
-| Branch-key nudge  | settings.json / SessionStart | New session on keyless branch | Tell agent to rename `claude/*` → `BOOKSHELF-<n>-<slug>` (non-blocking, ADR-023) |
+| Hook              | Source / Event               | Trigger                                                       | Action                                                                                               |
+| ----------------- | ---------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Worktree env copy | settings.json / SessionStart | New session (`startup`)                                       | Copy `.env.local` into worktree, then `pnpm install`                                                 |
+| Branch-key nudge  | settings.json / SessionStart | New session on keyless branch                                 | Tell agent to rename `claude/*` → `BOOKSHELF-<n>-<slug>` (non-blocking, ADR-023)                     |
 | Branch-key gate   | settings.json / PreToolUse   | `git commit`/`push`, `gh pr create` (Bash **and** PowerShell) | **Block** (exit 2) if a worktree branch has no Jira key; `BRANCH_GUARD_BYPASS=1` overrides (ADR-023) |
-| Pre-PR docs gate  | settings.json / PreToolUse   | `gh pr create`               | Echo docs-update reminder (non-blocking)             |
-| Sensitive files   | hookify                      | `.env`/secret edits          | Warn                                                 |
-| No env in source  | hookify                      | env values written to source | Warn                                                 |
-| ISBN reminder     | hookify                      | "isbn" in new text           | Warn                                                 |
-| Hardcoded data    | hookify                      | ISBN/ASIN literals in source | Warn                                                 |
+| Pre-PR docs gate  | settings.json / PreToolUse   | `gh pr create`                                                | Echo docs-update reminder (non-blocking)                                                             |
+| Sensitive files   | hookify                      | `.env`/secret edits                                           | Warn                                                                                                 |
+| No env in source  | hookify                      | env values written to source                                  | Warn                                                                                                 |
+| ISBN reminder     | hookify                      | "isbn" in new text                                            | Warn                                                                                                 |
+| Hardcoded data    | hookify                      | ISBN/ASIN literals in source                                  | Warn                                                                                                 |
 
 The `/productivity:*`, `/simplify`, and `/pr-review-toolkit:review-pr` steps in the workflow above
 are run **manually** as slash commands — they are intentionally **not** wired as hooks. Per the
