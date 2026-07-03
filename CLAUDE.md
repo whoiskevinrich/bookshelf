@@ -191,6 +191,8 @@ These are the hooks **actually configured** in `.claude/settings.json` and via h
 | Hook              | Source / Event               | Trigger                      | Action                                               |
 | ----------------- | ---------------------------- | ---------------------------- | ---------------------------------------------------- |
 | Worktree env copy | settings.json / SessionStart | New session (`startup`)      | Copy `.env.local` into worktree, then `pnpm install` |
+| Branch-key nudge  | settings.json / SessionStart | New session on keyless branch | Tell agent to rename `claude/*` → `BOOKSHELF-<n>-<slug>` (non-blocking, ADR-023) |
+| Branch-key gate   | settings.json / PreToolUse   | `git commit`/`push`, `gh pr create` (Bash **and** PowerShell) | **Block** (exit 2) if a worktree branch has no Jira key; `BRANCH_GUARD_BYPASS=1` overrides (ADR-023) |
 | Pre-PR docs gate  | settings.json / PreToolUse   | `gh pr create`               | Echo docs-update reminder (non-blocking)             |
 | Sensitive files   | hookify                      | `.env`/secret edits          | Warn                                                 |
 | No env in source  | hookify                      | env values written to source | Warn                                                 |

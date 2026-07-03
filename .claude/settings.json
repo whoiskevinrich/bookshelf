@@ -23,6 +23,43 @@
             "shell": "powershell",
             "async": false,
             "statusMessage": "Checking documentation requirements..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(git*)",
+            "command": "node scripts/check-ticket-branch.mjs",
+            "shell": "bash",
+            "async": false,
+            "statusMessage": "Checking worktree branch has a Jira key..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(gh pr create*)",
+            "command": "node scripts/check-ticket-branch.mjs",
+            "shell": "bash",
+            "async": false,
+            "statusMessage": "Checking worktree branch has a Jira key..."
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "PowerShell(git*)",
+            "command": "node scripts/check-ticket-branch.mjs",
+            "shell": "bash",
+            "async": false,
+            "statusMessage": "Checking worktree branch has a Jira key..."
+          },
+          {
+            "type": "command",
+            "if": "PowerShell(gh pr create*)",
+            "command": "node scripts/check-ticket-branch.mjs",
+            "shell": "bash",
+            "async": false,
+            "statusMessage": "Checking worktree branch has a Jira key..."
           }
         ]
       }
@@ -37,6 +74,13 @@
             "shell": "bash",
             "async": false,
             "statusMessage": "Copying .env.local files into worktree..."
+          },
+          {
+            "type": "command",
+            "command": "case \"$PWD\" in *.claude/worktrees/*) BR=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); case \"$BR\" in *BOOKSHELF-[0-9]*|main|master|HEAD) : ;; *) echo \"[branch-guard] Worktree branch '$BR' has no Jira key. Before any implementation work, confirm the BOOKSHELF ticket with the user and rename the branch: git branch -m $BR BOOKSHELF-<n>-<slug>. Commits, pushes, and PRs are blocked until then (ADR-023).\" ;; esac ;; esac",
+            "shell": "bash",
+            "async": false,
+            "statusMessage": "Checking worktree branch has a Jira key..."
           },
           {
             "type": "command",
