@@ -137,10 +137,12 @@ All buttons must use `<Button>` from `src/components/ui/Button.tsx`. **Never** w
 
 ### Sizes
 
-| Size           | Padding         | Text      | Use for                                                      |
-| -------------- | --------------- | --------- | ------------------------------------------------------------ |
-| `sm`           | `px-2.5 py-1.5` | `text-xs` | Inline actions within content (card buttons, search results) |
-| `md` (default) | `px-4 py-2`     | `text-sm` | Standard page buttons                                        |
+| Size           | Padding             | Text      | Use for                                                      |
+| -------------- | ------------------- | --------- | ------------------------------------------------------------ |
+| `sm`           | `px-2.5 py-1.5`     | `text-xs` | Inline actions within content (card buttons, search results) |
+| `md` (default) | `px-4 py-3 sm:py-2` | `text-sm` | Standard page buttons                                        |
+
+`md` is **responsive** (BOOKSHELF-56): `py-3` holds a 44px touch target on mobile and relaxes to the denser `py-2` desktop rhythm at >=`sm`. Do not flatten it to a single `py-2`, which reintroduces a sub-44px target on touch.
 
 For full-width auth submit buttons, pass `className="w-full"` — the component does not have a built-in `fullWidth` prop.
 
@@ -286,6 +288,22 @@ Never communicate state by color alone. Use shape/icon/text alongside color:
 ### Touch targets
 
 Minimum tap target: 44×44px (WCAG 2.5.8). The `<Button>` `sm` size is `py-1.5 text-xs` — this meets the minimum at typical font sizes. Do not use `py-1` or smaller.
+
+**Mobile floor (BOOKSHELF-56):** shared controls denser than 44px on desktop carry a mobile-only floor via a responsive class - `<Button>` `md` uses `py-3 sm:py-2`, and `<SegmentedControl>` buttons use `min-h-11 sm:min-h-0`. The pattern is 44px by default, relaxing at >=`sm` - never the reverse.
+
+### Safe-area insets (notched devices)
+
+Bottom-anchored and full-bleed UI must clear the mobile browser chrome and the home indicator (BOOKSHELF-56). Two requirements:
+
+1. `index.html` viewport meta includes `viewport-fit=cover` - without it `env(safe-area-inset-*)` resolves to `0` and the padding below is a no-op.
+2. Apply the inset via inline `style` (Tailwind v4 drops arbitrary `env()` values - see note), keeping the matching static padding class as the non-notched fallback:
+   - Padded bars (scan-modal footer): keep `py-3`, add `style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}`
+   - Cards anchored to `bottom-0` (Confirm/Added sheets): `style={{ paddingBottom: "env(safe-area-inset-bottom)" }}` on the wrapper
+   - Top chrome under a notch (scan-modal header): `style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}`
+
+> **Why inline style, not a Tailwind arbitrary value:** Tailwind v4's candidate scanner silently drops classes whose arbitrary value is a CSS function, so `pb-[env(safe-area-inset-bottom)]` compiles to nothing. Use inline `style` for any `env()`-based value. This matches the scanner's existing inline-style usage (reticle `boxShadow`/dimensions).
+
+The full-screen `ScanModal` (`fixed inset-0`) is the canonical example - its header, footer, sheets, and manual panel all honour the insets.
 
 ### Interactive affordances
 
