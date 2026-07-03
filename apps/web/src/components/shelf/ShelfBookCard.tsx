@@ -471,26 +471,26 @@ export function ShelfBookCard({
       <div className="px-0.5">
         <Link
           to={`/book/${isbn}`}
-          className="block text-xs font-medium leading-snug line-clamp-2 min-h-[2.1rem] dark:text-white text-slate-900 hover:underline"
+          className="block text-[13px] font-medium leading-snug line-clamp-2 min-h-[2.3rem] dark:text-white text-slate-900 hover:underline"
         >
           {title}
         </Link>
         {authors.length > 0 && (
-          <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate leading-tight">
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 truncate leading-tight">
             {authors.join(", ")}
           </p>
         )}
-        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 truncate">
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 truncate">
           {isbn}
         </p>
         {tags.length > 0 && (
           <div className="mt-1 flex items-center gap-1">
-            <span className="inline-flex min-w-0 items-center gap-0.5 rounded-full border border-paper-400 px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
+            <span className="inline-flex min-w-0 items-center gap-0.5 rounded-full border border-paper-400 px-1.5 py-0.5 text-[11px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
               <TagIcon />
               <span className="truncate">{tags[0]}</span>
             </span>
             {tags.length > 1 && (
-              <span className="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
+              <span className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
                 +{tags.length - 1}
               </span>
             )}
@@ -499,7 +499,7 @@ export function ShelfBookCard({
       </div>
 
       {error && (
-        <p className="text-[10px] text-red-500 dark:text-red-400 leading-tight px-0.5">{error}</p>
+        <p className="text-xs text-red-500 dark:text-red-400 leading-tight px-0.5">{error}</p>
       )}
 
       <ConfirmDialog

@@ -350,7 +350,10 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
       aria-modal="true"
       aria-label="Scan a book"
     >
-      <header className="flex items-center justify-between px-4 py-2">
+      <header
+        className="flex items-center justify-between px-4 py-2"
+        style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
+      >
         <button
           type="button"
           onClick={onClose}
@@ -547,7 +550,10 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
       )}
 
       {showFooter && (
-        <footer className="space-y-3 border-t border-white/10 bg-slate-950/90 px-4 py-3">
+        <footer
+          className="space-y-3 border-t border-white/10 bg-slate-950/90 px-4 py-3"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        >
           {scanMode === "continuous" && added.length > 0 && (
             <ContinuousList added={added} onUndo={undo} />
           )}
@@ -607,7 +613,10 @@ function ConfirmSheet({
   onScanAgain: () => void;
 }) {
   return (
-    <div className="animate-fade-up absolute inset-x-0 bottom-0">
+    <div
+      className="animate-fade-up absolute inset-x-0 bottom-0"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="m-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
         <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-emerald-400">
           <CheckIcon /> Barcode found · {isbn}
@@ -676,7 +685,10 @@ function AddedSheet({
   onDone: () => void;
 }) {
   return (
-    <div className="animate-fade-up absolute inset-x-0 bottom-0">
+    <div
+      className="animate-fade-up absolute inset-x-0 bottom-0"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="m-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
         <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-emerald-400">
           <CheckIcon /> Added to {item.status === "owned" ? "your shelf" : "wishlist"}
@@ -740,7 +752,10 @@ function ManualPanel({
   const [value, setValue] = useState(initialIsbn);
   return (
     <div className="absolute inset-0 overflow-y-auto bg-slate-950">
-      <div className="mx-auto flex max-w-sm flex-col items-center px-6 py-10 text-center">
+      <div
+        className="mx-auto flex max-w-sm flex-col items-center px-6 py-10 text-center"
+        style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}
+      >
         <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/5">
           <KeyboardIcon className="h-6 w-6 text-slate-300" />
         </div>
