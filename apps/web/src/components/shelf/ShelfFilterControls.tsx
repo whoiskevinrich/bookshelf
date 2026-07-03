@@ -190,6 +190,97 @@ export function TagBrowsePanel({
   );
 }
 
+// ── Library search input ─────────────────────────────────────────────────────
+
+function SearchGlyph() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function ClearGlyph() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+/**
+ * Free-text search over the loaded library (title + author). Controlled value is
+ * immediate; `matchCount` reflects the debounced result count (null when idle).
+ */
+export function LibrarySearchInput({
+  value,
+  onChange,
+  matchCount,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  matchCount: number | null;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="relative">
+        <span
+          className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400 dark:text-slate-500"
+          aria-hidden="true"
+        >
+          <SearchGlyph />
+        </span>
+        <input
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Search your library by title or author…"
+          aria-label="Search your library"
+          maxLength={200}
+          className={`w-full text-sm pl-9 ${value ? "pr-9" : ""} ${inputClass} [&::-webkit-search-cancel-button]:appearance-none`}
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            aria-label="Clear search"
+            className="absolute inset-y-0 right-2 flex items-center rounded text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300"
+          >
+            <ClearGlyph />
+          </button>
+        )}
+      </div>
+      {matchCount !== null && (
+        <p className="text-xs text-slate-600 dark:text-slate-400" role="status" aria-live="polite">
+          {matchCount === 1 ? "1 match" : `${matchCount} matches`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Active-filter bar (with save-as-smart-shelf) ─────────────────────────────
 
 export function ActiveFilterBar({
