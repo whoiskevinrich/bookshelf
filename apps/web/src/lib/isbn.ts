@@ -21,6 +21,31 @@ export function toIsbn13(raw: string): string | null {
   return s.length === 10 ? isbn10to13(s) : s;
 }
 
+/**
+ * Normalize a scanned barcode value to a canonical **ISBN-13**, tolerating a read
+ * that merged the EAN-13 book code with its EAN-2/EAN-5 price add-on into one
+ * digit run. Book barcodes often carry a smaller supplemental barcode (price /
+ * currency); most decoders drop it, but some native `BarcodeDetector`
+ * implementations concatenate it, yielding 15 (EAN-13 + EAN-2) or 18 (EAN-13 +
+ * EAN-5) digits instead of 13.
+ *
+ * If `raw` already normalizes cleanly (`toIsbn13`) that wins. Otherwise, when the
+ * digits are a 978/979 EAN-13 followed by a 2- or 5-digit add-on, the leading 13
+ * are checksum-validated and returned. The 978/979 prefix + checksum gate makes a
+ * false positive astronomically unlikely, so this is safe by construction. Returns
+ * null when neither holds — the caller keeps scanning.
+ */
+export function extractIsbn13(raw: string): string | null {
+  const direct = toIsbn13(raw);
+  if (direct) return direct;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 15 || digits.length === 18) {
+    const core = digits.slice(0, 13);
+    if (/^97[89]/.test(core)) return toIsbn13(core);
+  }
+  return null;
+}
+
 function validIsbn10(s: string): boolean {
   let sum = 0;
   for (let i = 0; i < 9; i++) {

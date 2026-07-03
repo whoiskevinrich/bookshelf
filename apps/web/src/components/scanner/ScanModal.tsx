@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { toIsbn13 } from "../../lib/isbn";
+import { extractIsbn13, toIsbn13 } from "../../lib/isbn";
 import {
   getBookByIsbn,
   isConflictError,
@@ -217,7 +217,9 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
 
   function handleDecode(raw: string) {
     if (processing.current) return;
-    const isbn = toIsbn13(raw);
+    // extractIsbn13 (not toIsbn13) so a barcode read that merged the EAN-13 with
+    // its EAN-2/EAN-5 price add-on still resolves — see BOOKSHELF-50.
+    const isbn = extractIsbn13(raw);
     if (!isbn) return;
     if (scanMode === "continuous" && addedIsbns.current.has(isbn)) return;
     setShowFallbackCallout(false);

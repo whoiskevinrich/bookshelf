@@ -100,6 +100,9 @@ async function createWasmScanner(): Promise<BarcodeScanner> {
       const results = await reader.readBarcodes(image, {
         formats: ["EAN-13", "UPC-A", "UPC-E"],
         tryHarder: true,
+        // Drop any EAN-2/EAN-5 price add-on rather than merging it into the text
+        // (this is already the default — pinned explicitly for BOOKSHELF-50).
+        eanAddOnSymbol: "Ignore",
       });
       const hit = results.find((r) => r.isValid && r.text);
       return hit?.text ?? null;
