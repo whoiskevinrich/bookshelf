@@ -13,6 +13,7 @@ import {
   TagBrowsePanel,
   ActiveFilterBar,
   ReadingListBar,
+  LibrarySearchInput,
   SmartShelvesGroup,
 } from "./ShelfFilterControls";
 
@@ -141,6 +142,48 @@ describe("TagBrowsePanel", () => {
     render(<TagBrowsePanel tags={tags} activeTag={null} onPick={() => {}} />);
     await user.type(screen.getByRole("textbox", { name: "Filter by tag" }), "zzz");
     expect(screen.getByText(/No tags match/)).toBeInTheDocument();
+  });
+});
+
+describe("LibrarySearchInput", () => {
+  it("renders a labelled search box and reports typing", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<LibrarySearchInput value="" onChange={onChange} matchCount={null} />);
+
+    const box = screen.getByRole("searchbox", { name: "Search your library" });
+    expect(box).toBeInTheDocument();
+    await user.type(box, "a");
+    expect(onChange).toHaveBeenCalledWith("a");
+  });
+
+  it("shows a clear button only when there is a value, and clears on click", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <LibrarySearchInput value="" onChange={onChange} matchCount={null} />,
+    );
+    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
+
+    rerender(<LibrarySearchInput value="dune" onChange={onChange} matchCount={2} />);
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it("renders no count when idle and a pluralized count otherwise", () => {
+    const { rerender } = render(
+      <LibrarySearchInput value="" onChange={() => {}} matchCount={null} />,
+    );
+    expect(screen.queryByText(/match/)).not.toBeInTheDocument();
+
+    rerender(<LibrarySearchInput value="dune" onChange={() => {}} matchCount={1} />);
+    expect(screen.getByText("1 match")).toBeInTheDocument();
+
+    rerender(<LibrarySearchInput value="the" onChange={() => {}} matchCount={4} />);
+    expect(screen.getByText("4 matches")).toBeInTheDocument();
+
+    rerender(<LibrarySearchInput value="zzz" onChange={() => {}} matchCount={0} />);
+    expect(screen.getByText("0 matches")).toBeInTheDocument();
   });
 });
 

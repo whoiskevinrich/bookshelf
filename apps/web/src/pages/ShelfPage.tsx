@@ -21,6 +21,7 @@ import {
   TagBrowsePanel,
   ActiveFilterBar,
   ReadingListBar,
+  LibrarySearchInput,
   SmartShelvesGroup,
   buildFilter,
   ruleToActive,
@@ -43,6 +44,8 @@ import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
 import { MobileScanHint } from "../components/shelf/MobileScanHint";
 import { useHorizontalScrollOnWheel } from "../hooks/useHorizontalScrollOnWheel";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { entryMatchesQuery } from "../lib/search";
 import { BookSearch } from "../components/BookSearch";
 import { Button } from "../components/ui/Button";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -360,6 +363,13 @@ export function ShelfPage() {
   const [showSaveSmart, setShowSaveSmart] = useState(false);
   const [smartShelfToDelete, setSmartShelfToDelete] = useState<SmartShelfWithCount | null>(null);
 
+  // Free-text search over the loaded library (BOOKSHELF-52). Client-side and
+  // debounced so filtering the whole library stays off the typing hot path; it
+  // composes on top of the active facet/tag/reading-list base set.
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
+  const searchActive = debouncedSearch.trim().length > 0;
+
   // Replace history (not push) so tweaking filters doesn't stack up back-nav.
   const updateParams = useCallback(
     (mutate: (p: URLSearchParams) => void) => {
@@ -443,6 +453,21 @@ export function ShelfPage() {
   const readingListEntries = useMemo(
     () => (view === "reading-list" ? allEntries.filter(isReadingListEntry) : []),
     [view, allEntries],
+  );
+
+  // Search composes on top of whichever view is active: the reading-list
+  // composite, the server-filtered facet/tag set, or the full library. Empty
+  // query leaves every view untouched (searchResults is unused then).
+  const searchBaseEntries = useMemo(() => {
+    if (view === "reading-list") return readingListEntries;
+    if (isFiltered) return filteredQuery.data?.entries ?? [];
+    return allEntries;
+  }, [view, isFiltered, readingListEntries, filteredQuery.data, allEntries]);
+
+  const searchResults = useMemo(
+    () =>
+      searchActive ? searchBaseEntries.filter((e) => entryMatchesQuery(e, debouncedSearch)) : [],
+    [searchActive, searchBaseEntries, debouncedSearch],
   );
 
   const { namedShelfEntries, unshelved } = useMemo(() => {
@@ -656,9 +681,62 @@ export function ShelfPage() {
                       }}
                     />
                   )}
+                  <LibrarySearchInput
+                    value={search}
+                    onChange={setSearch}
+                    matchCount={searchActive ? searchResults.length : null}
+                  />
                 </div>
 
-                {view === "reading-list" ? (
+                {searchActive ? (
+                  <div className="space-y-4">
+                    {searchResults.length > 0 ? (
+                      <div className="flex flex-wrap gap-4">
+                        {searchResults.map((entry, index) => (
+                          <ShelfBookCard
+                            key={entry.isbn}
+                            entry={entry}
+                            shelves={orderedShelves}
+                            staggerIndex={index}
+                            onMove={(isbn, status) => moveMutation.mutate({ isbn, status })}
+                            onRemove={(isbn) => removeMutation.mutate(isbn)}
+                            onAddToShelf={(shelfId, isbn) =>
+                              addToShelfMutation.mutate({ shelfId, isbn })
+                            }
+                            onRemoveFromShelf={(shelfId, isbn) =>
+                              removeFromShelfMutation.mutate({ shelfId, isbn })
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          No books match “{debouncedSearch.trim()}”.
+                        </p>
+                        <Button variant="ghost" size="sm" onClick={() => setSearch("")}>
+                          Clear search
+                        </Button>
+                      </div>
+                    )}
+                    {/* Search only covers loaded books; more pages exist client-side (v1). */}
+                    {!isFiltered && shelfQuery.hasNextPage && (
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Searching loaded books only.{" "}
+                        <button
+                          type="button"
+                          onClick={() => void shelfQuery.fetchNextPage()}
+                          disabled={shelfQuery.isFetchingNextPage}
+                          className="underline hover:text-slate-900 dark:hover:text-white disabled:opacity-60"
+                        >
+                          {shelfQuery.isFetchingNextPage
+                            ? "Loading more…"
+                            : "Load more to search everything"}
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                ) : view === "reading-list" ? (
                   <div className="space-y-4">
                     <ReadingListBar count={readingListEntries.length} onClear={clearFilter} />
                     {readingListEntries.length > 0 ? (
