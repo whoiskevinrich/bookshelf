@@ -182,14 +182,31 @@ jobs:
             --type String --overwrite --value "$GITHUB_SHA"
           echo "Recorded last good dev SHA: $GITHUB_SHA"
 
-      - name: Sync Jira tickets → On dev
+      - name: Detect Jira sync config
+        id: jiracfg
         if: steps.smoke.outcome != 'failure'
+        # Skip the Jira sync entirely when no token is configured, instead of letting
+        # the script soft-fail with a ::warning:: on every deploy. Interim guard while
+        # the token-auth path is replaced with a token-free mechanism (BOOKSHELF-84);
+        # the whole sync step is removed by that work. `secrets` can't be read in an
+        # `if:` expression, so we surface presence through an output here.
+        env:
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          if [ -n "$JIRA_API_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No JIRA_API_TOKEN configured — skipping Jira sync (token auth being replaced, BOOKSHELF-84)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync Jira tickets → On dev
+        if: steps.smoke.outcome != 'failure' && steps.jiracfg.outputs.enabled == 'true'
         # Dev deploy succeeded and smoke passed — move each ticket referenced in the
         # merge commit to "On dev", the human-QA queue (ADR-024). The key is read from
         # the squash-commit subject (same source as the prod → Done sync). Idempotent
         # and soft-failing (::warning:: + exit 0), so a Jira hiccup never red-builds a
-        # good dev deploy. No-ops with a warning until the "On dev" status exists in
-        # Jira (BOOKSHELF-80), so shipping this before the workflow config is safe.
+        # good dev deploy.
         env:
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
