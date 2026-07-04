@@ -1,1 +1,3 @@
-# Formatting is enforced at commit time (pre-commit). Nothing to do here.
+# Read-only formatting gate — byte-identical to the CI Format job (ADR-025).
+# Never writes, so it can never reintroduce the pre-commit re-stage bug.
+pnpm format:check

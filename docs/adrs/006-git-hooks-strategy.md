@@ -1,7 +1,13 @@
 # ADR-006: Git Hooks Strategy — Husky with Auto-Format on Commit
 
-**Status**: Accepted  
+**Status**: Superseded by [ADR-025](./025-formatting-gate-belt-and-suspenders.md)  
 **Date**: 2026-06-02
+
+> **Superseded (2026-07-04).** The `pre-commit` "stage the formatted changes" half of this
+> decision was never implemented (`.husky/pre-commit` was a bare `pnpm format`, which cannot
+> re-stage), so every recent PR failed the Format check. ADR-025 replaces the single
+> mutate-at-commit hook with a four-layer belt-and-suspenders gate. The choice of Husky over
+> Lefthook still stands.
 
 ## Context
 
