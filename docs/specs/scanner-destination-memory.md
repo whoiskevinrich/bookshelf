@@ -1,6 +1,6 @@
 # Spec: Scanner Remembers the Last Destination (BOOKSHELF-58)
 
-**Status**: Specified (not yet implemented)
+**Status**: Implemented (PR pending merge)
 **Date**: 2026-07-04
 **Jira**: BOOKSHELF-58 (epic BOOKSHELF-62 Feedback) — labels `design-ui`, `p2`, `size-s`, `user-feedback`
 **Related**: `docs/specs/isbn-scanning.md`, `docs/specs/isbn-text-scan.md`, ADR-021 (Wishlist terminology), ADR-024 (this decision), BOOKSHELF-27 (add books to a populated shelf — future "target shelf" destinations)
@@ -46,8 +46,8 @@ destinations are an explicit non-goal here and are deferred to BOOKSHELF-27.
 - Cross-device sync of the remembered destination (client-only `localStorage`, per device,
   consistent with the other scanner preferences — see `isbn-scanning.md`).
 - Surfacing destination in **Account → Settings**. Unlike `postScanBehavior` / `scanMode`
-  (deliberate configuration that lives in Settings), destination is *remembered last-use
-  state*; its only control is the in-scanner chip.
+  (deliberate configuration that lives in Settings), destination is _remembered last-use
+  state_; its only control is the in-scanner chip.
 - Changing the default destination away from **Owned**.
 
 ## Design
@@ -57,11 +57,11 @@ destinations are an explicit non-goal here and are deferred to BOOKSHELF-27.
 Add a third preference to `ScannerPreferencesContext`, persisted exactly like the existing
 two via `useLocalStorage`:
 
-| Preference        | Values            | Default    | localStorage key         |
-| ----------------- | ----------------- | ---------- | ------------------------ |
-| `postScanBehavior`| `confirm` \| `autoAddOwned` | `confirm` | `scanner:postScanBehavior` |
-| `scanMode`        | `single` \| `continuous`    | `single`  | `scanner:scanMode`         |
-| **`scanDestination`** | **`owned` \| `want`**   | **`owned`** | **`scanner:destination`**  |
+| Preference            | Values                      | Default     | localStorage key           |
+| --------------------- | --------------------------- | ----------- | -------------------------- |
+| `postScanBehavior`    | `confirm` \| `autoAddOwned` | `confirm`   | `scanner:postScanBehavior` |
+| `scanMode`            | `single` \| `continuous`    | `single`    | `scanner:scanMode`         |
+| **`scanDestination`** | **`owned` \| `want`**       | **`owned`** | **`scanner:destination`**  |
 
 - Values reuse `ShelfStatus` (`owned` \| `want`) so the destination feeds `commitAdd`
   directly with no mapping.
@@ -99,7 +99,7 @@ trailing chevron.
 - **Confirm mode** (`ConfirmSheet`): still shows **both** buttons. The chip's destination
   decides which is **primary** (`variant="app"` + `autoFocus`) and which is secondary — so
   the remembered destination is one tap / one Enter away. Tapping the non-primary button adds
-  *that one book* to the other status but **does not** change `scanDestination` (chip is the
+  _that one book_ to the other status but **does not** change `scanDestination` (chip is the
   only setter — see ADR-024). Example: default Owned → "Add owned" primary, "Add to wishlist"
   secondary; tapping wishlist adds one wishlist book, chip stays Owned.
 - **No-match manual entry** (`ManualPanel` "Add anyway"): same emphasis ordering by the
