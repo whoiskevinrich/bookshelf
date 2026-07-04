@@ -656,7 +656,7 @@ function ConfirmSheet({
         {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
         {/* The remembered destination is the emphasised (primary + autofocused) button so
             Enter adds there; tapping the other button is a one-off that leaves the
-            remembered default untouched — the chip is the only setter (ADR-024). */}
+            remembered default untouched — the chip is the only setter (ADR-026). */}
         <div className="mb-1 flex gap-2">
           <Button
             variant={destination === "owned" ? "app" : "secondary"}
@@ -907,7 +907,7 @@ const DESTINATION_LABEL: Record<ShelfStatus, string> = { owned: "Owned", want: "
  * The remembered scan destination, shown as a tappable chip over the live camera.
  * Tapping opens a two-option menu (Owned / Wishlist); choosing one updates the
  * persisted preference. This is the only control that changes the remembered default —
- * per-book confirm-sheet taps don't (ADR-024 / BOOKSHELF-58).
+ * per-book confirm-sheet taps don't (ADR-026 / BOOKSHELF-58).
  */
 function DestinationControl({
   destination,

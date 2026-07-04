@@ -3,7 +3,7 @@
 **Status**: Implemented (PR pending merge)
 **Date**: 2026-07-04
 **Jira**: BOOKSHELF-58 (epic BOOKSHELF-62 Feedback) — labels `design-ui`, `p2`, `size-s`, `user-feedback`
-**Related**: `docs/specs/isbn-scanning.md`, `docs/specs/isbn-text-scan.md`, ADR-021 (Wishlist terminology), ADR-024 (this decision), BOOKSHELF-27 (add books to a populated shelf — future "target shelf" destinations)
+**Related**: `docs/specs/isbn-scanning.md`, `docs/specs/isbn-text-scan.md`, ADR-021 (Wishlist terminology), ADR-026 (this decision), BOOKSHELF-27 (add books to a populated shelf — future "target shelf" destinations)
 
 ## Problem
 
@@ -88,7 +88,7 @@ trailing chevron.
   announces the change ("Now adding to Wishlist"). Meets the 44px touch floor.
 - This chip is why Option B (top chip) was chosen over a footer toggle: in **auto-add** and
   **continuous** modes there is no confirm sheet, and the footer is covered or absent — the
-  one visible, always-present affordance is required exactly there. See ADR-024.
+  one visible, always-present affordance is required exactly there. See ADR-026.
 
 ### 3. How each flow uses the destination
 
@@ -100,7 +100,7 @@ trailing chevron.
   decides which is **primary** (`variant="app"` + `autoFocus`) and which is secondary — so
   the remembered destination is one tap / one Enter away. Tapping the non-primary button adds
   _that one book_ to the other status but **does not** change `scanDestination` (chip is the
-  only setter — see ADR-024). Example: default Owned → "Add owned" primary, "Add to wishlist"
+  only setter — see ADR-026). Example: default Owned → "Add owned" primary, "Add to wishlist"
   secondary; tapping wishlist adds one wishlist book, chip stays Owned.
 - **No-match manual entry** (`ManualPanel` "Add anyway"): same emphasis ordering by the
   remembered destination; the two explicit buttons remain.

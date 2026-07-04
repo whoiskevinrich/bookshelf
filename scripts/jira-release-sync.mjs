@@ -6,11 +6,12 @@
 // release-please generated for this tag: its CHANGELOG body carries each commit
 // subject, and our subjects carry the Jira key, e.g. "... (BOOKSHELF-69) (#92)".
 //
-// Dependency-free (Node 22 global fetch). Talks only to the GitHub REST API
-// (read the release) and the Jira REST API (transition issues) — no AWS, no gh
-// CLI. SOFT-FAILS by design: a Jira outage or a misconfigured secret logs a
-// GitHub `::warning::` and exits 0, so it never red-builds a prod deploy that
-// already succeeded and smoke-passed.
+// The Jira REST plumbing (idempotent transition + soft-fail) lives in
+// ./lib/jira-sync.mjs, shared with jira-dev-sync.mjs (ADR-024). Dependency-free
+// (Node 22 global fetch). Talks only to the GitHub REST API (read the release) and
+// the Jira REST API (transition issues) — no AWS, no gh CLI. SOFT-FAILS by design:
+// a Jira outage or a misconfigured secret logs a GitHub `::warning::` and exits 0,
+// so it never red-builds a prod deploy that already succeeded and smoke-passed.
 //
 // Env:
 //   RELEASE_TAG        required — e.g. "v1.2.3"
@@ -24,8 +25,10 @@
 //   DRY_RUN            optional — "true" to validate + log without POSTing the
 //                      transition (for local pre-flight checks; no tickets move)
 
-const warn = (msg) => console.log(`::warning::[jira-sync] ${msg}`);
-const info = (msg) => console.log(`[jira-sync] ${msg}`);
+import { makeLog, extractKeys, makeJiraClient, syncKeys } from "./lib/jira-sync.mjs";
+
+const log = makeLog();
+const { warn, info } = log;
 
 const {
   RELEASE_TAG,
@@ -59,14 +62,6 @@ const missing = Object.entries({
   .map(([k]) => k);
 if (missing.length) bailSoft(`missing required env: ${missing.join(", ")} — skipping Jira sync`);
 
-const jiraBase = JIRA_BASE_URL.replace(/\/+$/, "");
-const jiraAuth = "Basic " + Buffer.from(`${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}`).toString("base64");
-const jiraHeaders = {
-  Authorization: jiraAuth,
-  Accept: "application/json",
-  "Content-Type": "application/json",
-};
-
 async function getReleaseBody() {
   const url = `https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${encodeURIComponent(RELEASE_TAG)}`;
   const res = await fetch(url, {
@@ -84,70 +79,6 @@ async function getReleaseBody() {
   return json.body ?? "";
 }
 
-function extractKeys(body) {
-  const re = new RegExp(`\\b${JIRA_KEY_PREFIX}-\\d+\\b`, "gi");
-  const keys = new Set();
-  for (const m of body.matchAll(re)) keys.add(m[0].toUpperCase());
-  return [...keys];
-}
-
-async function currentStatus(key) {
-  const res = await fetch(`${jiraBase}/rest/api/3/issue/${key}?fields=status`, {
-    headers: jiraHeaders,
-  });
-  if (res.status === 404) return { missing: true };
-  if (!res.ok) throw new Error(`GET issue ${key} failed: ${res.status} ${res.statusText}`);
-  const json = await res.json();
-  return { status: json.fields?.status?.name ?? null };
-}
-
-async function findTransitionId(key) {
-  const res = await fetch(`${jiraBase}/rest/api/3/issue/${key}/transitions`, {
-    headers: jiraHeaders,
-  });
-  if (!res.ok)
-    throw new Error(`GET transitions for ${key} failed: ${res.status} ${res.statusText}`);
-  const json = await res.json();
-  const target = JIRA_TARGET_STATUS.toLowerCase();
-  // Match on the transition's destination status name (robust to transition
-  // naming like "Done" vs "Mark as Done").
-  const t = (json.transitions ?? []).find((tr) => tr.to?.name?.toLowerCase() === target);
-  return t?.id ?? null;
-}
-
-async function transition(key, transitionId) {
-  const res = await fetch(`${jiraBase}/rest/api/3/issue/${key}/transitions`, {
-    method: "POST",
-    headers: jiraHeaders,
-    body: JSON.stringify({ transition: { id: transitionId } }),
-  });
-  if (!res.ok)
-    throw new Error(
-      `POST transition ${transitionId} on ${key} failed: ${res.status} ${res.statusText}`,
-    );
-}
-
-async function syncOne(key) {
-  const cur = await currentStatus(key);
-  if (cur.missing) return warn(`${key}: not found in Jira — skipping`);
-  if (cur.status?.toLowerCase() === JIRA_TARGET_STATUS.toLowerCase()) {
-    return info(`${key}: already "${JIRA_TARGET_STATUS}" — no-op`);
-  }
-  const id = await findTransitionId(key);
-  if (!id) {
-    return warn(
-      `${key}: no transition to "${JIRA_TARGET_STATUS}" available from "${cur.status}" — skipping`,
-    );
-  }
-  if (dryRun) {
-    return info(
-      `${key}: [dry-run] would transition "${cur.status}" → "${JIRA_TARGET_STATUS}" (id ${id})`,
-    );
-  }
-  await transition(key, id);
-  info(`${key}: "${cur.status}" → "${JIRA_TARGET_STATUS}" (${RELEASE_TAG})`);
-}
-
 async function main() {
   let body;
   try {
@@ -156,7 +87,7 @@ async function main() {
     return bailSoft(`${err.message} — skipping Jira sync`);
   }
 
-  const keys = extractKeys(body);
+  const keys = extractKeys(body, JIRA_KEY_PREFIX);
   if (keys.length === 0) {
     info(`no ${JIRA_KEY_PREFIX}-* keys in ${RELEASE_TAG} release notes — nothing to sync`);
     return;
@@ -165,17 +96,19 @@ async function main() {
     `${dryRun ? "[dry-run] " : ""}syncing ${keys.length} ticket(s) for ${RELEASE_TAG}: ${keys.join(", ")}`,
   );
 
-  let failures = 0;
-  for (const key of keys) {
-    try {
-      await syncOne(key);
-    } catch (err) {
-      failures++;
-      warn(`${key}: ${err.message}`);
-    }
-  }
-  // Soft-fail: report but never exit non-zero — prod already shipped.
-  if (failures) warn(`${failures} ticket(s) could not be synced — see warnings above`);
+  const client = makeJiraClient({
+    baseUrl: JIRA_BASE_URL,
+    email: JIRA_USER_EMAIL,
+    token: JIRA_API_TOKEN,
+  });
+  await syncKeys({
+    keys,
+    targetStatus: JIRA_TARGET_STATUS,
+    client,
+    dryRun,
+    log,
+    context: RELEASE_TAG,
+  });
   info("Jira sync complete");
 }
 

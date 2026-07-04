@@ -1,4 +1,4 @@
-# ADR-024: Scanner Destination Memory
+# ADR-026: Scanner Destination Memory
 
 **Status**: Accepted
 **Date**: 2026-07-04
