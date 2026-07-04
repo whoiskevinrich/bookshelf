@@ -3,7 +3,7 @@
 **Status**: Draft
 **Date**: 2026-07-03
 **Owner**: Solo developer
-**Jira**: TBD (tickets to be drafted from this spec — not yet created)
+**Jira**: Epic BOOKSHELF-72 · stories BOOKSHELF-73 (convention), BOOKSHELF-74 (generator), BOOKSHELF-75 (panel + dot), BOOKSHELF-76 (seed)
 **Related**: ADR-017 (CI-derived release version), `release-please-config.json`, `docs/runbooks/cicd-setup.md`, `docs/design-system.md`, `docs/specs/multiple-copies.md`
 
 ## Problem
@@ -19,6 +19,7 @@ This is not a utility feature (it is **not** for re-engagement or for explaining
 **In scope — a curated, in-app "What's New" feed.** A passive panel, opened from a header icon, showing a date-grouped, human-readable list of notable changes, fed by an opt-in commit convention and generated at build time.
 
 **Out of scope (deferred):**
+
 - **Interruptive "moment"** — a toast/modal on version change. High-delight but higher-risk; revisited as P2 once the passive panel proves out.
 - **Cross-device "seen" state** — server-side per-user read tracking. MVP is per-device via `localStorage`.
 - **Stale-tab live detection** — notifying a long-open tab that a new build deployed without a reload.
@@ -27,12 +28,14 @@ This is not a utility feature (it is **not** for re-engagement or for explaining
 ## Goals / Non-goals
 
 **Goals**
+
 - Give users a friendly, honest, always-current feed of notable changes, in the app.
-- Keep the content pipeline low-friction enough that it never goes stale (a visibly abandoned feed signals the *opposite* of momentum).
+- Keep the content pipeline low-friction enough that it never goes stale (a visibly abandoned feed signals the _opposite_ of momentum).
 - Zero new backend — no API route, no DynamoDB item, no auth surface. Static JSON bundled with the web build.
 - Read well cold, to a first-time visitor who has never seen the app.
 
 **Non-goals**
+
 - Not a version log. Releases with nothing user-facing produce **no** feed entry (silence, never "v0.4.2 — no notable changes").
 - Not marketing copy. Plain, present-tense, benefit-first — the CDS/house voice.
 - Not per-user or personalized. Everyone sees the same feed.
@@ -53,6 +56,7 @@ Prior art: Kubernetes `release-note` blocks, GitLab `Changelog:` trailers. This 
 **Authoring workflow — suggest at PR time.** The note is drafted at **pull-request creation**, not reconstructed later. Because a PR squash-merges into a single commit, the PR is that commit's future body — so PR creation is the moment to decide "does this change deserve a note, and what does it say?" The standing workflow (Phase 4, `docs/runbooks/pr-workflow.md`): before every `gh pr create`, propose a `Release-Note:` line for inclusion in the PR description (which becomes the squash commit body), **or** explicitly state "no user-facing note — internal/CI/infra change." This makes the capture step active (a decision on every PR) rather than passive (remembered at merge), which is what keeps the feed alive. A non-blocking reminder can extend the existing Pre-PR docs gate hook (`.claude/settings.json`), consistent with hook-safety (echo only — no `claude` re-entry).
 
 **Generate.** A build-time script (`scripts/gen-whats-new.mjs`) re-derives the **entire** feed from git history on every build:
+
 1. `git log` the full history, extract `Release-Note:` trailers with each commit's short SHA and author date.
 2. Emit reverse-chronological `apps/web/public/whats-new.json`.
 
@@ -60,7 +64,7 @@ The feed is a pure function of git history — **no state file, self-healing, an
 
 **Surface.** A sparkle icon in `AppHeader` (`apps/web/src/components/AppHeader.tsx`), left of the theme toggle, with an "unseen" dot. Clicking opens a panel: a date-grouped feed, newest first, each entry a one-line human sentence. Passive — never interrupts.
 
-**"Seen" tracking.** `localStorage` stores the `id` (short SHA) of the newest entry present when the panel was last opened. On load, entries appearing *before* that id in feed order are "unseen" → the dot shows and those entries carry a "New" affordance. Per-device by design; the trade-off (dot re-lights on a new browser/device) is accepted for MVP.
+**"Seen" tracking.** `localStorage` stores the `id` (short SHA) of the newest entry present when the panel was last opened. On load, entries appearing _before_ that id in feed order are "unseen" → the dot shows and those entries carry a "New" affordance. Per-device by design; the trade-off (dot re-lights on a new browser/device) is accepted for MVP.
 
 ### `whats-new.json` schema
 
@@ -69,12 +73,12 @@ The feed is a pure function of git history — **no state file, self-healing, an
   "generatedAt": "2026-07-03T12:00:00Z",
   "entries": [
     {
-      "id": "a1b2c3d",       // short commit SHA — stable, unique id for seen-tracking
-      "date": "2026-07-03",  // commit author date, YYYY-MM-DD (grouping key)
-      "note": "Find any book you own by title or author, right from the shelf."
+      "id": "a1b2c3d", // short commit SHA — stable, unique id for seen-tracking
+      "date": "2026-07-03", // commit author date, YYYY-MM-DD (grouping key)
+      "note": "Find any book you own by title or author, right from the shelf.",
       // "icon": "search"    // P1 — optional Tabler icon name
-    }
-  ]
+    },
+  ],
 }
 ```
 
@@ -93,12 +97,14 @@ P0 captures a **single sentence** per trailer (the `note`) — minimum friction.
 ### Must-Have (P0)
 
 **P0-1 — `Release-Note:` convention + PR-time authoring.** Documented in a runbook and the PR template. A `Release-Note:` trailer in a commit body flags that commit as a feed entry; its value is the displayed sentence. The note is authored at PR-creation time (see Authoring workflow above).
+
 - [ ] Convention documented in `docs/runbooks/` and referenced from the PR template (a `Release-Note:` field/prompt in the template body).
 - [ ] Trailer is optional; its absence produces no entry and no error.
 - [ ] Phase-4 workflow (`docs/runbooks/pr-workflow.md`) requires a Release-Note decision before `gh pr create` — a suggested line, or an explicit "internal change, no note."
 - [ ] Optional non-blocking reminder added to the Pre-PR docs gate hook (echo only, hook-safe).
 
 **P0-2 — build-time generator (`scripts/gen-whats-new.mjs`).** Re-derives `apps/web/public/whats-new.json` from `git log` on every web build.
+
 - [ ] Given a commit with `Release-Note: <text>`, when the script runs, then an entry with that commit's short SHA, date, and text appears in the output.
 - [ ] Given a commit with no trailer, when the script runs, then no entry is produced for it.
 - [ ] Given multiple `Release-Note:` trailers in one commit, then each becomes its own entry.
@@ -107,6 +113,7 @@ P0 captures a **single sentence** per trailer (the `note`) — minimum friction.
 - [ ] Deterministic: same history → byte-identical output (stable ordering, no timestamps in entries).
 
 **P0-3 — What's New panel UI.** Sparkle icon in `AppHeader` opens a panel rendering the feed.
+
 - [ ] Icon sits left of `ThemeToggle`, present in both the inline (`sm+`) nav and the mobile cluster.
 - [ ] Panel groups entries by date, newest first; each entry shows its sentence.
 - [ ] Empty/failed fetch: panel shows a graceful empty state; a missing/broken `whats-new.json` never breaks the header (error-boundary + fallback, per the app's async rules).
@@ -115,6 +122,7 @@ P0 captures a **single sentence** per trailer (the `note`) — minimum friction.
 - [ ] Accessible: icon has an `aria-label`; panel is keyboard-dismissible; the "new" state is not communicated by color alone (dot has a shape; entries use a "New" text affordance).
 
 **P0-4 — unseen tracking.** `localStorage` high-water mark by entry `id`.
+
 - [ ] Given unseen entries exist, when the header renders, then the dot is shown.
 - [ ] Given the user opens the panel, when it closes (or on open), then the newest entry id is stored and the dot clears.
 - [ ] Given a first-ever visitor with no stored value, then define the initial state explicitly (see Open Questions Q2).
@@ -138,11 +146,13 @@ P0 captures a **single sentence** per trailer (the `note`) — minimum friction.
 Analytics go through `track()` → `POST /v1/events` (ADR-016); adding events requires updating both the client `AnalyticsEvent` union and the server `ALLOWED_EVENTS` allowlist.
 
 **Leading indicators**
+
 - **Panel open rate**: % of sessions that open What's New in the first 30 days. Target: ≥ 20% try it once; stretch ≥ 35%.
 - **Dot → open conversion**: of sessions that render an unseen dot, % that open the panel. Target: ≥ 40%.
 - **Pipeline liveness (process metric, no analytics needed)**: ≥ 1 `Release-Note:` entry per calendar month. If a month passes with zero, the convention isn't sticking — the single most important health check.
 
 **Lagging indicators**
+
 - **Qualitative**: for the current known audience, direct ask — did they notice, do they read it, does it make the app feel more alive? (n is small enough to just ask.)
 - **Trust signal for cold visitors**: once P1-3 (standalone page) ships, track referral/landing views of `/whats-new`.
 
@@ -150,10 +160,10 @@ Analytics go through `track()` → `POST /v1/events` (ADR-016); adding events re
 
 ## Open Questions
 
-- **Q1 (design) — "new" accent color.** The design system has no brand accent. What color signals "new" without colliding with red (error) / green (success)? Options: a neutral `slate-900`/white dot, or introduce one restrained accent (P1-4). *Non-blocking* — MVP can ship with a neutral dot.
-- **Q2 (design/product) — first-visit initial state.** For a brand-new user with no `localStorage` value, do we (a) mark everything as seen (no dot on first load — quietest), or (b) show the dot to pull them into the feed once? Leaning (a). *Non-blocking.*
-- **Q3 (engineering) — trailer robustness.** How lenient is trailer parsing (case, whitespace, multi-line folding, multiple per commit)? Do we validate/lint the trailer in CI, or accept whatever's there? *Non-blocking* — start permissive.
-- **Q4 (engineering) — history depth & the first run.** Do we backfill by retroactively adding trailers to recent notable merges (via a one-time seed list in the generator, since we can't rewrite history), or start the feed empty from the first release that adopts the convention? *Non-blocking* — a small seed list makes launch feel non-empty (see cheap test below).
+- **Q1 (design) — "new" accent color.** The design system has no brand accent. What color signals "new" without colliding with red (error) / green (success)? Options: a neutral `slate-900`/white dot, or introduce one restrained accent (P1-4). _Non-blocking_ — MVP can ship with a neutral dot.
+- **Q2 (design/product) — first-visit initial state.** For a brand-new user with no `localStorage` value, do we (a) mark everything as seen (no dot on first load — quietest), or (b) show the dot to pull them into the feed once? Leaning (a). _Non-blocking._
+- **Q3 (engineering) — trailer robustness.** How lenient is trailer parsing (case, whitespace, multi-line folding, multiple per commit)? Do we validate/lint the trailer in CI, or accept whatever's there? _Non-blocking_ — start permissive.
+- **Q4 (engineering) — history depth & the first run.** Do we backfill by retroactively adding trailers to recent notable merges (via a one-time seed list in the generator, since we can't rewrite history), or start the feed empty from the first release that adopts the convention? _Non-blocking_ — a small seed list makes launch feel non-empty (see cheap test below).
 - **Q5 (product) — should entries ever link out?** e.g. an entry linking to the relevant screen. Deferred, but the schema should not foreclose an optional `href`.
 
 ## Timeline Considerations
