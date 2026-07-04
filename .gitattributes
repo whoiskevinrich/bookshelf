@@ -1,6 +1,8 @@
 # Normalize line endings to LF in the working tree on every machine, overriding
-# per-machine core.autocrlf. Without this, Prettier's `--check` false-fails on a
-# Windows CRLF checkout while Linux CI (LF) stays green — see ADR-025.
+# per-machine core.autocrlf, so the local Prettier check matches Linux CI
+# byte-for-byte regardless of the prettier `endOfLine` setting — see ADR-025.
+# (Today `endOfLine: auto` in .prettierrc.json already absorbs a CRLF checkout;
+# this removes the reliance on that single config line.)
 * text=auto eol=lf
 
 # Binary assets — never apply line-ending conversion.
