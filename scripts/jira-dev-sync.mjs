@@ -33,7 +33,7 @@ const {
   JIRA_USER_EMAIL,
   JIRA_API_TOKEN,
   JIRA_KEY_PREFIX = "BOOKSHELF",
-  JIRA_TARGET_STATUS = "On dev",
+  JIRA_TARGET_STATUS = "On Dev",
   DRY_RUN,
 } = process.env;
 

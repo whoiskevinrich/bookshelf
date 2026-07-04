@@ -21,16 +21,16 @@ Goal: keep status in lock-step with pipeline position with **exactly one human t
 
 ### New statuses (both `In Progress` category)
 
-- **`On dev`** — merged, deployed to dev, smoke-passed, awaiting human QA.
+- **`On Dev`** — merged, deployed to dev, smoke-passed, awaiting human QA.
 - **`Ready for release`** — QA passed; cleared for the next prod release.
 
 ### Edge map (actor in bold)
 
 | Edge                         | Trigger                                                 | Actor                              |
 | ---------------------------- | ------------------------------------------------------- | ---------------------------------- |
-| `In Review → On dev`         | dev deploy succeeds **and smoke passes** (`deploy.yml`) | **automated** (this ADR)           |
-| `On dev → Ready for release` | QA sign-off                                             | **human — the one gate**           |
-| `On dev → In Progress`       | QA fails (kickback)                                     | **human**                          |
+| `In Review → On Dev`         | dev deploy succeeds **and smoke passes** (`deploy.yml`) | **automated** (this ADR)           |
+| `On Dev → Ready for release` | QA sign-off                                             | **human — the one gate**           |
+| `On Dev → In Progress`       | QA fails (kickback)                                     | **human**                          |
 | `Ready for release → Done`   | prod promote smoke-passes                               | **automated** (ADR-022, unchanged) |
 
 Optional upstream edges (`branch push → In Progress`, `PR opened → In Review`) are **deferred** — they're polish, not required for the QA-tracking goal, and the branch guard already pins the key regardless.
@@ -41,18 +41,18 @@ The Release-Please PR is merge-ready exactly when `status = "Ready for release"`
 
 ### Where and when
 
-The `→ On dev` step hooks at the **end of `deploy.yml`, gated on smoke success** — the same seam as the existing `Record last good dev SHA` step (`if: steps.smoke.outcome != 'failure'`). A ticket reaches `On dev` only when its code is live on dev _and_ smoke-passed, mirroring ADR-022's "only when verifiably live" principle one environment earlier. A failed dev deploy (which auto-rolls-back per ADR-020) never advances a ticket.
+The `→ On Dev` step hooks at the **end of `deploy.yml`, gated on smoke success** — the same seam as the existing `Record last good dev SHA` step (`if: steps.smoke.outcome != 'failure'`). A ticket reaches `On Dev` only when its code is live on dev _and_ smoke-passed, mirroring ADR-022's "only when verifiably live" principle one environment earlier. A failed dev deploy (which auto-rolls-back per ADR-020) never advances a ticket.
 
 ### How
 
 - **Key source is the merge-commit subject** (`github.event.head_commit.message`), matched with the same `\bBOOKSHELF-\d+\b` regex as ADR-022 — **not** a PR-API lookup. The squash subject already carries the key (`… (BOOKSHELF-75) (#103)`), and ADR-022's sync already depends on keys-in-subjects, so this is consistent and needs no extra API call. (A `gh pr view <sha> --json headRefName` fallback to the branch name is a documented hardening option if a subject ever lacks its key — see Alternatives.)
-- **Shared helpers, no duplication.** Extract the Jira REST core (`buildAuth`, `currentStatus`, `findTransitionId` by _destination status_, `transition`, idempotent `syncOne`, soft-fail) into `scripts/lib/jira-sync.mjs`. `jira-release-sync.mjs` is refactored to import it (key source = release body, target = `Done`); a new `jira-dev-sync.mjs` imports it (key source = commit message, target = `On dev`). `JIRA_TARGET_STATUS` is already env-configurable, so the only real difference between the two entry points is where the keys come from.
-- **Idempotent + soft-fail preserved.** Already-`On dev` is a no-op; a missing secret / Jira outage / unreachable transition logs a `::warning::` and exits 0. A dev deploy that already succeeded and smoke-passed must never red-build over a Jira hiccup (same principle as ADR-022 / ADR-017).
-- **Single owner per edge.** The `→ On dev` edge is owned solely by `deploy.yml`. Do **not** also add a Jira Automation rule for it — two owners would double-fire and race.
+- **Shared helpers, no duplication.** Extract the Jira REST core (`buildAuth`, `currentStatus`, `findTransitionId` by _destination status_, `transition`, idempotent `syncOne`, soft-fail) into `scripts/lib/jira-sync.mjs`. `jira-release-sync.mjs` is refactored to import it (key source = release body, target = `Done`); a new `jira-dev-sync.mjs` imports it (key source = commit message, target = `On Dev`). `JIRA_TARGET_STATUS` is already env-configurable, so the only real difference between the two entry points is where the keys come from.
+- **Idempotent + soft-fail preserved.** Already-`On Dev` is a no-op; a missing secret / Jira outage / unreachable transition logs a `::warning::` and exits 0. A dev deploy that already succeeded and smoke-passed must never red-build over a Jira hiccup (same principle as ADR-022 / ADR-017).
+- **Single owner per edge.** The `→ On Dev` edge is owned solely by `deploy.yml`. Do **not** also add a Jira Automation rule for it — two owners would double-fire and race.
 
 ### Credentials
 
-Reuse the existing `vars.JIRA_BASE_URL` + `secrets.JIRA_USER_EMAIL` + `secrets.JIRA_API_TOKEN` from ADR-022. They must be made available to the **`dev`** GitHub environment (previously only the `prod`/promote job consumed them). No new AWS/OIDC permissions — the step talks only to the Jira REST API.
+Reuse ADR-022's credentials. `secrets.JIRA_USER_EMAIL` + `secrets.JIRA_API_TOKEN` are **repo-level**, so the `dev` deploy job already sees them. But `vars.JIRA_BASE_URL` was **`prod`-environment-scoped** (only `promote.yml` used it) — it must be promoted to a **repo-level variable** (or duplicated into the `dev` environment), or it expands to an empty string in the dev job and the sync silently no-ops (see `docs/runbooks/required-secrets-and-vars.md`). No new AWS/OIDC permissions — the step talks only to the Jira REST API.
 
 ### Manual dependency (BOOKSHELF-80)
 
@@ -61,24 +61,24 @@ The two statuses and their transitions must be added first in Jira's **team-mana
 ## Alternatives considered
 
 - **Resolve the key via the merged PR's head branch** (`gh pr view <sha> --json headRefName`). More robust if a commit subject omits its key, but adds an API call and diverges from ADR-022's mechanism. The branch guard (ADR-023) already makes subject-keys reliable (branch → PR title → squash subject), so this is deferred as a fallback, not the default.
-- **Jira-native automation** (GitHub-for-Jira app + Automation rules). Near-zero code for branch/PR edges, but it **can't observe "dev deploy + smoke passed"** — the exact signal that defines `On dev`. Rejected for this edge; it could still drive the deferred upstream edges if wanted.
-- **One combined status** instead of two. Collapsing `On dev` and `Ready for release` loses the ability to answer "what's QA'd and awaiting release?" as a query — which is the entire point of the release-gate tie-in.
-- **Auto-advance `On dev → Ready for release`.** That transition _is_ the QA sign-off — the one deliberate human step. Automating it defeats the goal.
+- **Jira-native automation** (GitHub-for-Jira app + Automation rules). Near-zero code for branch/PR edges, but it **can't observe "dev deploy + smoke passed"** — the exact signal that defines `On Dev`. Rejected for this edge; it could still drive the deferred upstream edges if wanted.
+- **One combined status** instead of two. Collapsing `On Dev` and `Ready for release` loses the ability to answer "what's QA'd and awaiting release?" as a query — which is the entire point of the release-gate tie-in.
+- **Auto-advance `On Dev → Ready for release`.** That transition _is_ the QA sign-off — the one deliberate human step. Automating it defeats the goal.
 
 ## Implementation
 
 - **`scripts/lib/jira-sync.mjs`** (new) — shared, dependency-free Jira REST helpers + key extraction.
 - **`scripts/jira-release-sync.mjs`** — refactored to import the shared lib (behaviour unchanged; still targets `Done` from the release body).
-- **`scripts/jira-dev-sync.mjs`** (new) — scans a commit message for keys, transitions each to `On dev`; same idempotent + soft-fail contract; honours `DRY_RUN`.
-- **`.github/workflows/deploy.yml`** — new `Sync Jira tickets → On dev` step gated `if: steps.smoke.outcome != 'failure'`, passing the Jira vars/secrets and the head-commit message.
-- **Jira** (manual, BOOKSHELF-80) — add `On dev` + `Ready for release` statuses and transitions; a saved "Needs QA" board filter (`status = "On dev"`).
+- **`scripts/jira-dev-sync.mjs`** (new) — scans a commit message for keys, transitions each to `On Dev`; same idempotent + soft-fail contract; honours `DRY_RUN`.
+- **`.github/workflows/deploy.yml`** — new `Sync Jira tickets → On Dev` step gated `if: steps.smoke.outcome != 'failure'`, passing the Jira vars/secrets and the head-commit message.
+- **Jira** (manual, BOOKSHELF-80) — add `On Dev` + `Ready for release` statuses and transitions; a saved "Needs QA" board filter (`status = "On Dev"`).
 - **Docs** — this ADR + a `docs/decisions.md` row; note the dev-env secrets in `docs/runbooks/cicd-setup.md`; reconcile BOOKSHELF-70's release-please framing.
 
 ## Consequences
 
 **Good**
 
-- "What needs human QA?" becomes a saved query (`status = "On dev"`); a merged ticket surfaces there automatically.
+- "What needs human QA?" becomes a saved query (`status = "On Dev"`); a merged ticket surfaces there automatically.
 - `Done` regains an honest meaning (live in prod); the QA queue and the release-ready set are each independently queryable.
 - Reuses ADR-022's proven idempotent/soft-fail machinery; the shared lib removes the near-duplicate script.
 
