@@ -13,6 +13,18 @@ Canonical source: docs/runbooks/qa-checklist.md
 
 <!-- Tests added/updated, local dev verification, `pnpm preflight` output, etc. -->
 
+## Release note
+
+<!--
+User-facing change? Add a trailer line OUTSIDE this comment, on its own line, e.g.:
+
+Release-Note: Find any book you own by title or author, right from your shelf.
+
+Plain, present-tense, benefit-first — the app's voice, not the commit subject. It's
+collected into the in-app "What's New" feed (docs/specs/whats-new.md). Leave this section
+empty for internal/CI/infra/test/chore changes — no trailer, no feed entry.
+-->
+
 ## QA checklist
 
 **General**

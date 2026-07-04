@@ -93,12 +93,17 @@ This skill checks for active AWS credentials, acquires them via
 1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm preflight`
    (`preflight` includes `pnpm qa:guards` — the same QA Guards check CI runs).
    No version bump — the deploy workflow derives the version at merge (ADR-017).
-2. Document as appropriate (the Pre-PR docs gate hook will remind you):
+2. **Decide the Release-Note** (BOOKSHELF-73): if this PR changes something users would
+   notice, add a `Release-Note:` trailer to the PR description (app voice — plain,
+   present-tense, benefit-first, not the Conventional-Commit subject) so it lands in the
+   squash commit and the in-app "What's New" feed; state "no user-facing note" for
+   internal/CI/infra/test/chore. See `docs/specs/whats-new.md`.
+3. Document as appropriate (the Pre-PR docs gate hook will remind you):
    - Technical decisions → `docs/adrs/<slug>.md` + row in `docs/decisions.md`
    - Spec changes → `docs/specs/<slug>.md`
    - System operations (scripts, infra, env setup) → `docs/runbooks/<slug>.md`
-3. `/pr-review-toolkit:review-pr all` — address all Critical issues first
-4. Work through `docs/runbooks/qa-checklist.md` — the PR template prefills the `[attest]`
+4. `/pr-review-toolkit:review-pr all` — address all Critical issues first
+5. Work through `docs/runbooks/qa-checklist.md` — the PR template prefills the `[attest]`
    items; the `[auto]` items are enforced by the QA Guards CI check (`pnpm qa:guards`)
 
 ### Phase 5 — Merge and Deploy

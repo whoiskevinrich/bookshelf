@@ -20,7 +20,22 @@ pnpm preflight
 
 Runs `format → lint → test → qa:guards → synth` in sequence — a local dry-run of all CI checks. Fix any failures before pushing.
 
-### 2. Push and open the PR
+### 2. Decide the release note
+
+If this PR changes something a **user** would notice, add a `Release-Note:` trailer to the
+PR description so it lands in the squash-merge commit body and, from there, the in-app
+"What's New" feed. Write it in the app's voice — plain, present-tense, benefit-first — not
+the Conventional-Commit subject:
+
+```
+Release-Note: Find any book you own by title or author, right from your shelf.
+```
+
+Leave it out entirely for internal/CI/infra/test/chore changes — no trailer means no feed
+entry, which is exactly how the feed avoids empty/noisy releases. A build-time script
+collects these trailers into `whats-new.json`. See [the What's New spec](../specs/whats-new.md).
+
+### 3. Push and open the PR
 
 ```powershell
 git push -u origin <branch>
