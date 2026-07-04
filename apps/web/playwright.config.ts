@@ -58,7 +58,12 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
+  // In CI also emit the HTML report so the "Upload Playwright report" step has
+  // something to upload — without it, a failed run leaves zero trace/screenshot
+  // artifact to debug from (open: "never" keeps it from trying to launch a browser).
+  reporter: process.env.CI
+    ? [["github"], ["list"], ["html", { open: "never" }]]
+    : [["list"]],
   use: {
     baseURL: APP_BASE_URL,
     trace: "on-first-retry",
