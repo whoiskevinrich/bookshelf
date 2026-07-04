@@ -1,0 +1,16 @@
+# Normalize line endings to LF in the working tree on every machine, overriding
+# per-machine core.autocrlf. Without this, Prettier's `--check` false-fails on a
+# Windows CRLF checkout while Linux CI (LF) stays green — see ADR-025.
+* text=auto eol=lf
+
+# Binary assets — never apply line-ending conversion.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary
+*.wasm  binary
