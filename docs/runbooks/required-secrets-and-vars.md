@@ -11,7 +11,7 @@ missing credential. Two real examples from the E2E pipeline (BOOKSHELF-4):
   book-search spec failed with a UI symptom ("Add Owned" button never appears").
 - **Present but wrong** → can't be read back. `TEST_USER_PASSWORD` existed but
   didn't match the QA Cognito user, so `auth.setup.ts` login timed out. `gh secret
-  list` shows the name, never the value, so a stale/mistyped secret is invisible
+list` shows the name, never the value, so a stale/mistyped secret is invisible
   until you exercise it.
 
 This runbook is the fast path to rule both out before spelunking application code.
@@ -26,15 +26,15 @@ This runbook is the fast path to rule both out before spelunking application cod
 
 Kept in sync by hand — regenerate the reference columns with the grep in §2.
 
-| Name                 | Kind   | Scope        | Used by                     | How to verify the **value** works |
-| -------------------- | ------ | ------------ | --------------------------- | --------------------------------- |
-| `AWS_ROLE_ARN`       | var    | env (dev/prod) | deploy, e2e, promote      | The "Configure AWS credentials" step succeeds (OIDC assume) |
-| `AWS_REGION`         | var    | env (dev/prod) | deploy, e2e, promote      | Non-empty; `us-west-2` for dev |
-| `TEST_USER_EMAIL`    | secret | repo         | e2e                         | Matches a real Cognito user (§4) |
-| `TEST_USER_PASSWORD` | secret | repo         | e2e                         | Authenticates that user (§4) |
-| `JIRA_BASE_URL`      | var    | env (prod)   | promote (release sync)      | Non-empty site URL |
-| `JIRA_USER_EMAIL`    | secret | repo         | promote (release sync)      | A Jira API call succeeds |
-| `JIRA_API_TOKEN`     | secret | repo         | promote (release sync)      | A Jira API call succeeds |
+| Name                 | Kind   | Scope          | Used by                | How to verify the **value** works                           |
+| -------------------- | ------ | -------------- | ---------------------- | ----------------------------------------------------------- |
+| `AWS_ROLE_ARN`       | var    | env (dev/prod) | deploy, e2e, promote   | The "Configure AWS credentials" step succeeds (OIDC assume) |
+| `AWS_REGION`         | var    | env (dev/prod) | deploy, e2e, promote   | Non-empty; `us-west-2` for dev                              |
+| `TEST_USER_EMAIL`    | secret | repo           | e2e                    | Matches a real Cognito user (§4)                            |
+| `TEST_USER_PASSWORD` | secret | repo           | e2e                    | Authenticates that user (§4)                                |
+| `JIRA_BASE_URL`      | var    | env (prod)     | promote (release sync) | Non-empty site URL                                          |
+| `JIRA_USER_EMAIL`    | secret | repo           | promote (release sync) | A Jira API call succeeds                                    |
+| `JIRA_API_TOKEN`     | secret | repo           | promote (release sync) | A Jira API call succeeds                                    |
 
 **Scope matters and is easy to get wrong:**
 
@@ -87,7 +87,7 @@ Cross-check the §2 output against §3. A name in §2 that is absent from **ever
 relevant scope in §3 is the missing-entirely failure mode — set it before re-running.
 
 A recent `Updated` timestamp on a secret does **not** mean the value is correct — it
-only means someone wrote *something*. Confirm the value with §4.
+only means someone wrote _something_. Confirm the value with §4.
 
 ---
 
@@ -146,7 +146,7 @@ wrong account.
 ## 5. Where diagnostics land when a value is wrong
 
 - The Playwright HTML report is uploaded by the E2E job (`playwright-report/`).
-  If the "Upload Playwright report" step says *"No files were found"*, the report
+  If the "Upload Playwright report" step says _"No files were found"_, the report
   wasn't generated — check the `reporter` includes `html` in CI
   (`apps/web/playwright.config.ts`).
 - The E2E job pipes the API/web dev-server stdout, so upstream failures show as
