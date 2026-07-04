@@ -81,7 +81,11 @@ jobs:
           DYNAMODB_TABLE_NAME=${{ steps.cfg.outputs.table_name }}
           AWS_REGION=${{ vars.AWS_REGION }}
           BOOK_PROVIDER=google-books
-          GOOGLE_BOOKS_API_KEY=${{ secrets.GOOGLE_BOOKS_API_KEY }}
+          # Resolve the Google Books key from SSM at runtime (same param the deployed
+          # dev Lambda reads), so the E2E API server makes authenticated upstream calls.
+          # Without a key, Google Books throttles the shared runner IP (429) and every
+          # book-search/ISBN spec fails. The OIDC creds above grant SSM read.
+          GOOGLE_BOOKS_API_KEY_SSM_NAME=/bookshelf/google-books-api-key
           EOF
 
       - name: Write apps/web/.env.local
