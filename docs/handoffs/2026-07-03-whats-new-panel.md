@@ -29,8 +29,8 @@ The SPA consumes a static asset at **`/whats-new.json`** (served from `apps/web/
 {
   "generatedAt": "2026-07-03", // YYYY-MM-DD or null (derived from newest commit date)
   "entries": [
-    { "id": "a1b2c3d", "date": "2026-07-03", "note": "Find any book you own by title or author." }
-  ]
+    { "id": "a1b2c3d", "date": "2026-07-03", "note": "Find any book you own by title or author." },
+  ],
 }
 ```
 
@@ -50,12 +50,12 @@ The SPA consumes a static asset at **`/whats-new.json`** (served from `apps/web/
 
 Kevin chose **terracotta** (the `c-coral` family) as the app's first non-error/success accent. Values:
 
-| Use | Light | Dark (tune against `slate-900`) |
-| --- | --- | --- |
-| Unseen dot | `#D85A30` | `#D85A30` (stays visible on dark) or a touch lighter `#F0997B` |
-| "New" pill bg | `#FAECE7` | `~coral-900/30` (e.g. `#4A1B0C`/30) |
-| "New" pill text | `#712B13` | `#F0997B` |
-| "New" pill border | `#F0997B` | `#712B13` |
+| Use               | Light     | Dark (tune against `slate-900`)                                |
+| ----------------- | --------- | -------------------------------------------------------------- |
+| Unseen dot        | `#D85A30` | `#D85A30` (stays visible on dark) or a touch lighter `#F0997B` |
+| "New" pill bg     | `#FAECE7` | `~coral-900/30` (e.g. `#4A1B0C`/30)                            |
+| "New" pill text   | `#712B13` | `#F0997B`                                                      |
+| "New" pill border | `#F0997B` | `#712B13`                                                      |
 
 **Two required doc updates in this PR:**
 
