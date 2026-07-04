@@ -2,6 +2,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/Button";
 import { ThemeToggle } from "../components/icons/ThemeIcons";
+import { WhatsNewPanel } from "./WhatsNewPanel";
 import { MobileMenu, mobileMenuRowClass } from "./MobileMenu";
 
 const activeLinkClass = "text-sm font-medium text-slate-900 dark:text-white";
@@ -83,11 +84,13 @@ export function AppHeader() {
             </Button>
           </>
         )}
+        <WhatsNewPanel />
         <ThemeToggle />
       </nav>
 
       {/* Mobile cluster — below sm. ThemeToggle stays visible; links collapse into the menu. */}
       <div className="flex items-center gap-1 sm:hidden">
+        <WhatsNewPanel />
         <ThemeToggle />
         <MobileMenu>
           {renderShelfLinks(panelLinkClass)}
