@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "whats-new": "node ../../scripts/gen-whats-new.mjs",
+    "dev": "node ../../scripts/gen-whats-new.mjs && vite",
+    "build": "node ../../scripts/gen-whats-new.mjs && tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
