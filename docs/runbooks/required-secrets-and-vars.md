@@ -26,15 +26,15 @@ This runbook is the fast path to rule both out before spelunking application cod
 
 Kept in sync by hand — regenerate the reference columns with the grep in §2.
 
-| Name                 | Kind   | Scope          | Used by                | How to verify the **value** works                           |
-| -------------------- | ------ | -------------- | ---------------------- | ----------------------------------------------------------- |
-| `AWS_ROLE_ARN`       | var    | env (dev/prod) | deploy, e2e, promote   | The "Configure AWS credentials" step succeeds (OIDC assume) |
-| `AWS_REGION`         | var    | env (dev/prod) | deploy, e2e, promote   | Non-empty; `us-west-2` for dev                              |
-| `TEST_USER_EMAIL`    | secret | repo           | e2e                    | Matches a real Cognito user (§4)                            |
-| `TEST_USER_PASSWORD` | secret | repo           | e2e                    | Authenticates that user (§4)                                |
-| `JIRA_BASE_URL`      | var    | env (prod)     | promote (release sync) | Non-empty site URL                                          |
-| `JIRA_USER_EMAIL`    | secret | repo           | promote (release sync) | A Jira API call succeeds                                    |
-| `JIRA_API_TOKEN`     | secret | repo           | promote (release sync) | A Jira API call succeeds                                    |
+| Name                 | Kind   | Scope          | Used by                     | How to verify the **value** works                           |
+| -------------------- | ------ | -------------- | --------------------------- | ----------------------------------------------------------- |
+| `AWS_ROLE_ARN`       | var    | env (dev/prod) | deploy, e2e, promote        | The "Configure AWS credentials" step succeeds (OIDC assume) |
+| `AWS_REGION`         | var    | env (dev/prod) | deploy, e2e, promote        | Non-empty; `us-west-2` for dev                              |
+| `TEST_USER_EMAIL`    | secret | repo           | e2e                         | Matches a real Cognito user (§4)                            |
+| `TEST_USER_PASSWORD` | secret | repo           | e2e                         | Authenticates that user (§4)                                |
+| `JIRA_BASE_URL`      | var    | repo           | promote, deploy (Jira sync) | Non-empty site URL                                          |
+| `JIRA_USER_EMAIL`    | secret | repo           | promote, deploy (Jira sync) | A Jira API call succeeds                                    |
+| `JIRA_API_TOKEN`     | secret | repo           | promote, deploy (Jira sync) | A Jira API call succeeds                                    |
 
 **Scope matters and is easy to get wrong:**
 
@@ -76,7 +76,7 @@ REPO="whoiskevinrich/bookshelf"
 gh secret   list --repo "$REPO"
 gh variable list --repo "$REPO"
 
-# Environment-scoped — REQUIRED for AWS_ROLE_ARN / AWS_REGION / prod JIRA_BASE_URL
+# Environment-scoped — REQUIRED for AWS_ROLE_ARN / AWS_REGION (dev vs prod resolve differently)
 gh secret   list --repo "$REPO" --env dev
 gh variable list --repo "$REPO" --env dev
 gh secret   list --repo "$REPO" --env prod
