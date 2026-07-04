@@ -42,7 +42,7 @@ view in barcode and text modes.
 Rejected the alternative of an "Add to" segmented control in the footer alongside the
 existing toggles (Option A). The footer is **covered by the confirm sheet and absent in the
 camera-unavailable state**, and — decisively — in **auto-add** and **continuous** modes there
-is *no* confirm sheet at all, so the footer would hide the destination in exactly the modes
+is _no_ confirm sheet at all, so the footer would hide the destination in exactly the modes
 where a wrong destination is committed silently and fastest. A chip over the viewfinder is
 the one affordance guaranteed to be present when it matters. This directly serves the ticket's
 "visible during scanning… never silently add to a surprising place."
@@ -58,7 +58,7 @@ being a surprise.
 
 The remembered default changes **only** when the user taps the chip. In confirm mode both
 "Add owned" / "Add to wishlist" buttons remain; the chip's destination merely decides which is
-primary/autofocused. Tapping the non-default button adds *that one book* to the other status
+primary/autofocused. Tapping the non-default button adds _that one book_ to the other status
 **without** mutating `scanDestination`.
 
 Rejected "last add wins" (every add, including a one-off confirm-sheet tap, rewrites the
