@@ -13,6 +13,16 @@
   --color-paper-300: #e5dfd0;
   --color-paper-400: #ddd5c1;
   --color-paper-500: #d3ccba;
+
+  /* ── Terracotta "new" accent (BOOKSHELF-75) ──────────────────
+     The app's first non-error/success accent — signals "new"
+     (What's New unseen dot / "New" pill) without colliding with
+     red (error) or green (success). See docs/design-system.md. */
+  --color-c-coral-50: #faece7;
+  --color-c-coral-300: #f0997b;
+  --color-c-coral-500: #d85a30;
+  --color-c-coral-800: #712b13;
+  --color-c-coral-900: #4a1b0c;
 }
 
 /* ── Animations ─────────────────────────────────────────── */

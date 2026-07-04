@@ -50,6 +50,16 @@ These are additive — they signal state, not brand.
 | Success text     | `text-green-700`           | `dark:text-green-400`       |
 | Success bg       | `bg-green-50`              | `dark:bg-green-900/30`      |
 | Link/interactive | `text-slate-900 underline` | `dark:text-white underline` |
+| New dot          | `bg-c-coral-500`           | `dark:bg-c-coral-300`       |
+| New pill text    | `text-c-coral-800`         | `dark:text-c-coral-300`     |
+| New pill bg      | `bg-c-coral-50`            | `dark:bg-c-coral-900/30`    |
+| New pill border  | `border-c-coral-300`       | `dark:border-c-coral-800`   |
+
+The **terracotta `c-coral-*` scale** (defined in `src/index.css` `@theme`) is the app's
+first accent beyond red/green — it signals **"new"** (the What's New unseen dot and "New"
+pill, BOOKSHELF-75), not brand. Reach for it only for newness/notification affordances;
+red stays error, green stays success. Because the dot is a shape (not just a hue) and the
+"New" pill carries a text label, this accent satisfies the color-only rule below.
 
 ---
 
