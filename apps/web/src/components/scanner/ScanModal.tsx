@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { extractIsbn13, toIsbn13 } from "../../lib/isbn";
 import {
@@ -56,9 +56,11 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     postScanBehavior,
     scanMode,
     ocrInputMode,
+    scanDestination,
     setPostScanBehavior,
     setScanMode,
     setOcrInputMode,
+    setScanDestination,
   } = useScannerPreferences();
   const addMutation = useAddToShelf();
   const removeMutation = useRemoveFromShelf();
@@ -212,7 +214,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         console.error(`[ScanModal] metadata lookup failed for ${isbn}; adding bare ISBN`, err);
       book = null;
     }
-    await commitAdd(isbn, "owned", book, "auto");
+    await commitAdd(isbn, scanDestination, book, "auto");
   }
 
   function handleDecode(raw: string) {
@@ -338,6 +340,8 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
   // ── Computed display flags ─────────────────────────────────────────────────
   const cameraUnavailable = status === "denied" || status === "no-camera" || status === "error";
   const showFooter = status === "scanning" && view === "scanning";
+  // The remembered-destination chip rides over the live viewfinder, in barcode and text modes.
+  const showDestinationChip = status === "scanning" && view === "scanning";
   const showModeBar =
     features.ocrScan && supportsCameraScan() && status === "scanning" && view === "scanning";
 
@@ -377,6 +381,12 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         ocrMissHint={ocrMissHint}
         onOcrScan={() => void handleOcrScan()}
       >
+        {/* Remembered scan destination — always visible while the camera is live so a
+            silent auto-add can never land somewhere surprising (BOOKSHELF-58). */}
+        {showDestinationChip && (
+          <DestinationControl destination={scanDestination} onChange={setScanDestination} />
+        )}
+
         {/* Mid-scan feedback flash: green for an add, amber for a duplicate */}
         {flash && view === "scanning" && (
           <>
@@ -387,7 +397,8 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
                 className="animate-success-flash pointer-events-none absolute inset-0 ring-4 ring-inset ring-emerald-400/70"
               />
             )}
-            <div className="absolute inset-x-0 top-4 flex justify-center px-4">
+            {/* Sits below the destination chip (top-3) so the two never overlap. */}
+            <div className="absolute inset-x-0 top-16 flex justify-center px-4">
               <div
                 className={`animate-fade-up flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium ${
                   flash.kind === "added"
@@ -491,6 +502,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           <ConfirmSheet
             book={foundBook}
             isbn={pendingIsbn}
+            destination={scanDestination}
             busy={busy}
             error={error}
             onAdd={(s) => void commitAdd(pendingIsbn, s, foundBook)}
@@ -503,6 +515,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
             heading="Couldn't find that book"
             subheading="Double-check the ISBN, or add it without details."
             initialIsbn={pendingIsbn}
+            destination={scanDestination}
             error={error}
             busy={busy}
             onLookup={manualLookup}
@@ -600,6 +613,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
 function ConfirmSheet({
   book,
   isbn,
+  destination,
   busy,
   error,
   onAdd,
@@ -607,6 +621,7 @@ function ConfirmSheet({
 }: {
   book: BookSearchResult;
   isbn: string;
+  destination: ShelfStatus;
   busy: boolean;
   error: string | null;
   onAdd: (status: ShelfStatus) => void;
@@ -639,22 +654,25 @@ function ConfirmSheet({
           </div>
         </div>
         {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
+        {/* The remembered destination is the emphasised (primary + autofocused) button so
+            Enter adds there; tapping the other button is a one-off that leaves the
+            remembered default untouched — the chip is the only setter (ADR-026). */}
         <div className="mb-1 flex gap-2">
-          {/* autoFocus so Enter adds right after an Enter-submitted manual lookup */}
           <Button
-            variant="app"
+            variant={destination === "owned" ? "app" : "secondary"}
             className="flex-1"
             disabled={busy}
             onClick={() => onAdd("owned")}
-            autoFocus
+            {...(destination === "owned" ? { autoFocus: true } : {})}
           >
             Add owned
           </Button>
           <Button
-            variant="secondary"
+            variant={destination === "want" ? "app" : "secondary"}
             className="flex-1"
             disabled={busy}
             onClick={() => onAdd("want")}
+            {...(destination === "want" ? { autoFocus: true } : {})}
           >
             Add to wishlist
           </Button>
@@ -732,6 +750,7 @@ function ManualPanel({
   heading,
   subheading,
   initialIsbn = "",
+  destination = "owned",
   error,
   busy,
   onLookup,
@@ -742,6 +761,7 @@ function ManualPanel({
   heading: string;
   subheading: string;
   initialIsbn?: string;
+  destination?: ShelfStatus;
   error: string | null;
   busy: boolean;
   onLookup: (value: string) => void;
@@ -796,8 +816,9 @@ function ManualPanel({
 
         {onAddAnyway && (
           <div className="mt-3 flex w-full gap-2">
+            {/* Emphasise the remembered destination, matching the confirm sheet. */}
             <Button
-              variant="secondary"
+              variant={destination === "owned" ? "app" : "secondary"}
               className="flex-1"
               disabled={busy}
               onClick={() => onAddAnyway("owned")}
@@ -805,7 +826,7 @@ function ManualPanel({
               Add owned
             </Button>
             <Button
-              variant="secondary"
+              variant={destination === "want" ? "app" : "secondary"}
               className="flex-1"
               disabled={busy}
               onClick={() => onAddAnyway("want")}
@@ -878,7 +899,176 @@ function ContinuousList({ added, onUndo }: { added: AddedItem[]; onUndo: (isbn: 
   );
 }
 
+// ── Destination chip ─────────────────────────────────────────────────────────
+
+const DESTINATION_LABEL: Record<ShelfStatus, string> = { owned: "Owned", want: "Wishlist" };
+
+/**
+ * The remembered scan destination, shown as a tappable chip over the live camera.
+ * Tapping opens a two-option menu (Owned / Wishlist); choosing one updates the
+ * persisted preference. This is the only control that changes the remembered default —
+ * per-book confirm-sheet taps don't (ADR-026 / BOOKSHELF-58).
+ */
+function DestinationControl({
+  destination,
+  onChange,
+}: {
+  destination: ShelfStatus;
+  onChange: (value: ShelfStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    // Capture so Escape closes the menu without also closing the whole scanner.
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
+
+  function choose(value: ShelfStatus) {
+    onChange(value);
+    setOpen(false);
+  }
+
+  const label = DESTINATION_LABEL[destination];
+
+  return (
+    <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-4">
+      <div ref={rootRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label={`Adding to ${label}. Change scan destination`}
+          className="flex min-h-11 items-center gap-2 rounded-full border border-white/15 bg-slate-950/70 px-4 py-2 text-sm backdrop-blur-sm transition-colors hover:border-white/30"
+        >
+          {destination === "owned" ? <BookIcon /> : <BookmarkIcon />}
+          <span>
+            Adding to <span className="font-medium">{label}</span>
+          </span>
+          <ChevronIcon open={open} />
+        </button>
+
+        {open && (
+          <div
+            role="menu"
+            aria-label="Scan destination"
+            className="absolute left-1/2 top-full z-20 mt-2 w-44 -translate-x-1/2 overflow-hidden rounded-xl border border-white/15 bg-slate-900 shadow-lg"
+          >
+            <DestinationOption
+              icon={<BookIcon />}
+              label="Owned"
+              selected={destination === "owned"}
+              onSelect={() => choose("owned")}
+            />
+            <div className="h-px bg-white/10" />
+            <DestinationOption
+              icon={<BookmarkIcon />}
+              label="Wishlist"
+              selected={destination === "want"}
+              onSelect={() => choose("want")}
+            />
+          </div>
+        )}
+      </div>
+      <span className="sr-only" aria-live="polite">
+        Adding to {label}
+      </span>
+    </div>
+  );
+}
+
+function DestinationOption({
+  icon,
+  label,
+  selected,
+  onSelect,
+}: {
+  icon: ReactNode;
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={`flex min-h-11 w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm ${
+        selected ? "bg-emerald-500/10 text-emerald-300" : "text-slate-200 hover:bg-white/5"
+      }`}
+    >
+      <span aria-hidden="true">{icon}</span>
+      <span className="flex-1">{label}</span>
+      {selected && <CheckIcon />}
+    </button>
+  );
+}
+
 // ── Icons ────────────────────────────────────────────────────────────────────
+
+function BookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0" fill="none" aria-hidden="true">
+      <path
+        d="M4 4h5a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 4h-5a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h5z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BookmarkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0" fill="none" aria-hidden="true">
+      <path
+        d="M6 4h12v16l-6-4-6 4z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`h-3.5 w-3.5 flex-shrink-0 text-slate-400 transition-transform ${
+        open ? "rotate-180" : ""
+      }`}
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M4 6l4 4 4-4"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function XIcon() {
   return (

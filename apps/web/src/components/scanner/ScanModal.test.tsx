@@ -74,6 +74,27 @@ describe("ScanModal — manual entry via Enter", () => {
     expect(mockAdd).toHaveBeenCalledWith(ISBN, "owned", BOOK);
   });
 
+  it("emphasises the remembered Wishlist destination on the confirm sheet (BOOKSHELF-58)", async () => {
+    // Reopening with Wishlist remembered → it's the primary, autofocused action, so
+    // Enter adds to the wishlist without the user re-picking it.
+    window.localStorage.setItem("scanner:destination", "want");
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockResolvedValue({} as never);
+    renderModal();
+
+    await lookUpViaEnter(user);
+
+    expect(await screen.findByText(/Barcode found/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Add to wishlist" })).toHaveFocus(),
+    );
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText(/Added to wishlist/)).toBeInTheDocument();
+    expect(mockAdd).toHaveBeenCalledWith(ISBN, "want", BOOK);
+  });
+
   it("rejects an invalid ISBN on Enter without a lookup", async () => {
     const user = userEvent.setup();
     renderModal();
