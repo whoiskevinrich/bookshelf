@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { ShelfStatus } from "../lib/api-client";
 
@@ -21,10 +21,13 @@ interface ScannerPreferencesValue {
   scanMode: ScanMode;
   ocrInputMode: OcrInputMode;
   scanDestination: ScanDestination;
+  /** Remembered target named shelf (or `null` for "No shelf") — BOOKSHELF-85. */
+  scanShelfId: string | null;
   setPostScanBehavior: (value: PostScanBehavior) => void;
   setScanMode: (value: ScanMode) => void;
   setOcrInputMode: (value: OcrInputMode) => void;
   setScanDestination: (value: ScanDestination) => void;
+  setScanShelfId: (value: string | null) => void;
 }
 
 const ScannerPreferencesContext = createContext<ScannerPreferencesValue | null>(null);
@@ -59,6 +62,18 @@ export function ScannerPreferencesProvider({ children }: { children: ReactNode }
     "owned",
     memberOf(SCAN_DESTINATION_VALUES),
   );
+  // Stored as "" for "no shelf" since useLocalStorage requires a string type;
+  // surfaced through the context as `null` (BOOKSHELF-85).
+  const [scanShelfIdRaw, setScanShelfIdRaw] = useLocalStorage<string>(
+    "scanner:shelfId",
+    "",
+    (raw) => raw,
+  );
+  const scanShelfId = scanShelfIdRaw || null;
+  const setScanShelfId = useCallback(
+    (value: string | null) => setScanShelfIdRaw(value ?? ""),
+    [setScanShelfIdRaw],
+  );
 
   const value = useMemo(
     () => ({
@@ -66,20 +81,24 @@ export function ScannerPreferencesProvider({ children }: { children: ReactNode }
       scanMode,
       ocrInputMode,
       scanDestination,
+      scanShelfId,
       setPostScanBehavior,
       setScanMode,
       setOcrInputMode,
       setScanDestination,
+      setScanShelfId,
     }),
     [
       postScanBehavior,
       scanMode,
       ocrInputMode,
       scanDestination,
+      scanShelfId,
       setPostScanBehavior,
       setScanMode,
       setOcrInputMode,
       setScanDestination,
+      setScanShelfId,
     ],
   );
 
