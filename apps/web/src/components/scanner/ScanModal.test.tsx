@@ -203,4 +203,22 @@ describe("ScanModal — remembered shelf (BOOKSHELF-85)", () => {
     expect(await screen.findByText(/Added to your shelf/)).toBeInTheDocument();
     expect(mockAddBookToShelf).not.toHaveBeenCalled();
   });
+
+  it("still reports success when the status add succeeds but the shelf-link call fails", async () => {
+    window.localStorage.setItem("scanner:shelfId", SCI_FI_SHELF.shelfId);
+    mockFetchShelves.mockResolvedValue([SCI_FI_SHELF]);
+    mockAddBookToShelf.mockRejectedValue(new Error("network down"));
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockResolvedValue({} as never);
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add owned" }));
+
+    // The book was genuinely added — a shelf-link failure must not be
+    // misreported as the whole add having failed.
+    expect(await screen.findByText(/Added to your shelf/)).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't add that book — try again.")).not.toBeInTheDocument();
+  });
 });

@@ -185,9 +185,17 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     try {
       await addMutation.mutateAsync({ isbn, status, ...(book ? { book } : {}) });
       // Shelf membership is additive to status, not an alternative — applies
-      // regardless of which status button triggered the add (BOOKSHELF-85).
+      // regardless of which status button triggered the add (BOOKSHELF-85). Its
+      // own try/catch keeps a shelf-link failure from being misreported as a
+      // failure of the add that already succeeded above.
       if (activeShelf) {
-        await addToShelfMutation.mutateAsync({ shelfId: activeShelf.shelfId, isbn });
+        try {
+          await addToShelfMutation.mutateAsync({ shelfId: activeShelf.shelfId, isbn });
+        } catch (shelfErr) {
+          if (import.meta.env.DEV) {
+            console.error(`[ScanModal] shelf add failed for ${isbn}`, shelfErr);
+          }
+        }
       }
       const item = buildAddedItem(isbn, status, book);
       recordAdded(item);
