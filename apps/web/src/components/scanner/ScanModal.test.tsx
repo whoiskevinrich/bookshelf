@@ -15,10 +15,24 @@ vi.mock("../../lib/runtime-config", () => ({
 vi.mock("../../lib/analytics", () => ({ track: vi.fn() }));
 vi.mock("../../lib/api-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/api-client")>();
-  return { ...actual, getBookByIsbn: vi.fn(), addToShelf: vi.fn() };
+  return {
+    ...actual,
+    getBookByIsbn: vi.fn(),
+    addToShelf: vi.fn(),
+    fetchShelves: vi.fn(),
+    addBookToShelf: vi.fn(),
+  };
 });
 
-import { getBookByIsbn, addToShelf, ApiError, type BookSearchResult } from "../../lib/api-client";
+import {
+  getBookByIsbn,
+  addToShelf,
+  fetchShelves,
+  addBookToShelf,
+  ApiError,
+  type BookSearchResult,
+  type Shelf,
+} from "../../lib/api-client";
 import { ScanModal } from "./ScanModal";
 
 const ISBN = "9780441013593";
@@ -30,9 +44,17 @@ const BOOK: BookSearchResult = {
   publishedYear: 1965,
   description: null,
 };
+const SCI_FI_SHELF: Shelf = {
+  shelfId: "shelf-scifi",
+  name: "Sci-Fi",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  bookIds: [],
+};
 
 const mockGetBook = vi.mocked(getBookByIsbn);
 const mockAdd = vi.mocked(addToShelf);
+const mockFetchShelves = vi.mocked(fetchShelves);
+const mockAddBookToShelf = vi.mocked(addBookToShelf);
 
 function renderModal() {
   return renderWithProviders(
@@ -50,6 +72,7 @@ async function lookUpViaEnter(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  mockFetchShelves.mockResolvedValue([]);
 });
 
 describe("ScanModal — manual entry via Enter", () => {
@@ -131,5 +154,71 @@ describe("ScanModal — add error messages", () => {
     await user.click(await screen.findByRole("button", { name: "Add owned" }));
 
     expect(await screen.findByText("Couldn't add that book — try again.")).toBeInTheDocument();
+  });
+});
+
+describe("ScanModal — remembered shelf (BOOKSHELF-85)", () => {
+  it("also adds to the remembered shelf on commit, in addition to status", async () => {
+    window.localStorage.setItem("scanner:shelfId", SCI_FI_SHELF.shelfId);
+    mockFetchShelves.mockResolvedValue([SCI_FI_SHELF]);
+    mockAddBookToShelf.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockResolvedValue({} as never);
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add owned" }));
+
+    await waitFor(() =>
+      expect(mockAddBookToShelf).toHaveBeenCalledWith(SCI_FI_SHELF.shelfId, ISBN),
+    );
+  });
+
+  it("skips the shelf add when the remembered shelf id no longer exists", async () => {
+    window.localStorage.setItem("scanner:shelfId", "deleted-shelf");
+    mockFetchShelves.mockResolvedValue([SCI_FI_SHELF]);
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockResolvedValue({} as never);
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add owned" }));
+
+    expect(await screen.findByText(/Added to your shelf/)).toBeInTheDocument();
+    expect(mockAddBookToShelf).not.toHaveBeenCalled();
+  });
+
+  it("doesn't call the shelf add when no shelf is remembered", async () => {
+    mockFetchShelves.mockResolvedValue([SCI_FI_SHELF]);
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockResolvedValue({} as never);
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add owned" }));
+
+    expect(await screen.findByText(/Added to your shelf/)).toBeInTheDocument();
+    expect(mockAddBookToShelf).not.toHaveBeenCalled();
+  });
+
+  it("still reports success when the status add succeeds but the shelf-link call fails", async () => {
+    window.localStorage.setItem("scanner:shelfId", SCI_FI_SHELF.shelfId);
+    mockFetchShelves.mockResolvedValue([SCI_FI_SHELF]);
+    mockAddBookToShelf.mockRejectedValue(new Error("network down"));
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockResolvedValue({} as never);
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add owned" }));
+
+    // The book was genuinely added — a shelf-link failure must not be
+    // misreported as the whole add having failed.
+    expect(await screen.findByText(/Added to your shelf/)).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't add that book — try again.")).not.toBeInTheDocument();
   });
 });

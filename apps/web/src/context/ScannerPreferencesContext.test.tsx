@@ -33,3 +33,27 @@ describe("ScannerPreferencesContext — scanDestination (BOOKSHELF-58)", () => {
     expect(result.current.scanDestination).toBe("owned");
   });
 });
+
+describe("ScannerPreferencesContext — scanShelfId (BOOKSHELF-85)", () => {
+  it("defaults to null (no shelf) when nothing is stored", () => {
+    const { result } = renderHook(() => useScannerPreferences(), { wrapper });
+    expect(result.current.scanShelfId).toBeNull();
+  });
+
+  it("persists a chosen shelf id and round-trips through localStorage", () => {
+    const first = renderHook(() => useScannerPreferences(), { wrapper });
+    act(() => first.result.current.setScanShelfId("shelf-123"));
+    expect(window.localStorage.getItem("scanner:shelfId")).toBe("shelf-123");
+
+    const second = renderHook(() => useScannerPreferences(), { wrapper });
+    expect(second.result.current.scanShelfId).toBe("shelf-123");
+  });
+
+  it("clearing back to null stores an empty string, not the literal 'null'", () => {
+    const { result } = renderHook(() => useScannerPreferences(), { wrapper });
+    act(() => result.current.setScanShelfId("shelf-123"));
+    act(() => result.current.setScanShelfId(null));
+    expect(result.current.scanShelfId).toBeNull();
+    expect(window.localStorage.getItem("scanner:shelfId")).toBe("");
+  });
+});

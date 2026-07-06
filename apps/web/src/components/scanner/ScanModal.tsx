@@ -5,9 +5,11 @@ import {
   getBookByIsbn,
   isConflictError,
   type BookSearchResult,
+  type Shelf,
   type ShelfStatus,
 } from "../../lib/api-client";
 import { useAddToShelf, useRemoveFromShelf } from "../../hooks/useShelf";
+import { useShelves, useAddBookToShelf } from "../../hooks/useShelves";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner";
 import { useScannerPreferences } from "../../context/ScannerPreferencesContext";
 import { getRuntimeConfig } from "../../lib/runtime-config";
@@ -57,13 +59,20 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     scanMode,
     ocrInputMode,
     scanDestination,
+    scanShelfId,
     setPostScanBehavior,
     setScanMode,
     setOcrInputMode,
     setScanDestination,
+    setScanShelfId,
   } = useScannerPreferences();
   const addMutation = useAddToShelf();
   const removeMutation = useRemoveFromShelf();
+  const addToShelfMutation = useAddBookToShelf();
+  const shelves = useShelves().data ?? [];
+  // A remembered shelf id that's since been deleted resolves to "no shelf" for
+  // this render/commit without clearing the stored preference (BOOKSHELF-85).
+  const activeShelf = scanShelfId ? (shelves.find((s) => s.shelfId === scanShelfId) ?? null) : null;
 
   const [view, setView] = useState<View>("scanning");
   const [pendingIsbn, setPendingIsbn] = useState<string | null>(null);
@@ -175,6 +184,19 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       await addMutation.mutateAsync({ isbn, status, ...(book ? { book } : {}) });
+      // Shelf membership is additive to status, not an alternative — applies
+      // regardless of which status button triggered the add (BOOKSHELF-85). Its
+      // own try/catch keeps a shelf-link failure from being misreported as a
+      // failure of the add that already succeeded above.
+      if (activeShelf) {
+        try {
+          await addToShelfMutation.mutateAsync({ shelfId: activeShelf.shelfId, isbn });
+        } catch (shelfErr) {
+          if (import.meta.env.DEV) {
+            console.error(`[ScanModal] shelf add failed for ${isbn}`, shelfErr);
+          }
+        }
+      }
       const item = buildAddedItem(isbn, status, book);
       recordAdded(item);
       if (scanMode === "single") {
@@ -384,7 +406,13 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         {/* Remembered scan destination — always visible while the camera is live so a
             silent auto-add can never land somewhere surprising (BOOKSHELF-58). */}
         {showDestinationChip && (
-          <DestinationControl destination={scanDestination} onChange={setScanDestination} />
+          <DestinationControl
+            destination={scanDestination}
+            onChange={setScanDestination}
+            shelves={shelves}
+            shelfId={activeShelf?.shelfId ?? null}
+            onShelfChange={setScanShelfId}
+          />
         )}
 
         {/* Mid-scan feedback flash: green for an add, amber for a duplicate */}
@@ -912,9 +940,15 @@ const DESTINATION_LABEL: Record<ShelfStatus, string> = { owned: "Owned", want: "
 function DestinationControl({
   destination,
   onChange,
+  shelves,
+  shelfId,
+  onShelfChange,
 }: {
   destination: ShelfStatus;
   onChange: (value: ShelfStatus) => void;
+  shelves: Shelf[];
+  shelfId: string | null;
+  onShelfChange: (value: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -944,7 +978,17 @@ function DestinationControl({
     setOpen(false);
   }
 
+  function chooseShelf(value: string | null) {
+    onShelfChange(value);
+    setOpen(false);
+  }
+
   const label = DESTINATION_LABEL[destination];
+  const activeShelfName = shelfId
+    ? (shelves.find((s) => s.shelfId === shelfId)?.name ?? null)
+    : null;
+  const triggerLabel = activeShelfName ? `${label} · ${activeShelfName}` : label;
+  const announceLabel = activeShelfName ? `${label} and ${activeShelfName}` : `${label}, no shelf`;
 
   return (
     <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-4">
@@ -954,12 +998,12 @@ function DestinationControl({
           onClick={() => setOpen((o) => !o)}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={`Adding to ${label}. Change scan destination`}
+          aria-label={`Adding to ${announceLabel}. Change scan destination`}
           className="flex min-h-11 items-center gap-2 rounded-full border border-white/15 bg-slate-950/70 px-4 py-2 text-sm backdrop-blur-sm transition-colors hover:border-white/30"
         >
           {destination === "owned" ? <BookIcon /> : <BookmarkIcon />}
           <span>
-            Adding to <span className="font-medium">{label}</span>
+            Adding to <span className="font-medium">{triggerLabel}</span>
           </span>
           <ChevronIcon open={open} />
         </button>
@@ -968,7 +1012,7 @@ function DestinationControl({
           <div
             role="menu"
             aria-label="Scan destination"
-            className="absolute left-1/2 top-full z-20 mt-2 w-44 -translate-x-1/2 overflow-hidden rounded-xl border border-white/15 bg-slate-900 shadow-lg"
+            className="absolute left-1/2 top-full z-20 mt-2 w-48 -translate-x-1/2 overflow-hidden rounded-xl border border-white/15 bg-slate-900 shadow-lg"
           >
             <DestinationOption
               icon={<BookIcon />}
@@ -983,11 +1027,38 @@ function DestinationControl({
               selected={destination === "want"}
               onSelect={() => choose("want")}
             />
+            {shelves.length > 0 && (
+              <>
+                <div className="h-px bg-white/10" />
+                <div
+                  role="group"
+                  aria-label="Shelf"
+                  className="px-3 pt-2 pb-1 text-xs font-medium text-slate-400"
+                >
+                  Shelf
+                </div>
+                <DestinationOption
+                  icon={<BookmarkIcon />}
+                  label="No shelf"
+                  selected={shelfId === null}
+                  onSelect={() => chooseShelf(null)}
+                />
+                {shelves.map((shelf) => (
+                  <DestinationOption
+                    key={shelf.shelfId}
+                    icon={<BookmarkIcon />}
+                    label={shelf.name}
+                    selected={shelfId === shelf.shelfId}
+                    onSelect={() => chooseShelf(shelf.shelfId)}
+                  />
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>
       <span className="sr-only" aria-live="polite">
-        Adding to {label}
+        Adding to {announceLabel}
       </span>
     </div>
   );
