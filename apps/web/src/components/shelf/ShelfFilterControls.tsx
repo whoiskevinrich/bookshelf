@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "../ui/Button";
 import { inputClass } from "../../lib/form-styles";
 import { SORT_OPTIONS, type SortKey } from "../../lib/sort";
+import type { AuthorCount } from "../../lib/authors";
 import type { ShelfEntry, ShelfFilter, SmartShelfWithCount, TagCount } from "../../lib/api-client";
 
 // ── Facet model ──────────────────────────────────────────────────────────────
@@ -181,6 +182,70 @@ export function TagBrowsePanel({
             </button>
           ))}
           {tags.length > matches.length && (
+            <span className="self-center text-xs text-slate-400 dark:text-slate-500">
+              type to find more
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Author browse (on-demand; derived from loaded library) ───────────────────
+
+export function AuthorBrowsePanel({
+  authors,
+  activeAuthor,
+  onPick,
+}: {
+  authors: AuthorCount[];
+  activeAuthor: string | null;
+  onPick: (author: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const matches = authors
+    .filter((a) => (query ? a.author.toLowerCase().includes(query) : true))
+    .slice(0, 24);
+
+  return (
+    <div className="rounded-xl border border-paper-300 dark:border-slate-700 p-4 space-y-3">
+      <input
+        type="text"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Filter by author…"
+        className={`w-full text-sm ${inputClass}`}
+        aria-label="Filter by author"
+      />
+      {authors.length === 0 ? (
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          No author data yet — add books with metadata to browse by author.
+        </p>
+      ) : matches.length === 0 ? (
+        <p className="text-sm text-slate-600 dark:text-slate-400">No authors match “{q}”.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {matches.map((a) => (
+            <button
+              key={a.author}
+              type="button"
+              onClick={() => onPick(a.author)}
+              aria-pressed={activeAuthor === a.author}
+              className={`${chipBase} ${activeAuthor === a.author ? chipSelected : chipUnselected}`}
+            >
+              {a.author}
+              <span
+                className={
+                  activeAuthor === a.author ? "opacity-80" : "text-slate-400 dark:text-slate-500"
+                }
+              >
+                {a.count}
+              </span>
+            </button>
+          ))}
+          {authors.length > matches.length && (
             <span className="self-center text-xs text-slate-400 dark:text-slate-500">
               type to find more
             </span>
@@ -404,6 +469,49 @@ export function ReadingListBar({ count, onClear }: { count: number; onClear: () 
       className="flex flex-wrap items-center gap-2 rounded-xl bg-paper-200 dark:bg-slate-800/50 p-3"
     >
       <span className={`${chipBase} ${chipSelected}`}>Reading list</span>
+      <span className="text-xs text-slate-600 dark:text-slate-400">
+        → {count} {count === 1 ? "book" : "books"}
+      </span>
+      <div className="ml-auto">
+        <Button variant="ghost" size="sm" onClick={onClear}>
+          Clear
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Active author bar (client-side filter; not a saveable rule) ──────────────
+
+export function ActiveAuthorBar({
+  author,
+  count,
+  onClear,
+}: {
+  author: string;
+  count: number;
+  onClear: () => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Author filter"
+      className="flex flex-wrap items-center gap-2 rounded-xl bg-paper-200 dark:bg-slate-800/50 p-3"
+    >
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+        Author
+      </span>
+      <span className={`${chipBase} ${chipSelected}`}>
+        {author}
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Remove author ${author} filter`}
+          className="grid h-5 w-5 place-items-center rounded-full hover:bg-white/20"
+        >
+          <XIcon />
+        </button>
+      </span>
       <span className="text-xs text-slate-600 dark:text-slate-400">
         → {count} {count === 1 ? "book" : "books"}
       </span>

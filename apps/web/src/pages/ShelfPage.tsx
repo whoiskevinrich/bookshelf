@@ -19,7 +19,9 @@ import {
 import {
   FacetBar,
   TagBrowsePanel,
+  AuthorBrowsePanel,
   ActiveFilterBar,
+  ActiveAuthorBar,
   ReadingListBar,
   LibrarySearchInput,
   SortControl,
@@ -33,6 +35,7 @@ import {
 } from "../components/shelf/ShelfFilterControls";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { sortEntries, parseSortKey, DEFAULT_SORT, type SortKey } from "../lib/sort";
+import { deriveAuthors, entryHasAuthor } from "../lib/authors";
 import type { SmartShelfWithCount } from "../lib/api-client";
 import {
   useShelves,
@@ -361,8 +364,12 @@ export function ShelfPage() {
   const facet = parseFacet(searchParams.get("facet"));
   const tag = searchParams.get("tag");
   const view = searchParams.get("view") === "reading-list" ? "reading-list" : null;
+  // Author filter (BOOKSHELF-57) — client-side, derived from loaded library data.
+  // Deep-linkable like facet/tag; composes with them rather than replacing them.
+  const author = searchParams.get("author");
 
   const [showBrowse, setShowBrowse] = useState(false);
+  const [showAuthorBrowse, setShowAuthorBrowse] = useState(false);
   const [showSaveSmart, setShowSaveSmart] = useState(false);
   const [smartShelfToDelete, setSmartShelfToDelete] = useState<SmartShelfWithCount | null>(null);
 
@@ -413,6 +420,16 @@ export function ShelfPage() {
         p.delete("view");
         if (t) p.set("tag", t);
         else p.delete("tag");
+      }),
+    [updateParams],
+  );
+  // Author composes with facet/tag/view (it's an extra client-side narrowing),
+  // so it never clears them — only itself.
+  const setAuthor = useCallback(
+    (a: string | null) =>
+      updateParams((p) => {
+        if (a) p.set("author", a);
+        else p.delete("author");
       }),
     [updateParams],
   );
@@ -476,15 +493,39 @@ export function ShelfPage() {
     return allEntries;
   }, [view, isFiltered, readingListEntries, filteredQuery.data, allEntries]);
 
+  // Author narrows whatever base is active (reading-list / facet-tag / all), and
+  // search narrows further — so search composes on top of the author filter.
+  const authorActive = author !== null && author.length > 0;
+  const authorScopedBase = useMemo(
+    () =>
+      authorActive
+        ? searchBaseEntries.filter((e) => entryHasAuthor(e, author!))
+        : searchBaseEntries,
+    [authorActive, searchBaseEntries, author],
+  );
+
+  // Author options come from the whole loaded library, derived only while the
+  // browse panel is open (like the tag list) to avoid scanning on every render.
+  const authorOptions = useMemo(
+    () => (showAuthorBrowse ? deriveAuthors(allEntries) : []),
+    [showAuthorBrowse, allEntries],
+  );
+
+  // Author active without a search query → its own flat, sorted grid.
+  const authorEntries = useMemo(
+    () => (authorActive && !searchActive ? sortEntries(authorScopedBase, sort) : []),
+    [authorActive, searchActive, authorScopedBase, sort],
+  );
+
   const searchResults = useMemo(
     () =>
       searchActive
         ? sortEntries(
-            searchBaseEntries.filter((e) => entryMatchesQuery(e, debouncedSearch)),
+            authorScopedBase.filter((e) => entryMatchesQuery(e, debouncedSearch)),
             sort,
           )
         : [],
-    [searchActive, searchBaseEntries, debouncedSearch, sort],
+    [searchActive, authorScopedBase, debouncedSearch, sort],
   );
 
   // Server-filtered (facet/tag) entries, re-sorted client-side to match the pref.
@@ -550,6 +591,7 @@ export function ShelfPage() {
       p.delete("facet");
       p.delete("tag");
       p.delete("view");
+      p.delete("author");
     });
     setShowSaveSmart(false);
   }
@@ -558,12 +600,14 @@ export function ShelfPage() {
     const a = ruleToActive(shelf.rule);
     updateParams((p) => {
       p.delete("view");
+      p.delete("author");
       if (a.facet) p.set("facet", a.facet);
       else p.delete("facet");
       if (a.tag) p.set("tag", a.tag);
       else p.delete("tag");
     });
     setShowBrowse(false);
+    setShowAuthorBrowse(false);
     setShowSaveSmart(false);
   }
 
@@ -699,9 +743,28 @@ export function ShelfPage() {
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <FacetBar facet={facet} onSelect={setFacet} />
-                    <Button variant="ghost" size="sm" onClick={() => setShowBrowse((v) => !v)}>
-                      {showBrowse ? "Close" : "Browse tags"}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowAuthorBrowse((v) => !v);
+                          setShowBrowse(false);
+                        }}
+                      >
+                        {showAuthorBrowse ? "Close" : "Browse authors"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowBrowse((v) => !v);
+                          setShowAuthorBrowse(false);
+                        }}
+                      >
+                        {showBrowse ? "Close" : "Browse tags"}
+                      </Button>
+                    </div>
                   </div>
                   {showBrowse && (
                     <TagBrowsePanel
@@ -710,6 +773,16 @@ export function ShelfPage() {
                       onPick={(t) => {
                         setTag(t);
                         setShowBrowse(false);
+                      }}
+                    />
+                  )}
+                  {showAuthorBrowse && (
+                    <AuthorBrowsePanel
+                      authors={authorOptions}
+                      activeAuthor={author}
+                      onPick={(a) => {
+                        setAuthor(a);
+                        setShowAuthorBrowse(false);
                       }}
                     />
                   )}
@@ -769,6 +842,54 @@ export function ShelfPage() {
                           {shelfQuery.isFetchingNextPage
                             ? "Loading more…"
                             : "Load more to search everything"}
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                ) : authorActive ? (
+                  <div className="space-y-4">
+                    <ActiveAuthorBar
+                      author={author!}
+                      count={authorEntries.length}
+                      onClear={() => setAuthor(null)}
+                    />
+                    {authorEntries.length > 0 ? (
+                      <div className="flex flex-wrap gap-4">
+                        {authorEntries.map((entry, index) => (
+                          <ShelfBookCard
+                            key={entry.isbn}
+                            entry={entry}
+                            shelves={orderedShelves}
+                            staggerIndex={index}
+                            onMove={(isbn, status) => moveMutation.mutate({ isbn, status })}
+                            onRemove={(isbn) => removeMutation.mutate(isbn)}
+                            onAddToShelf={(shelfId, isbn) =>
+                              addToShelfMutation.mutate({ shelfId, isbn })
+                            }
+                            onRemoveFromShelf={(shelfId, isbn) =>
+                              removeFromShelfMutation.mutate({ shelfId, isbn })
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        No loaded books by {author} match the current filters.
+                      </p>
+                    )}
+                    {/* Author options come from loaded books only (like search). */}
+                    {shelfQuery.hasNextPage && (
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Filtering loaded books only.{" "}
+                        <button
+                          type="button"
+                          onClick={() => void shelfQuery.fetchNextPage()}
+                          disabled={shelfQuery.isFetchingNextPage}
+                          className="underline hover:text-slate-900 dark:hover:text-white disabled:opacity-60"
+                        >
+                          {shelfQuery.isFetchingNextPage
+                            ? "Loading more…"
+                            : "Load more to cover everything"}
                         </button>
                       </p>
                     )}
