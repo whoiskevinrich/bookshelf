@@ -11,7 +11,9 @@ import {
   isReadingListEntry,
   FacetBar,
   TagBrowsePanel,
+  AuthorBrowsePanel,
   ActiveFilterBar,
+  ActiveAuthorBar,
   ReadingListBar,
   LibrarySearchInput,
   SortControl,
@@ -185,6 +187,51 @@ describe("LibrarySearchInput", () => {
 
     rerender(<LibrarySearchInput value="zzz" onChange={() => {}} matchCount={0} />);
     expect(screen.getByText("0 matches")).toBeInTheDocument();
+  });
+});
+
+describe("AuthorBrowsePanel", () => {
+  const authors = [
+    { author: "Frank Herbert", count: 3 },
+    { author: "Isaac Asimov", count: 1 },
+  ];
+
+  it("lists authors with counts and reports the pick", async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    render(<AuthorBrowsePanel authors={authors} activeAuthor={null} onPick={onPick} />);
+
+    await user.click(screen.getByRole("button", { name: /Frank Herbert/ }));
+    expect(onPick).toHaveBeenCalledWith("Frank Herbert");
+  });
+
+  it("filters the list by the typed query", async () => {
+    const user = userEvent.setup();
+    render(<AuthorBrowsePanel authors={authors} activeAuthor={null} onPick={() => {}} />);
+
+    await user.type(screen.getByRole("textbox", { name: "Filter by author" }), "asimov");
+    expect(screen.getByRole("button", { name: /Isaac Asimov/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Frank Herbert/ })).not.toBeInTheDocument();
+  });
+
+  it("shows an empty hint when there is no author data", () => {
+    render(<AuthorBrowsePanel authors={[]} activeAuthor={null} onPick={() => {}} />);
+    expect(screen.getByText(/no author data yet/i)).toBeInTheDocument();
+  });
+});
+
+describe("ActiveAuthorBar", () => {
+  it("shows the author and clears on both affordances", async () => {
+    const user = userEvent.setup();
+    const onClear = vi.fn();
+    render(<ActiveAuthorBar author="Ursula K. Le Guin" count={4} onClear={onClear} />);
+
+    expect(screen.getByText("→ 4 books")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Remove author Ursula K. Le Guin filter" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    expect(onClear).toHaveBeenCalledTimes(2);
   });
 });
 
