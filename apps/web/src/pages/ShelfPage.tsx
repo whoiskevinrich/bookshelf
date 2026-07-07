@@ -22,6 +22,7 @@ import {
   ActiveFilterBar,
   ReadingListBar,
   LibrarySearchInput,
+  SortControl,
   SmartShelvesGroup,
   buildFilter,
   ruleToActive,
@@ -30,6 +31,8 @@ import {
   facetLabel,
   type SystemFacet,
 } from "../components/shelf/ShelfFilterControls";
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import { sortEntries, parseSortKey, DEFAULT_SORT, type SortKey } from "../lib/sort";
 import type { SmartShelfWithCount } from "../lib/api-client";
 import {
   useShelves,
@@ -370,6 +373,15 @@ export function ShelfPage() {
   const debouncedSearch = useDebouncedValue(search, 200);
   const searchActive = debouncedSearch.trim().length > 0;
 
+  // Sort preference (BOOKSHELF-57). Persisted per browser via localStorage so it
+  // survives reloads; applied client-side to every rendered grid via sortEntries,
+  // so it composes with the facet/tag filter, reading list, and search views.
+  const [sort, setSort] = useLocalStorage<SortKey>(
+    "bookshelf:library-sort",
+    DEFAULT_SORT,
+    parseSortKey,
+  );
+
   // Replace history (not push) so tweaking filters doesn't stack up back-nav.
   const updateParams = useCallback(
     (mutate: (p: URLSearchParams) => void) => {
@@ -451,8 +463,8 @@ export function ShelfPage() {
   // not a server filter — its union (reading OR owned-and-unread) isn't expressible
   // as a single ShelfFilter.
   const readingListEntries = useMemo(
-    () => (view === "reading-list" ? allEntries.filter(isReadingListEntry) : []),
-    [view, allEntries],
+    () => (view === "reading-list" ? sortEntries(allEntries.filter(isReadingListEntry), sort) : []),
+    [view, allEntries, sort],
   );
 
   // Search composes on top of whichever view is active: the reading-list
@@ -466,8 +478,19 @@ export function ShelfPage() {
 
   const searchResults = useMemo(
     () =>
-      searchActive ? searchBaseEntries.filter((e) => entryMatchesQuery(e, debouncedSearch)) : [],
-    [searchActive, searchBaseEntries, debouncedSearch],
+      searchActive
+        ? sortEntries(
+            searchBaseEntries.filter((e) => entryMatchesQuery(e, debouncedSearch)),
+            sort,
+          )
+        : [],
+    [searchActive, searchBaseEntries, debouncedSearch, sort],
+  );
+
+  // Server-filtered (facet/tag) entries, re-sorted client-side to match the pref.
+  const filteredEntries = useMemo(
+    () => sortEntries(filteredQuery.data?.entries ?? [], sort),
+    [filteredQuery.data, sort],
   );
 
   const { namedShelfEntries, unshelved } = useMemo(() => {
@@ -475,11 +498,20 @@ export function ShelfPage() {
     return {
       namedShelfEntries: orderedShelves.map((shelf) => {
         const shelfSet = new Set(shelf.bookIds);
-        return { shelf, entries: allEntries.filter((e) => shelfSet.has(e.isbn)) };
+        return {
+          shelf,
+          entries: sortEntries(
+            allEntries.filter((e) => shelfSet.has(e.isbn)),
+            sort,
+          ),
+        };
       }),
-      unshelved: allEntries.filter((e) => !allShelvedIsbns.has(e.isbn)),
+      unshelved: sortEntries(
+        allEntries.filter((e) => !allShelvedIsbns.has(e.isbn)),
+        sort,
+      ),
     };
-  }, [allEntries, orderedShelves]);
+  }, [allEntries, orderedShelves, sort]);
 
   // "a" shortcut — open the add-book panel (ignored when focus is in a field).
   useEffect(() => {
@@ -681,11 +713,16 @@ export function ShelfPage() {
                       }}
                     />
                   )}
-                  <LibrarySearchInput
-                    value={search}
-                    onChange={setSearch}
-                    matchCount={searchActive ? searchResults.length : null}
-                  />
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-[16rem] flex-1">
+                      <LibrarySearchInput
+                        value={search}
+                        onChange={setSearch}
+                        matchCount={searchActive ? searchResults.length : null}
+                      />
+                    </div>
+                    <SortControl value={sort} onChange={setSort} />
+                  </div>
                 </div>
 
                 {searchActive ? (
@@ -798,9 +835,9 @@ export function ShelfPage() {
                     )}
                     {filteredQuery.isLoading ? (
                       <ShelfSkeleton sections={1} />
-                    ) : (filteredQuery.data?.entries.length ?? 0) > 0 ? (
+                    ) : filteredEntries.length > 0 ? (
                       <div className="flex flex-wrap gap-4">
-                        {filteredQuery.data!.entries.map((entry, index) => (
+                        {filteredEntries.map((entry, index) => (
                           <ShelfBookCard
                             key={entry.isbn}
                             entry={entry}

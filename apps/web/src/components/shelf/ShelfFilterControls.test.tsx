@@ -14,6 +14,7 @@ import {
   ActiveFilterBar,
   ReadingListBar,
   LibrarySearchInput,
+  SortControl,
   SmartShelvesGroup,
 } from "./ShelfFilterControls";
 
@@ -184,6 +185,28 @@ describe("LibrarySearchInput", () => {
 
     rerender(<LibrarySearchInput value="zzz" onChange={() => {}} matchCount={0} />);
     expect(screen.getByText("0 matches")).toBeInTheDocument();
+  });
+});
+
+describe("SortControl", () => {
+  it("renders the current selection and reports changes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<SortControl value="added-desc" onChange={onChange} />);
+
+    const select = screen.getByRole("combobox", { name: "Sort books" });
+    expect(select).toHaveValue("added-desc");
+
+    await user.selectOptions(select, "title-asc");
+    expect(onChange).toHaveBeenCalledWith("title-asc");
+  });
+
+  it("groups the options by field", () => {
+    render(<SortControl value="added-desc" onChange={() => {}} />);
+    // optgroup labels expose the grouping to assistive tech.
+    for (const group of ["Date added", "Title", "Author", "Release date"]) {
+      expect(screen.getByRole("group", { name: group })).toBeInTheDocument();
+    }
   });
 });
 

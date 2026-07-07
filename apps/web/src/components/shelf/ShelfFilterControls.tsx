@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "../ui/Button";
 import { inputClass } from "../../lib/form-styles";
+import { SORT_OPTIONS, type SortKey } from "../../lib/sort";
 import type { ShelfEntry, ShelfFilter, SmartShelfWithCount, TagCount } from "../../lib/api-client";
 
 // ── Facet model ──────────────────────────────────────────────────────────────
@@ -278,6 +279,48 @@ export function LibrarySearchInput({
         </p>
       )}
     </div>
+  );
+}
+
+// ── Sort control ─────────────────────────────────────────────────────────────
+
+/**
+ * Library sort selector (BOOKSHELF-57). A native `<select>` with grouped
+ * options — fully keyboard/screen-reader accessible with no custom menu code.
+ * The chosen key is persisted by the caller (localStorage) and drives
+ * `sortEntries`, so sort composes with every filter and search view.
+ */
+export function SortControl({
+  value,
+  onChange,
+}: {
+  value: SortKey;
+  onChange: (value: SortKey) => void;
+}) {
+  const groups = SORT_OPTIONS.reduce<Record<string, typeof SORT_OPTIONS>>((acc, o) => {
+    (acc[o.group] ??= []).push(o);
+    return acc;
+  }, {});
+  return (
+    <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+      <span className="shrink-0">Sort</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as SortKey)}
+        aria-label="Sort books"
+        className="min-h-11 rounded-lg border border-paper-400 bg-paper-50 px-2.5 py-1.5 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 sm:min-h-0 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:ring-slate-300"
+      >
+        {Object.entries(groups).map(([group, opts]) => (
+          <optgroup key={group} label={group}>
+            {opts.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </label>
   );
 }
 
