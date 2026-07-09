@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.3.0...v0.4.0) (2026-07-09)
+
+
+### Features
+
+* **web:** library author filter, derived client-side (BOOKSHELF-57) ([#112](https://github.com/whoiskevinrich/bookshelf/issues/112)) ([c626114](https://github.com/whoiskevinrich/bookshelf/commit/c62611471ed05b0a4b2b02f843e792889f56d464))
+* **web:** library sort — date added, title, author, release (BOOKSHELF-57) ([#111](https://github.com/whoiskevinrich/bookshelf/issues/111)) ([02d8e8d](https://github.com/whoiskevinrich/bookshelf/commit/02d8e8d196f1e5ce46487b4ca171e9f7fb486af7))
+* **web:** scanner remembers a shelf destination, not just status (BOOKSHELF-85) ([#109](https://github.com/whoiskevinrich/bookshelf/issues/109)) ([95beb99](https://github.com/whoiskevinrich/bookshelf/commit/95beb9973a065970b4c8a3542a7241068b1f92fc))
+
 ## [0.3.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.2.1...v0.3.0) (2026-07-05)
 
 
