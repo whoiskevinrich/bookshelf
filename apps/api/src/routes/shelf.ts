@@ -7,7 +7,8 @@ import { authMiddleware } from "../middleware/auth.js";
 import {
   queryBookEntries,
   getBookEntry,
-  batchGetBookEntries,
+  queryEditionsForIsbn,
+  queryGroupedWith,
   putBookEntry,
   deleteBookEntry,
   updateBookEntryAttributes,
@@ -27,6 +28,7 @@ import {
 } from "../lib/dynamo.js";
 import { getBookByIsbn } from "../lib/books/search.js";
 import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
+import { isValidFormat, soloWorkKey, type EditionFormat } from "../lib/works.js";
 import type { Context } from "hono";
 import { parseJsonBody } from "./_utils.js";
 
@@ -155,7 +157,9 @@ shelfRouter.get("/", async (c) => {
   }
 });
 
-// GET /v1/shelf/:isbn — single entry with book metadata (for the book-detail view)
+// GET /v1/shelf/:isbn — single entry with book metadata + its edition set (BOOKSHELF-90).
+// `editions` is the sibling entries sharing this work's effective key (including self);
+// `editions.length > 1` means "part of a multi-edition work".
 shelfRouter.get("/:isbn", async (c) => {
   const { userId } = c.get("auth");
 
@@ -164,11 +168,11 @@ shelfRouter.get("/:isbn", async (c) => {
   const isbn = isbnOrErr;
 
   try {
-    const [entry] = await batchGetBookEntries(userId, [isbn]);
-    if (!entry) {
+    const result = await queryEditionsForIsbn(userId, isbn);
+    if (!result) {
       return c.json({ error: "Book not found on your shelf" }, 404);
     }
-    return c.json(entry);
+    return c.json({ ...result.entry, editions: result.editions });
   } catch (err) {
     console.error("Shelf entry fetch error:", err);
     return c.json({ error: "Failed to fetch book" }, 500);
@@ -258,11 +262,22 @@ shelfRouter.post("/", async (c) => {
       ? (rawBook as BookMetadata)
       : null;
 
+  let resolvedMeta: BookMetadata | null = null;
   try {
-    const metadata = clientBook ?? (await getBookByIsbn(isbn));
-    if (metadata) await putBookMetadata(isbn, sanitizeBookMetadata(metadata), addedAt);
+    resolvedMeta = clientBook ?? (await getBookByIsbn(isbn));
+    if (resolvedMeta) await putBookMetadata(isbn, sanitizeBookMetadata(resolvedMeta), addedAt);
   } catch (err) {
     console.error("Book metadata cache error:", err);
+  }
+
+  // Edition grouping (BOOKSHELF-90): tell the client which existing editions this
+  // add auto-joined, so it can raise the "grouped with …" notification. Best-effort
+  // — a failure here must not fail the add (the book is already on the shelf).
+  let groupedWith: string[] = [];
+  try {
+    groupedWith = await queryGroupedWith(userId, isbn, resolvedMeta);
+  } catch (err) {
+    console.error("Grouped-with computation error:", err);
   }
 
   return c.json(
@@ -275,7 +290,9 @@ shelfRouter.post("/", async (c) => {
       addedAt,
       notes: null,
       copies: 1,
+      format: null,
       status: derivedStatus(owned),
+      groupedWith,
     },
     201,
   );
@@ -434,14 +451,39 @@ shelfRouter.patch("/:isbn", async (c) => {
     }
     patch.copies = copies;
   }
+  // Edition format (BOOKSHELF-90): one of the enum values, or null to clear.
+  if (obj["format"] !== undefined) {
+    if (obj["format"] !== null && !isValidFormat(obj["format"])) {
+      return c.json(
+        { error: "format must be 'hardcover', 'paperback', 'ebook', 'audiobook', or null" },
+        400,
+      );
+    }
+    patch.format = obj["format"] as EditionFormat | null;
+  }
+  // Ungroup / regroup (BOOKSHELF-90): a semantic verb. The raw workKey override stays
+  // server-internal — `false` detaches this edition (unique solo key), `true` re-attaches
+  // it (drop the override so the derived key applies). Translated to a patch below.
+  let grouped: boolean | undefined;
+  if (obj["grouped"] !== undefined) {
+    if (typeof obj["grouped"] !== "boolean") {
+      return c.json({ error: "grouped must be a boolean" }, 400);
+    }
+    grouped = obj["grouped"];
+  }
 
   if (
     patch.owned === undefined &&
     patch.want === undefined &&
     patch.readingStatus === undefined &&
-    patch.copies === undefined
+    patch.copies === undefined &&
+    patch.format === undefined &&
+    grouped === undefined
   ) {
-    return c.json({ error: "Body must include owned, want, readingStatus, or copies" }, 400);
+    return c.json(
+      { error: "Body must include owned, want, readingStatus, copies, format, or grouped" },
+      400,
+    );
   }
 
   // Owned and Want are mutually exclusive (ADR-019, revised). Setting one true
@@ -475,6 +517,12 @@ shelfRouter.patch("/:isbn", async (c) => {
     patch.copies = 1;
   }
 
+  // Translate the `grouped` verb into the workKey override write (BOOKSHELF-90):
+  // false → detach (unique solo key); true → re-attach (REMOVE the override → null).
+  if (grouped !== undefined) {
+    patch.workKey = grouped ? null : soloWorkKey(isbn);
+  }
+
   try {
     await updateBookEntryAttributes(userId, isbn, patch);
   } catch (err) {
@@ -487,6 +535,7 @@ shelfRouter.patch("/:isbn", async (c) => {
   const readingStatus =
     patch.readingStatus !== undefined ? patch.readingStatus : existing.readingStatus;
   const copies = patch.copies ?? existing.copies;
+  const format = patch.format !== undefined ? patch.format : existing.format;
 
   return c.json({
     isbn,
@@ -497,6 +546,7 @@ shelfRouter.patch("/:isbn", async (c) => {
     addedAt: existing.addedAt,
     notes: existing.notes,
     copies,
+    format,
     status: derivedStatus(owned),
   });
 });
