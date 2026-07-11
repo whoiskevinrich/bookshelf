@@ -53,6 +53,23 @@ describe("ShelfBookCard — state pills (#82)", () => {
   });
 });
 
+describe("ShelfBookCard — copies badge (BOOKSHELF-60)", () => {
+  it("shows a ×N badge when copies > 1 on an owned book", () => {
+    renderCard({ owned: true, want: false, copies: 3 });
+    expect(screen.getByText("×3")).toBeInTheDocument();
+  });
+
+  it("renders no badge when copies is 1", () => {
+    renderCard({ owned: true, want: false, copies: 1 });
+    expect(screen.queryByText(/^×/)).not.toBeInTheDocument();
+  });
+
+  it("renders no badge for a wishlisted book even if copies > 1", () => {
+    renderCard({ owned: false, want: true, copies: 3 });
+    expect(screen.queryByText(/^×/)).not.toBeInTheDocument();
+  });
+});
+
 describe("ShelfBookCard — tags", () => {
   it("shows the first tag and a +N overflow badge", () => {
     renderCard({ tags: ["fiction", "sci-fi", "owned-copy"] });

@@ -66,9 +66,21 @@ export function useUpdateBookAttributes(isbn: string) {
       // Mirror the server's mutual-exclusivity rule so the UI doesn't flash a bad state.
       const next = { ...prev, ...attrs };
       if (attrs.owned === true) next.want = false;
-      if (attrs.want === true) next.owned = false;
+      if (attrs.want === true) {
+        next.owned = false;
+        // Mirror the server's copies reset on owned→want (BOOKSHELF-60).
+        next.copies = 1;
+      }
       return next;
     },
+  );
+}
+
+export function useUpdateBookCopies(isbn: string) {
+  return useEntryMutation<number>(
+    isbn,
+    (copies) => updateShelfAttributes(isbn, { copies }),
+    (prev, copies) => ({ ...prev, copies }),
   );
 }
 

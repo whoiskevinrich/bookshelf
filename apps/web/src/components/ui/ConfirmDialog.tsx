@@ -11,6 +11,8 @@ interface ConfirmDialogProps {
   /** When true the confirm button uses the destructive (red) styling. */
   destructive?: boolean;
   pending?: boolean;
+  /** Error to surface inside the dialog (e.g. a failed confirm action). */
+  error?: string | null;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   destructive = false,
   pending = false,
+  error = null,
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -61,6 +64,7 @@ export function ConfirmDialog({
         <p id="confirm-dialog-body" className="mb-4 text-sm text-slate-600 dark:text-zinc-400">
           {message}
         </p>
+        {error && <p className="mb-4 text-sm text-red-500 dark:text-red-400">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button autoFocus variant="ghost" size="sm" onClick={onClose}>
             Cancel

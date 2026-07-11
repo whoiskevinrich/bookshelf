@@ -4,7 +4,7 @@
 **Date**: 2026-07-02
 **Owner**: Solo developer
 **Jira**: BOOKSHELF-60 (epic BOOKSHELF-62 Feedback)
-**Related**: ADR-019 (entry attributes), ADR-002 (shelf API / MCP inline), `docs/specs/core-shelf.md`
+**Related**: ADR-019 (entry attributes), ADR-002 (shelf API / MCP inline), `docs/specs/core-shelf.md`, `docs/specs/multiple-copies-system-design.md` (system-design deep dive: code-grounded data flow, concurrency, trade-offs), `docs/specs/multiple-copies-design-handoff.md` (frontend component-level spec: card badge, detail stepper, duplicate-add prompt)
 
 ## Problem
 

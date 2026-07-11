@@ -66,6 +66,7 @@ const ENTRY: ShelfEntry = {
   tags: [],
   addedAt: "2026-05-14T10:00:00.000Z",
   notes: null,
+  copies: 1,
   status: "owned",
 };
 
@@ -239,6 +240,7 @@ describe("POST /v1/shelf", () => {
     const body = (await res.json()) as ShelfEntry;
     expect(body.owned).toBe(true);
     expect(body.readingStatus).toBe("reading");
+    expect(body.copies).toBe(1);
   });
 
   it("returns 400 when neither owned, want, nor status is provided", async () => {
@@ -533,6 +535,148 @@ describe("PATCH /v1/shelf/:isbn", () => {
       body: JSON.stringify({ want: true }),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("PATCH /v1/shelf/:isbn — copies (BOOKSHELF-60)", () => {
+  it("updates copies within range", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: 3 }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.copies).toBe(3);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { copies: 3 },
+    );
+  });
+
+  it("accepts copies at the max bound (99)", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: 99 }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 for copies below 1", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: 0 }),
+    });
+    expect(res.status).toBe(400);
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for copies above 99", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: 100 }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for a non-integer copies value", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: 2.5 }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for a non-numeric copies value", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: "3" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("resets copies to 1 when moving an owned book to want", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, copies: 3 });
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ want: true }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.copies).toBe(1);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      expect.objectContaining({ want: true, owned: false, copies: 1 }),
+    );
+  });
+
+  it("overrides a client-supplied copies value when also moving to want", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, copies: 3 });
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ want: true, copies: 5 }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.copies).toBe(1);
+  });
+
+  it("leaves copies untouched when only readingStatus changes", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, copies: 4 });
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingStatus: "reading" }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.copies).toBe(4);
+  });
+
+  it("forces copies to 1 for a bare copies patch on a wishlist (non-owned) book", async () => {
+    // copies is owned-only — a client (or bug) sending copies to a want entry must
+    // never persist copies > 1 on it.
+    vi.mocked(getBookEntry).mockResolvedValueOnce(WANT_ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: 5 }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.copies).toBe(1);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      expect.objectContaining({ copies: 1 }),
+    );
   });
 });
 

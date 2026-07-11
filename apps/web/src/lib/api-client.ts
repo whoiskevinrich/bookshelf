@@ -7,6 +7,9 @@ export type ShelfStatus = "owned" | "want";
 
 export type ReadingStatus = "unread" | "reading" | "finished";
 
+/** Upper bound on a book's copy count (BOOKSHELF-60). Mirrors the API's COPIES_MAX. */
+export const COPIES_MAX = 99;
+
 export interface BookMetadata {
   title: string;
   authors: string[];
@@ -26,6 +29,8 @@ export interface ShelfEntry {
   tags: string[];
   addedAt: string;
   notes: string | null;
+  /** Copies owned (1–99, BOOKSHELF-60). Only meaningful when owned; defaults to 1. */
+  copies: number;
   /** @deprecated Derived from owned/want during the transition (ADR-019). */
   status: ShelfStatus;
   book: BookMetadata | null;
@@ -158,6 +163,7 @@ export interface EntryAttributes {
   owned?: boolean;
   want?: boolean;
   readingStatus?: ReadingStatus | null;
+  copies?: number;
 }
 
 export async function updateShelfAttributes(

@@ -6,6 +6,7 @@ import {
   useShelf,
   useFilteredShelf,
   useAddToShelf,
+  useAddAnotherCopy,
   useMoveShelfEntry,
   useRemoveFromShelf,
   flattenShelf,
@@ -58,7 +59,7 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ScanModal } from "../components/scanner/ScanModal";
 import { supportsCameraScan } from "../lib/device";
 import { getRuntimeConfig } from "../lib/runtime-config";
-import { isConflictError } from "../lib/api-client";
+import { isConflictError, fetchShelfEntry } from "../lib/api-client";
 import type { ShelfEntry, ShelfStatus, BookSearchResult, Shelf } from "../lib/api-client";
 
 // ── Section header ─────────────────────────────────────────────────────────
@@ -350,6 +351,7 @@ export function ShelfPage() {
   const shelfQuery = useShelf();
   const shelvesQuery = useShelves();
   const addMutation = useAddToShelf();
+  const addAnotherCopyMutation = useAddAnotherCopy();
   const moveMutation = useMoveShelfEntry();
   const removeMutation = useRemoveFromShelf();
   const addToShelfMutation = useAddBookToShelf();
@@ -372,6 +374,9 @@ export function ShelfPage() {
   const [showAuthorBrowse, setShowAuthorBrowse] = useState(false);
   const [showSaveSmart, setShowSaveSmart] = useState(false);
   const [smartShelfToDelete, setSmartShelfToDelete] = useState<SmartShelfWithCount | null>(null);
+  // Duplicate-add "add another copy" prompt (BOOKSHELF-60) — set only once the
+  // duplicate is confirmed to be an owned book (see handleAdd).
+  const [copyPrompt, setCopyPrompt] = useState<{ isbn: string; title: string } | null>(null);
 
   // Free-text search over the loaded library (BOOKSHELF-52). Client-side and
   // debounced so filtering the whole library stays off the typing hot path; it
@@ -582,8 +587,31 @@ export function ShelfPage() {
   }, [showSearch]);
 
   function handleAdd(isbn: string, status: ShelfStatus, book: BookSearchResult) {
-    addMutation.mutate({ isbn, status, book });
     setShowSearch(false);
+    addMutation.mutate(
+      { isbn, status, book },
+      {
+        onError: (err) => {
+          // Duplicate add (BOOKSHELF-60): a 409 means the book is already on the
+          // shelf. Offer "add another copy" only when it's actually *owned* — copies
+          // is owned-only, and the 409 alone doesn't distinguish owned from wishlist,
+          // so confirm ownership with a lookup before prompting.
+          if (isConflictError(err) && status === "owned") {
+            void fetchShelfEntry(isbn)
+              .then((entry) => {
+                if (entry.owned) setCopyPrompt({ isbn, title: book.title });
+              })
+              .catch(() => {});
+          }
+        },
+      },
+    );
+  }
+
+  function closeCopyPrompt() {
+    setCopyPrompt(null);
+    addMutation.reset();
+    addAnotherCopyMutation.reset();
   }
 
   function clearFilter() {
@@ -713,13 +741,31 @@ export function ShelfPage() {
           </div>
         )}
 
-        {addMutation.isError && (
+        {/* A duplicate add surfaces the plain message here; an owned duplicate is
+            handled by the "add another copy" dialog below instead (BOOKSHELF-60). */}
+        {addMutation.isError && !copyPrompt && (
           <p className="text-sm text-red-500 mb-4">
             {isConflictError(addMutation.error)
               ? "That book is already on your shelf."
               : `Couldn't add book — ${addMutation.error.message}`}
           </p>
         )}
+
+        <ConfirmDialog
+          open={copyPrompt !== null}
+          title="Add another copy?"
+          message={`You already own "${copyPrompt?.title}" — add another copy?`}
+          confirmLabel="Add another copy"
+          pending={addAnotherCopyMutation.isPending}
+          error={
+            addAnotherCopyMutation.isError ? "Couldn't add another copy — please try again." : null
+          }
+          onConfirm={() => {
+            if (!copyPrompt) return;
+            addAnotherCopyMutation.mutate(copyPrompt.isbn, { onSuccess: closeCopyPrompt });
+          }}
+          onClose={closeCopyPrompt}
+        />
 
         {isLoading && <ShelfSkeleton />}
 

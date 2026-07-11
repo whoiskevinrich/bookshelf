@@ -40,6 +40,9 @@ const NOTES_MAX_LENGTH = 2000;
 const TAGS_MAX_COUNT = 25;
 const TAG_MAX_LENGTH = 50;
 
+// Copies bound (BOOKSHELF-60 / endpoint checklist).
+const COPIES_MAX = 99;
+
 // BookMetadata field caps — applied before every putBookMetadata write.
 // The BOOK#${isbn} cache is shared across all users, so we bound the fields
 // regardless of whether metadata comes from the client or Google Books.
@@ -271,6 +274,7 @@ shelfRouter.post("/", async (c) => {
       tags: [],
       addedAt,
       notes: null,
+      copies: 1,
       status: derivedStatus(owned),
     },
     201,
@@ -418,9 +422,26 @@ shelfRouter.patch("/:isbn", async (c) => {
     }
     patch.readingStatus = obj["readingStatus"] as ReadingStatus | null;
   }
+  if (obj["copies"] !== undefined) {
+    const copies = obj["copies"];
+    if (
+      typeof copies !== "number" ||
+      !Number.isInteger(copies) ||
+      copies < 1 ||
+      copies > COPIES_MAX
+    ) {
+      return c.json({ error: `copies must be an integer between 1 and ${COPIES_MAX}` }, 400);
+    }
+    patch.copies = copies;
+  }
 
-  if (patch.owned === undefined && patch.want === undefined && patch.readingStatus === undefined) {
-    return c.json({ error: "Body must include owned, want, or readingStatus" }, 400);
+  if (
+    patch.owned === undefined &&
+    patch.want === undefined &&
+    patch.readingStatus === undefined &&
+    patch.copies === undefined
+  ) {
+    return c.json({ error: "Body must include owned, want, readingStatus, or copies" }, 400);
   }
 
   // Owned and Want are mutually exclusive (ADR-019, revised). Setting one true
@@ -446,6 +467,14 @@ shelfRouter.patch("/:isbn", async (c) => {
     return c.json({ error: "Book not found on your shelf" }, 404);
   }
 
+  // copies is only meaningful when owned (BOOKSHELF-60). Force it to 1 whenever the
+  // resulting state is not owned — this covers owned→want *and* a bare `{copies}`
+  // patch against a book that's already on the wishlist, so a non-owned entry can
+  // never carry copies > 1 regardless of what the client sends.
+  if (!(patch.owned ?? existing.owned)) {
+    patch.copies = 1;
+  }
+
   try {
     await updateBookEntryAttributes(userId, isbn, patch);
   } catch (err) {
@@ -457,6 +486,7 @@ shelfRouter.patch("/:isbn", async (c) => {
   const want = patch.want ?? existing.want;
   const readingStatus =
     patch.readingStatus !== undefined ? patch.readingStatus : existing.readingStatus;
+  const copies = patch.copies ?? existing.copies;
 
   return c.json({
     isbn,
@@ -466,6 +496,7 @@ shelfRouter.patch("/:isbn", async (c) => {
     tags: existing.tags,
     addedAt: existing.addedAt,
     notes: existing.notes,
+    copies,
     status: derivedStatus(owned),
   });
 });

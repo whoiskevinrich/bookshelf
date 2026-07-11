@@ -3,12 +3,13 @@ import { createPortal } from "react-dom";
 import { extractIsbn13, toIsbn13 } from "../../lib/isbn";
 import {
   getBookByIsbn,
+  fetchShelfEntry,
   isConflictError,
   type BookSearchResult,
   type Shelf,
   type ShelfStatus,
 } from "../../lib/api-client";
-import { useAddToShelf, useRemoveFromShelf } from "../../hooks/useShelf";
+import { useAddToShelf, useAddAnotherCopy, useRemoveFromShelf } from "../../hooks/useShelf";
 import { useShelves, useAddBookToShelf } from "../../hooks/useShelves";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner";
 import { useScannerPreferences } from "../../context/ScannerPreferencesContext";
@@ -67,6 +68,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     setScanShelfId,
   } = useScannerPreferences();
   const addMutation = useAddToShelf();
+  const addAnotherCopyMutation = useAddAnotherCopy();
   const removeMutation = useRemoveFromShelf();
   const addToShelfMutation = useAddBookToShelf();
   const shelves = useShelves().data ?? [];
@@ -76,6 +78,10 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
 
   const [view, setView] = useState<View>("scanning");
   const [pendingIsbn, setPendingIsbn] = useState<string | null>(null);
+  // ISBN of a "sheet"-source duplicate 409 on an owned add — offers "add another
+  // copy" inline (BOOKSHELF-60). Continuous/"auto" duplicates never set this; they
+  // keep the existing amber flash unchanged (never a silent increment).
+  const [duplicateIsbn, setDuplicateIsbn] = useState<string | null>(null);
   const [foundBook, setFoundBook] = useState<BookSearchResult | null>(null);
   const [added, setAdded] = useState<AddedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +142,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     runId.current += 1;
     setFoundBook(null);
     setPendingIsbn(null);
+    setDuplicateIsbn(null);
     setError(null);
     setView("scanning");
   }
@@ -217,10 +224,42 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           resumeScanning();
         } else {
           setError("That book is already on your shelf.");
+          // copies is owned-only (BOOKSHELF-60). The 409 fires for wishlist
+          // duplicates too, so an attempted "owned" add isn't enough — confirm the
+          // book is actually owned before offering "add another copy".
+          if (status === "owned") {
+            const existing = await fetchShelfEntry(isbn).catch(() => null);
+            if (existing?.owned) setDuplicateIsbn(isbn);
+          }
         }
       } else {
         setError("Couldn't add that book — try again.");
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** BOOKSHELF-60 — the "sheet"-source duplicate-add offer: never silent, never
+      reachable from continuous/"auto" mode (see duplicateIsbn above). */
+  async function addAnotherCopy(isbn: string, book: BookSearchResult | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      await addAnotherCopyMutation.mutateAsync(isbn);
+      const item = buildAddedItem(isbn, "owned", book);
+      recordAdded(item);
+      if (scanMode === "single") {
+        setView("added");
+        if (typeof navigator.vibrate === "function") navigator.vibrate(40);
+      } else {
+        showFlash(item, "added");
+        resumeScanning();
+      }
+    } catch (err) {
+      if (import.meta.env.DEV)
+        console.error(`[ScanModal] add another copy failed for ${isbn}`, err);
+      setError("Couldn't add another copy — try again.");
     } finally {
       setBusy(false);
     }
@@ -535,6 +574,9 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
             error={error}
             onAdd={(s) => void commitAdd(pendingIsbn, s, foundBook)}
             onScanAgain={resumeScanning}
+            {...(duplicateIsbn === pendingIsbn
+              ? { onAddAnotherCopy: () => void addAnotherCopy(pendingIsbn, foundBook) }
+              : {})}
           />
         )}
 
@@ -646,6 +688,7 @@ function ConfirmSheet({
   error,
   onAdd,
   onScanAgain,
+  onAddAnotherCopy,
 }: {
   book: BookSearchResult;
   isbn: string;
@@ -654,6 +697,8 @@ function ConfirmSheet({
   error: string | null;
   onAdd: (status: ShelfStatus) => void;
   onScanAgain: () => void;
+  /** Present only for a "sheet"-source duplicate 409 on an owned add (BOOKSHELF-60). */
+  onAddAnotherCopy?: () => void;
 }) {
   return (
     <div
@@ -682,6 +727,17 @@ function ConfirmSheet({
           </div>
         </div>
         {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
+        {onAddAnotherCopy && (
+          <Button
+            variant="app"
+            className="mb-2 w-full"
+            disabled={busy}
+            onClick={onAddAnotherCopy}
+            autoFocus
+          >
+            Add another copy
+          </Button>
+        )}
         {/* The remembered destination is the emphasised (primary + autofocused) button so
             Enter adds there; tapping the other button is a one-off that leaves the
             remembered default untouched — the chip is the only setter (ADR-026). */}
@@ -691,7 +747,7 @@ function ConfirmSheet({
             className="flex-1"
             disabled={busy}
             onClick={() => onAdd("owned")}
-            {...(destination === "owned" ? { autoFocus: true } : {})}
+            {...(destination === "owned" && !onAddAnotherCopy ? { autoFocus: true } : {})}
           >
             Add owned
           </Button>
@@ -700,7 +756,7 @@ function ConfirmSheet({
             className="flex-1"
             disabled={busy}
             onClick={() => onAdd("want")}
-            {...(destination === "want" ? { autoFocus: true } : {})}
+            {...(destination === "want" && !onAddAnotherCopy ? { autoFocus: true } : {})}
           >
             Add to wishlist
           </Button>

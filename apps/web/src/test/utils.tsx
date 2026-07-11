@@ -74,6 +74,7 @@ export function makeEntry(overrides: Partial<ShelfEntry> = {}): ShelfEntry {
     tags: [],
     addedAt: "2026-01-01T00:00:00.000Z",
     notes: null,
+    copies: 1,
     status: "owned",
     book: makeBook(),
     ...overrides,

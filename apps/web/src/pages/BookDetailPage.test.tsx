@@ -200,6 +200,61 @@ describe("BookDetailPage — Your copy panel (#82)", () => {
     expect(mockUpdateTags).toHaveBeenCalledWith(ISBN, ["fantasy"]);
   });
 
+  it("hides the Copies stepper for a wishlisted book", async () => {
+    resolveEntry({ owned: false, want: true, copies: 1 });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByText("Copies")).not.toBeInTheDocument();
+  });
+
+  it("shows the current copies count for an owned book", async () => {
+    resolveEntry({ owned: true, copies: 2 });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getByText("Copies")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("increments copies via the + button", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ owned: true, copies: 2 });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN, owned: true, copies: 3 }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("button", { name: "Add a copy" }));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { copies: 3 });
+  });
+
+  it("decrements copies via the - button", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ owned: true, copies: 2 });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN, owned: true, copies: 1 }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("button", { name: "Remove a copy" }));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { copies: 1 });
+  });
+
+  it("disables the - button at the floor of 1 (not a delete shortcut)", async () => {
+    resolveEntry({ owned: true, copies: 1 });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getByRole("button", { name: "Remove a copy" })).toBeDisabled();
+  });
+
+  it("disables the + button at the ceiling of 99", async () => {
+    resolveEntry({ owned: true, copies: 99 });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getByRole("button", { name: "Add a copy" })).toBeDisabled();
+  });
+
   it("saves notes on blur", async () => {
     const user = userEvent.setup();
     resolveEntry({ notes: null });

@@ -12,12 +12,19 @@ import {
   useBookEntry,
   useTags,
   useUpdateBookAttributes,
+  useUpdateBookCopies,
   useUpdateBookTags,
   useUpdateBookNotes,
 } from "../hooks/useBookEntry";
 import { useRemoveFromShelf } from "../hooks/useShelf";
 import { useShelves, useAddBookToShelf, useRemoveBookFromShelf } from "../hooks/useShelves";
-import { ApiError, type ReadingStatus, type Shelf, type ShelfEntry } from "../lib/api-client";
+import {
+  ApiError,
+  COPIES_MAX,
+  type ReadingStatus,
+  type Shelf,
+  type ShelfEntry,
+} from "../lib/api-client";
 
 const NOTES_MAX_LENGTH = 2000;
 const TAGS_MAX_COUNT = 25;
@@ -40,10 +47,85 @@ function ChevronLeftIcon() {
   );
 }
 
+// ── Copies stepper (BOOKSHELF-60) ────────────────────────────────────────────
+
+const COPIES_MIN = 1;
+
+function MinusIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-3.5 h-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d="M3.5 8h9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-3.5 h-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d="M8 3.5v9M3.5 8h9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** −/+ stepper for the copies count. Sends the absolute new value on each tap
+    (no atomic ADD — see docs/specs/multiple-copies-system-design.md §5). */
+function CopiesStepper({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="inline-flex items-center rounded-lg border border-paper-400 dark:border-slate-700 bg-paper-200 dark:bg-slate-800 p-0.5">
+      <button
+        type="button"
+        onClick={() => onChange(value - 1)}
+        disabled={disabled || value <= COPIES_MIN}
+        title="Remove a copy"
+        aria-label="Remove a copy"
+        className="grid h-11 w-11 place-items-center rounded-md text-slate-700 dark:text-slate-200 hover:bg-paper-50 dark:hover:bg-slate-900 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+      >
+        <MinusIcon />
+      </button>
+      <span className="min-w-[28px] text-center text-sm font-medium text-slate-900 dark:text-white">
+        {value}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(value + 1)}
+        disabled={disabled || value >= COPIES_MAX}
+        title="Add a copy"
+        aria-label="Add a copy"
+        className="grid h-11 w-11 place-items-center rounded-md text-slate-700 dark:text-slate-200 hover:bg-paper-50 dark:hover:bg-slate-900 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+      >
+        <PlusIcon />
+      </button>
+    </div>
+  );
+}
+
 // ── Your-copy panel ──────────────────────────────────────────────────────────
 
 function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
   const attrMutation = useUpdateBookAttributes(isbn);
+  const copiesMutation = useUpdateBookCopies(isbn);
   const tagsMutation = useUpdateBookTags(isbn);
   const notesMutation = useUpdateBookNotes(isbn);
   const tagsQuery = useTags();
@@ -102,6 +184,26 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
           />
         </div>
       </div>
+
+      {/* Copies (BOOKSHELF-60) — owned-only; hidden (not disabled) on wishlist books
+          so there's no orphaned control with no explanation. */}
+      {entry.owned && (
+        <div className="space-y-2">
+          <span className={labelClass}>Copies</span>
+          <div>
+            <CopiesStepper
+              value={entry.copies}
+              disabled={copiesMutation.isPending}
+              onChange={(next) => copiesMutation.mutate(next)}
+            />
+          </div>
+          {copiesMutation.isError && (
+            <p className="text-xs text-red-500 dark:text-red-400">
+              Couldn&apos;t update copies — {(copiesMutation.error as Error).message}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Reading status — may be unset */}
       <div className="space-y-2">
