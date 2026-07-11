@@ -13,15 +13,31 @@ vi.mock("../lib/api-client", async (importOriginal) => {
     addToShelf: vi.fn(),
     updateShelfStatus: vi.fn(),
     removeFromShelf: vi.fn(),
+    fetchShelfEntry: vi.fn(),
+    updateShelfAttributes: vi.fn(),
   };
 });
 
-import { fetchShelf, updateShelfStatus, removeFromShelf } from "../lib/api-client";
-import { useShelf, useMoveShelfEntry, useRemoveFromShelf, flattenShelf } from "./useShelf";
+import {
+  fetchShelf,
+  updateShelfStatus,
+  removeFromShelf,
+  fetchShelfEntry,
+  updateShelfAttributes,
+} from "../lib/api-client";
+import {
+  useShelf,
+  useMoveShelfEntry,
+  useRemoveFromShelf,
+  useAddAnotherCopy,
+  flattenShelf,
+} from "./useShelf";
 
 const mockFetchShelf = vi.mocked(fetchShelf);
 const mockUpdateStatus = vi.mocked(updateShelfStatus);
 const mockRemove = vi.mocked(removeFromShelf);
+const mockFetchEntry = vi.mocked(fetchShelfEntry);
+const mockUpdateAttrs = vi.mocked(updateShelfAttributes);
 
 function seedShelf(client: ReturnType<typeof createQueryWrapper>["client"], page: ShelfPage) {
   const data: InfiniteData<ShelfPage> = { pages: [page], pageParams: [null] };
@@ -114,6 +130,44 @@ describe("useMoveShelfEntry — optimistic owned/want sync", () => {
     const e = cached?.pages[0]?.entries[0];
     expect(e?.owned).toBe(false);
     expect(e?.want).toBe(true);
+  });
+});
+
+describe("useAddAnotherCopy (BOOKSHELF-60)", () => {
+  it("reads the current count and PATCHes the incremented absolute value", async () => {
+    mockFetchEntry.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 2 }));
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 3 }));
+    const { Wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useAddAnotherCopy(), { wrapper: Wrapper });
+
+    result.current.mutate("1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockFetchEntry).toHaveBeenCalledWith("1");
+    expect(mockUpdateAttrs).toHaveBeenCalledWith("1", { copies: 3 });
+  });
+
+  it("clamps at the 99 ceiling so a maxed-out book is a no-op, not a 400", async () => {
+    mockFetchEntry.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 99 }));
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 99 }));
+    const { Wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useAddAnotherCopy(), { wrapper: Wrapper });
+
+    result.current.mutate("1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith("1", { copies: 99 });
+  });
+
+  it("surfaces an error when the lookup fails (no silent success)", async () => {
+    mockFetchEntry.mockRejectedValue(new Error("network"));
+    const { Wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useAddAnotherCopy(), { wrapper: Wrapper });
+
+    result.current.mutate("1");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockUpdateAttrs).not.toHaveBeenCalled();
   });
 });
 

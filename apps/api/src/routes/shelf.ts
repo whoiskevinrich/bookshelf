@@ -456,12 +456,6 @@ shelfRouter.patch("/:isbn", async (c) => {
     return c.json({ error: "owned and want are mutually exclusive" }, 400);
   }
 
-  // copies is only meaningful when owned (BOOKSHELF-60) — moving to want resets it,
-  // overriding any client-supplied value in the same request.
-  if (patch.want === true) {
-    patch.copies = 1;
-  }
-
   let existing: ShelfEntry | null;
   try {
     existing = await getBookEntry(userId, isbn);
@@ -471,6 +465,14 @@ shelfRouter.patch("/:isbn", async (c) => {
   }
   if (!existing) {
     return c.json({ error: "Book not found on your shelf" }, 404);
+  }
+
+  // copies is only meaningful when owned (BOOKSHELF-60). Force it to 1 whenever the
+  // resulting state is not owned — this covers owned→want *and* a bare `{copies}`
+  // patch against a book that's already on the wishlist, so a non-owned entry can
+  // never carry copies > 1 regardless of what the client sends.
+  if (!(patch.owned ?? existing.owned)) {
+    patch.copies = 1;
   }
 
   try {

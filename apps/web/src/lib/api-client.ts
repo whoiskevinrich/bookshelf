@@ -7,6 +7,9 @@ export type ShelfStatus = "owned" | "want";
 
 export type ReadingStatus = "unread" | "reading" | "finished";
 
+/** Upper bound on a book's copy count (BOOKSHELF-60). Mirrors the API's COPIES_MAX. */
+export const COPIES_MAX = 99;
+
 export interface BookMetadata {
   title: string;
   authors: string[];

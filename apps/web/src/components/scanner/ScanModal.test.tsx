@@ -79,6 +79,21 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
   mockFetchShelves.mockResolvedValue([]);
+  // Default the ownership lookup (BOOKSHELF-60) to a wishlist entry so the copies
+  // offer is off unless a test opts in with an owned entry. Keeps the duplicate-add
+  // path from hitting an unmocked (undefined) promise.
+  mockFetchShelfEntry.mockResolvedValue({
+    isbn: ISBN,
+    owned: false,
+    want: true,
+    readingStatus: null,
+    tags: [],
+    addedAt: "2026-01-01T00:00:00.000Z",
+    notes: null,
+    copies: 1,
+    status: "want",
+    book: null,
+  });
 });
 
 describe("ScanModal — manual entry via Enter", () => {
@@ -205,6 +220,36 @@ describe("ScanModal — add another copy (BOOKSHELF-60)", () => {
 
     expect(await screen.findByText("That book is already on your shelf.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add another copy" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer 'Add another copy' when the duplicate is only on the wishlist", async () => {
+    // Attempting an *owned* add of a book that's already wishlisted 409s, but copies
+    // is owned-only — the offer must be gated on the book's real ownership.
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockRejectedValue(new ApiError(409, "Book already exists on your shelf"));
+    mockFetchShelfEntry.mockResolvedValue({
+      isbn: ISBN,
+      owned: false,
+      want: true,
+      readingStatus: null,
+      tags: [],
+      addedAt: "2026-01-01T00:00:00.000Z",
+      notes: null,
+      copies: 1,
+      status: "want",
+      book: null,
+    });
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add owned" }));
+
+    expect(await screen.findByText("That book is already on your shelf.")).toBeInTheDocument();
+    // Ownership lookup ran and returned a wishlist entry → no copy offer.
+    await waitFor(() => expect(mockFetchShelfEntry).toHaveBeenCalledWith(ISBN));
+    expect(screen.queryByRole("button", { name: "Add another copy" })).not.toBeInTheDocument();
+    expect(mockUpdateAttrs).not.toHaveBeenCalled();
   });
 });
 

@@ -657,6 +657,27 @@ describe("PATCH /v1/shelf/:isbn — copies (BOOKSHELF-60)", () => {
     const body = (await res.json()) as ShelfEntry;
     expect(body.copies).toBe(4);
   });
+
+  it("forces copies to 1 for a bare copies patch on a wishlist (non-owned) book", async () => {
+    // copies is owned-only — a client (or bug) sending copies to a want entry must
+    // never persist copies > 1 on it.
+    vi.mocked(getBookEntry).mockResolvedValueOnce(WANT_ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copies: 5 }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ShelfEntry;
+    expect(body.copies).toBe(1);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      expect.objectContaining({ copies: 1 }),
+    );
+  });
 });
 
 describe("PATCH /v1/shelf/:isbn/tags", () => {

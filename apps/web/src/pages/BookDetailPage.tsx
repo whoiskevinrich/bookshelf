@@ -18,7 +18,13 @@ import {
 } from "../hooks/useBookEntry";
 import { useRemoveFromShelf } from "../hooks/useShelf";
 import { useShelves, useAddBookToShelf, useRemoveBookFromShelf } from "../hooks/useShelves";
-import { ApiError, type ReadingStatus, type Shelf, type ShelfEntry } from "../lib/api-client";
+import {
+  ApiError,
+  COPIES_MAX,
+  type ReadingStatus,
+  type Shelf,
+  type ShelfEntry,
+} from "../lib/api-client";
 
 const NOTES_MAX_LENGTH = 2000;
 const TAGS_MAX_COUNT = 25;
@@ -44,7 +50,6 @@ function ChevronLeftIcon() {
 // ── Copies stepper (BOOKSHELF-60) ────────────────────────────────────────────
 
 const COPIES_MIN = 1;
-const COPIES_MAX = 99;
 
 function MinusIcon() {
   return (

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { extractIsbn13, toIsbn13 } from "../../lib/isbn";
 import {
   getBookByIsbn,
+  fetchShelfEntry,
   isConflictError,
   type BookSearchResult,
   type Shelf,
@@ -223,9 +224,13 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           resumeScanning();
         } else {
           setError("That book is already on your shelf.");
-          // copies is owned-only (BOOKSHELF-60) — only offer it for a duplicate
-          // "owned" add, not a duplicate "want" (already-wishlisted) add.
-          if (status === "owned") setDuplicateIsbn(isbn);
+          // copies is owned-only (BOOKSHELF-60). The 409 fires for wishlist
+          // duplicates too, so an attempted "owned" add isn't enough — confirm the
+          // book is actually owned before offering "add another copy".
+          if (status === "owned") {
+            const existing = await fetchShelfEntry(isbn).catch(() => null);
+            if (existing?.owned) setDuplicateIsbn(isbn);
+          }
         }
       } else {
         setError("Couldn't add that book — try again.");

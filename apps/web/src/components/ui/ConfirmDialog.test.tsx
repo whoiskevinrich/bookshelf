@@ -61,4 +61,19 @@ describe("ConfirmDialog", () => {
     await user.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("renders an error message inside the dialog when provided", () => {
+    // The error must live inside the modal — an inline page message would render
+    // behind the dialog's full-screen backdrop and be invisible (BOOKSHELF-60).
+    render(
+      <ConfirmDialog {...baseProps} open error="Couldn't add another copy — please try again." />,
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Couldn't add another copy — please try again.");
+  });
+
+  it("renders no error paragraph when error is null", () => {
+    render(<ConfirmDialog {...baseProps} open error={null} />);
+    expect(screen.queryByText(/couldn't/i)).not.toBeInTheDocument();
+  });
 });
