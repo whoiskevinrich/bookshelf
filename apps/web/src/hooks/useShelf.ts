@@ -9,6 +9,8 @@ import {
   fetchShelf,
   addToShelf,
   updateShelfStatus,
+  updateShelfAttributes,
+  fetchShelfEntry,
   removeFromShelf,
   type BookMetadata,
   type ShelfEntry,
@@ -62,6 +64,25 @@ export function useAddToShelf() {
       book?: BookMetadata;
     }) => addToShelf(isbn, status, book),
     onSuccess: () => qc.invalidateQueries({ queryKey: shelfKey() }),
+  });
+}
+
+/**
+ * The web-client side of the duplicate-add offer (BOOKSHELF-60): a 409 on `POST
+ * /v1/shelf` means the book is already owned, so this looks up its current copies
+ * and PATCHes the absolute incremented value — never a silent auto-increment.
+ */
+export function useAddAnotherCopy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (isbn: string) => {
+      const entry = await fetchShelfEntry(isbn);
+      return updateShelfAttributes(isbn, { copies: entry.copies + 1 });
+    },
+    onSuccess: (_entry, isbn) => {
+      void qc.invalidateQueries({ queryKey: shelfKey() });
+      void qc.invalidateQueries({ queryKey: ["book", isbn] });
+    },
   });
 }
 

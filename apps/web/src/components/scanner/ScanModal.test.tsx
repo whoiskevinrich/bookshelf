@@ -21,6 +21,8 @@ vi.mock("../../lib/api-client", async (importOriginal) => {
     addToShelf: vi.fn(),
     fetchShelves: vi.fn(),
     addBookToShelf: vi.fn(),
+    fetchShelfEntry: vi.fn(),
+    updateShelfAttributes: vi.fn(),
   };
 });
 
@@ -29,6 +31,8 @@ import {
   addToShelf,
   fetchShelves,
   addBookToShelf,
+  fetchShelfEntry,
+  updateShelfAttributes,
   ApiError,
   type BookSearchResult,
   type Shelf,
@@ -55,6 +59,8 @@ const mockGetBook = vi.mocked(getBookByIsbn);
 const mockAdd = vi.mocked(addToShelf);
 const mockFetchShelves = vi.mocked(fetchShelves);
 const mockAddBookToShelf = vi.mocked(addBookToShelf);
+const mockFetchShelfEntry = vi.mocked(fetchShelfEntry);
+const mockUpdateAttrs = vi.mocked(updateShelfAttributes);
 
 function renderModal() {
   return renderWithProviders(
@@ -154,6 +160,51 @@ describe("ScanModal — add error messages", () => {
     await user.click(await screen.findByRole("button", { name: "Add owned" }));
 
     expect(await screen.findByText("Couldn't add that book — try again.")).toBeInTheDocument();
+  });
+});
+
+describe("ScanModal — add another copy (BOOKSHELF-60)", () => {
+  it("offers 'Add another copy' on a duplicate owned add and completes it", async () => {
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockRejectedValue(new ApiError(409, "Book already exists on your shelf"));
+    mockFetchShelfEntry.mockResolvedValue({
+      isbn: ISBN,
+      owned: true,
+      want: false,
+      readingStatus: null,
+      tags: [],
+      addedAt: "2026-01-01T00:00:00.000Z",
+      notes: null,
+      copies: 2,
+      status: "owned",
+      book: null,
+    });
+    mockUpdateAttrs.mockResolvedValue({} as never);
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add owned" }));
+
+    const addAnother = await screen.findByRole("button", { name: "Add another copy" });
+    await user.click(addAnother);
+
+    await waitFor(() => expect(mockFetchShelfEntry).toHaveBeenCalledWith(ISBN));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { copies: 3 });
+    expect(await screen.findByText(/Added to your shelf/)).toBeInTheDocument();
+  });
+
+  it("does not offer 'Add another copy' for a duplicate wishlist add", async () => {
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(BOOK);
+    mockAdd.mockRejectedValue(new ApiError(409, "Book already exists on your shelf"));
+    renderModal();
+
+    await lookUpViaEnter(user);
+    await user.click(await screen.findByRole("button", { name: "Add to wishlist" }));
+
+    expect(await screen.findByText("That book is already on your shelf.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add another copy" })).not.toBeInTheDocument();
   });
 });
 

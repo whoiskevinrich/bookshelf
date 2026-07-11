@@ -6,6 +6,7 @@ import {
   useShelf,
   useFilteredShelf,
   useAddToShelf,
+  useAddAnotherCopy,
   useMoveShelfEntry,
   useRemoveFromShelf,
   flattenShelf,
@@ -350,6 +351,7 @@ export function ShelfPage() {
   const shelfQuery = useShelf();
   const shelvesQuery = useShelves();
   const addMutation = useAddToShelf();
+  const addAnotherCopyMutation = useAddAnotherCopy();
   const moveMutation = useMoveShelfEntry();
   const removeMutation = useRemoveFromShelf();
   const addToShelfMutation = useAddBookToShelf();
@@ -586,6 +588,10 @@ export function ShelfPage() {
     setShowSearch(false);
   }
 
+  // copies is owned-only (BOOKSHELF-60) — only a duplicate "owned" add offers it.
+  const duplicateOwnedAdd =
+    isConflictError(addMutation.error) && addMutation.variables?.status === "owned";
+
   function clearFilter() {
     updateParams((p) => {
       p.delete("facet");
@@ -713,11 +719,33 @@ export function ShelfPage() {
           </div>
         )}
 
-        {addMutation.isError && (
+        {/* Duplicate add (BOOKSHELF-60): a duplicate "owned" add offers "add another
+            copy" instead of a dead-end message; a duplicate "want" add (already
+            wishlisted) keeps the plain message — copies is owned-only. */}
+        {addMutation.isError && !duplicateOwnedAdd && (
           <p className="text-sm text-red-500 mb-4">
             {isConflictError(addMutation.error)
               ? "That book is already on your shelf."
               : `Couldn't add book — ${addMutation.error.message}`}
+          </p>
+        )}
+
+        <ConfirmDialog
+          open={duplicateOwnedAdd}
+          title="Add another copy?"
+          message={`You already own "${addMutation.variables?.book?.title ?? addMutation.variables?.isbn}" — add another copy?`}
+          confirmLabel="Add another copy"
+          pending={addAnotherCopyMutation.isPending}
+          onConfirm={() => {
+            const isbn = addMutation.variables?.isbn;
+            if (!isbn) return;
+            addAnotherCopyMutation.mutate(isbn, { onSuccess: () => addMutation.reset() });
+          }}
+          onClose={() => addMutation.reset()}
+        />
+        {addAnotherCopyMutation.isError && (
+          <p className="text-sm text-red-500 mb-4">
+            Couldn&apos;t add another copy — please try again.
           </p>
         )}
 

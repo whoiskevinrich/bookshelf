@@ -87,6 +87,11 @@ export interface ShelfEntry {
   tags: string[];
   addedAt: string;
   notes: string | null;
+  /**
+   * Number of copies owned (BOOKSHELF-60). Bounded 1–99; only meaningful when
+   * `owned` is true. Absent/legacy items dual-read as 1 — no backfill.
+   */
+  copies: number;
   /** @deprecated Derived from `owned`/`want` for one transition release (ADR-019). */
   status: ShelfStatus;
 }
@@ -103,6 +108,7 @@ export interface EntryAttributePatch {
   owned?: boolean;
   want?: boolean;
   readingStatus?: ReadingStatus | null;
+  copies?: number;
 }
 
 /** In-memory filter applied to the user's entries (ADR-019 — no GSI). */
@@ -175,6 +181,8 @@ function toShelfEntry(item: Record<string, unknown>): ShelfEntry {
     tags: toTags(item["tags"]),
     addedAt: String(item["addedAt"]),
     notes: str(item["notes"]),
+    // Dual-read default (BOOKSHELF-60): legacy/absent items read as 1, no backfill.
+    copies: num(item["copies"]) ?? 1,
     status: derivedStatus(owned),
   };
 }
@@ -380,7 +388,7 @@ export async function putBookEntry(
 }
 
 /**
- * Apply a partial attribute update (owned / want / readingStatus). Only the
+ * Apply a partial attribute update (owned / want / readingStatus / copies). Only the
  * fields present in `patch` are written; `readingStatus: null` is stored as NULL
  * (consistent with create), not removed. No-op if `patch` is empty.
  */
@@ -407,6 +415,11 @@ export async function updateBookEntryAttributes(
     sets.push("#readingStatus = :readingStatus");
     names["#readingStatus"] = "readingStatus";
     values[":readingStatus"] = patch.readingStatus;
+  }
+  if (patch.copies !== undefined) {
+    sets.push("#copies = :copies");
+    names["#copies"] = "copies";
+    values[":copies"] = patch.copies;
   }
 
   if (sets.length === 0) return;

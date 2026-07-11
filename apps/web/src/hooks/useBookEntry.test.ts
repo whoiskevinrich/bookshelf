@@ -26,6 +26,7 @@ import {
   useBookEntry,
   useTags,
   useUpdateBookAttributes,
+  useUpdateBookCopies,
   useUpdateBookTags,
   useUpdateBookNotes,
 } from "./useBookEntry";
@@ -143,6 +144,56 @@ describe("useUpdateBookAttributes — optimistic mutual exclusivity", () => {
     const cached = client.getQueryData<ShelfEntry>(["book", ISBN]);
     expect(cached?.owned).toBe(false);
     expect(cached?.want).toBe(true);
+  });
+
+  it("setting want=true optimistically resets copies to 1 (BOOKSHELF-60)", async () => {
+    const entry = makeEntry({ isbn: ISBN, owned: true, want: false, copies: 3 });
+    const { Wrapper, client } = createQueryWrapper();
+    seedEntry(client, entry);
+    mockUpdateAttrs.mockResolvedValue(
+      makeEntry({ isbn: ISBN, owned: false, want: true, copies: 1 }),
+    );
+
+    const { result } = renderHook(() => useUpdateBookAttributes(ISBN), { wrapper: Wrapper });
+    result.current.mutate({ want: true });
+
+    await waitFor(() => {
+      const cached = client.getQueryData<ShelfEntry>(["book", ISBN]);
+      expect(cached?.want).toBe(true);
+      expect(cached?.copies).toBe(1);
+    });
+  });
+});
+
+describe("useUpdateBookCopies — optimistic copies (BOOKSHELF-60)", () => {
+  it("applies the new copies value optimistically", async () => {
+    const entry = makeEntry({ isbn: ISBN, copies: 1 });
+    const { Wrapper, client } = createQueryWrapper();
+    seedEntry(client, entry);
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN, copies: 2 }));
+
+    const { result } = renderHook(() => useUpdateBookCopies(ISBN), { wrapper: Wrapper });
+    result.current.mutate(2);
+
+    await waitFor(() => {
+      const cached = client.getQueryData<ShelfEntry>(["book", ISBN]);
+      expect(cached?.copies).toBe(2);
+    });
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { copies: 2 });
+  });
+
+  it("rolls back copies when the request fails", async () => {
+    const entry = makeEntry({ isbn: ISBN, copies: 2 });
+    const { Wrapper, client } = createQueryWrapper();
+    seedEntry(client, entry);
+    mockUpdateAttrs.mockRejectedValue(new Error("nope"));
+
+    const { result } = renderHook(() => useUpdateBookCopies(ISBN), { wrapper: Wrapper });
+    result.current.mutate(3);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const cached = client.getQueryData<ShelfEntry>(["book", ISBN]);
+    expect(cached?.copies).toBe(2);
   });
 });
 
