@@ -4,7 +4,7 @@
 **Date**: 2026-07-10
 **Owner**: Solo developer
 **Jira**: [BOOKSHELF-60](https://whoiskevinrich.atlassian.net/browse/BOOKSHELF-60) (epic BOOKSHELF-62 Feedback)
-**Related**: `docs/specs/multiple-copies.md` (product spec / decision — this doc is its system-design companion), ADR-002 (shelf API shape), ADR-019 (entry attributes, same additive pattern)
+**Related**: `docs/specs/multiple-copies.md` (product spec / decision — this doc is its system-design companion), `docs/specs/multiple-copies-design-handoff.md` (frontend component-level spec — card badge, detail stepper, duplicate-add prompt), ADR-002 (shelf API shape), ADR-019 (entry attributes, same additive pattern)
 
 This is the system-design deep dive for the decision already recorded in `docs/specs/multiple-copies.md` and `docs/decisions.md`. That spec settled _what_ to build (a `copies` count, key unchanged); this doc grounds _how it fits the running system_ — current code paths, request flow, failure modes, and what would have to change if the requirements grow.
 
