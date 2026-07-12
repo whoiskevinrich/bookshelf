@@ -101,7 +101,11 @@ export async function addBookByIsbn(
 
   const card = cardByIsbn(page, isbn);
   await expect(card).toBeVisible({ timeout: 15_000 });
-  await expect(card.getByText(status === "owned" ? "Owned" : "Want", { exact: true })).toBeVisible({
+  // Pill label is "Wishlist" for want (display-only rename, ADR-021 — the wire
+  // value stays `want`).
+  await expect(
+    card.getByText(status === "owned" ? "Owned" : "Wishlist", { exact: true }),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -119,6 +123,10 @@ export async function removeBookByIsbn(page: Page, isbn: string): Promise<void> 
   // the card is hovered), so reveal it before clicking the trash action.
   await card.hover();
   await card.getByRole("button", { name: "Remove from library" }).click();
+
+  // Removing now opens a ConfirmDialog (BOOKSHELF-60) — confirm before the card
+  // is expected to disappear, or this hangs waiting on a dialog no one dismissed.
+  await page.getByRole("dialog").getByRole("button", { name: "Remove", exact: true }).click();
   await expect(cardByIsbn(page, isbn)).toHaveCount(0, { timeout: 15_000 });
 
   // The card disappears optimistically before the DELETE commits server-side.

@@ -74,6 +74,13 @@ describe("createGoogleBooksProvider.getByIsbn", () => {
     const result = await provider.getByIsbn("9999999999999");
     expect(result).toBeNull();
   });
+
+  it("returns the queried isbn, not the volume id, when the record has no industryIdentifiers", async () => {
+    mockResponse([makeVolume({ industryIdentifiers: [] })]);
+    const provider = createGoogleBooksProvider("key");
+    const result = await provider.getByIsbn("9780441569595");
+    expect(result?.isbn).toBe("9780441569595");
+  });
 });
 
 describe("format hint (BOOKSHELF-92)", () => {
