@@ -36,6 +36,12 @@ export interface ShelfEntry {
   copies: number;
   /** Per-edition format label (BOOKSHELF-91); null when unspecified. */
   format: EditionFormat | null;
+  /**
+   * Size of this entry's edition group, including itself (BOOKSHELF-93). 1 for solo
+   * entries — the common case. `> 1` means "this is part of a multi-edition work,"
+   * mirroring `ShelfEntryDetail.editions.length > 1`.
+   */
+  editionCount: number;
   /** @deprecated Derived from owned/want during the transition (ADR-019). */
   status: ShelfStatus;
   book: BookMetadata | null;

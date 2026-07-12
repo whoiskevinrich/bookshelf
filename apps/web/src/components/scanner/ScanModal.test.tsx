@@ -93,6 +93,7 @@ beforeEach(() => {
     copies: 1,
     status: "want",
     format: null,
+    editionCount: 1,
     book: null,
     editions: [],
   });
@@ -196,6 +197,7 @@ describe("ScanModal — add another copy (BOOKSHELF-60)", () => {
       copies: 2,
       status: "owned",
       format: null,
+      editionCount: 1,
       book: null,
       editions: [],
     });
@@ -243,6 +245,7 @@ describe("ScanModal — add another copy (BOOKSHELF-60)", () => {
       copies: 1,
       status: "want",
       format: null,
+      editionCount: 1,
       book: null,
       editions: [],
     });

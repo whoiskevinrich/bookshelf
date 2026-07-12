@@ -83,6 +83,7 @@ export function makeEntry(overrides: Partial<ShelfEntry> = {}): ShelfEntry {
     notes: null,
     copies: 1,
     format: null,
+    editionCount: 1,
     status: "owned",
     book: makeBook(),
     ...overrides,

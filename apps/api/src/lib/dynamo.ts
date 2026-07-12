@@ -150,6 +150,13 @@ export interface BookMetadata {
 
 export interface ShelfEntryWithBook extends ShelfEntry {
   book: BookMetadata | null;
+  /**
+   * Size of this entry's edition group, including itself (BOOKSHELF-93). 1 for solo
+   * entries — the common case. Same effective-work-key grouping as
+   * {@link queryEditionsForIsbn}; `> 1` is exactly "this is part of a multi-edition
+   * work," mirroring the detail view's `editions.length > 1` check.
+   */
+  editionCount: number;
 }
 
 export interface ShelfMeta {
@@ -337,9 +344,20 @@ export async function queryBookEntries(
     const items = (queryResult.Items ?? []) as Record<string, unknown>[];
     const entries = items.map(toShelfEntry);
     const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
+    // Page-local edition counts (BOOKSHELF-93): grouped only within this page, not
+    // scanned across the whole shelf, so the paginated list stays bounded — a
+    // sibling edition on another page won't be counted here. Acceptable for the
+    // affordance's "nice-to-have" precision; shelves small enough to fit one page
+    // (the common case) get exact counts. The filtered path below already has every
+    // entry in hand and computes exact whole-shelf counts.
+    const editionCounts = editionCountsFor(entries, bookMap);
 
     return {
-      entries: entries.map((e) => ({ ...e, book: bookMap[e.isbn] ?? null })),
+      entries: entries.map((e) => ({
+        ...e,
+        book: bookMap[e.isbn] ?? null,
+        editionCount: editionCounts[e.isbn] ?? 1,
+      })),
       nextCursor: queryResult.LastEvaluatedKey ? encodeCursor(queryResult.LastEvaluatedKey) : null,
       total: countResult.Count ?? 0,
     };
@@ -366,11 +384,20 @@ export async function queryBookEntries(
     lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
   } while (lastKey);
 
-  const entries = allItems.map(toShelfEntry).filter((e) => matchesFilter(e, filter));
-  const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
+  // allItems already covers the whole shelf (the loop above pages through every
+  // ENTRY# item), so edition counts computed here are exact — unlike the page-local
+  // counts in the unfiltered branch above.
+  const allEntries = allItems.map(toShelfEntry);
+  const entries = allEntries.filter((e) => matchesFilter(e, filter));
+  const bookMap = await fetchBookMetadataMap(allEntries.map((e) => e.isbn));
+  const editionCounts = editionCountsFor(allEntries, bookMap);
 
   return {
-    entries: entries.map((e) => ({ ...e, book: bookMap[e.isbn] ?? null })),
+    entries: entries.map((e) => ({
+      ...e,
+      book: bookMap[e.isbn] ?? null,
+      editionCount: editionCounts[e.isbn] ?? 1,
+    })),
     nextCursor: null,
     total: entries.length,
   };
@@ -589,6 +616,34 @@ function effectiveWorkKey(entry: ShelfEntry, book: BookMetadata | null): string 
 }
 
 /**
+ * Edition-group sizes, keyed by ISBN, for a set of entries (BOOKSHELF-93). A `null`
+ * effective key (missing metadata, or an ungrouped solo sentinel) never groups —
+ * that entry's count is always 1. Pure/synchronous: callers decide how much of the
+ * shelf `entries`/`bookMap` cover (a page vs. the whole shelf).
+ */
+export function editionCountsFor(
+  entries: ShelfEntry[],
+  bookMap: Record<string, BookMetadata>,
+): Record<string, number> {
+  const groups = new Map<string, string[]>();
+  const counts: Record<string, number> = {};
+  for (const entry of entries) {
+    const key = effectiveWorkKey(entry, bookMap[entry.isbn] ?? null);
+    if (key === null) {
+      counts[entry.isbn] = 1;
+      continue;
+    }
+    const group = groups.get(key) ?? [];
+    group.push(entry.isbn);
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) {
+    for (const isbn of group) counts[isbn] = group.length;
+  }
+  return counts;
+}
+
+/**
  * The edition set for one ISBN on the user's shelf: the entry itself (with book
  * metadata) plus every sibling entry sharing its effective work key. Returns
  * `null` when the ISBN is not on the shelf. A solo work (null effective key, or no
@@ -627,7 +682,7 @@ export async function queryEditionsForIsbn(
     book: bookMap[e.isbn] ?? null,
   }));
 
-  return { entry: { ...self, book: selfBook }, editions };
+  return { entry: { ...self, book: selfBook, editionCount: editions.length }, editions };
 }
 
 /**
@@ -821,10 +876,19 @@ export async function batchGetBookEntries(
     bookMap[String(book["isbn"])] = toBookMetadata(book);
   }
 
-  return (entryResult.Responses?.[TABLE_NAME] ?? []).map((item) => {
-    const entry = toShelfEntry(item as Record<string, unknown>);
-    return { ...entry, book: bookMap[entry.isbn] ?? null };
-  });
+  const entries = (entryResult.Responses?.[TABLE_NAME] ?? []).map((item) =>
+    toShelfEntry(item as Record<string, unknown>),
+  );
+  // Page-local edition counts (BOOKSHELF-93) — see the same caveat on the
+  // unfiltered branch of queryBookEntries: grouped only within this batch, not the
+  // whole shelf.
+  const editionCounts = editionCountsFor(entries, bookMap);
+
+  return entries.map((entry) => ({
+    ...entry,
+    book: bookMap[entry.isbn] ?? null,
+    editionCount: editionCounts[entry.isbn] ?? 1,
+  }));
 }
 
 export async function queryShelfMemberIsns(userId: string, shelfId: string): Promise<string[]> {

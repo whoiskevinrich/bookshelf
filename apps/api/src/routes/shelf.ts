@@ -314,6 +314,9 @@ shelfRouter.post("/", async (c) => {
       notes: null,
       copies: 1,
       format,
+      // Self + whatever this add auto-joined (BOOKSHELF-93) — same count the list/
+      // detail views would compute, without a second grouping query.
+      editionCount: (groupedWith?.length ?? 0) + 1,
       status: derivedStatus(owned),
       groupedWith,
     },

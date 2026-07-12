@@ -291,6 +291,7 @@ describe("POST /v1/shelf", () => {
     expect(body.owned).toBe(true);
     expect(body.readingStatus).toBe("reading");
     expect(body.copies).toBe(1);
+    expect((body as unknown as { editionCount: number }).editionCount).toBe(1);
   });
 
   it("returns groupedWith listing existing editions the add auto-joined", async () => {
@@ -303,9 +304,14 @@ describe("POST /v1/shelf", () => {
       body: JSON.stringify({ isbn: "9780441013593", owned: true }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { format: null; groupedWith: string[] };
+    const body = (await res.json()) as {
+      format: null;
+      groupedWith: string[];
+      editionCount: number;
+    };
     expect(body.format).toBeNull();
     expect(body.groupedWith).toEqual(["9780593099322"]);
+    expect(body.editionCount).toBe(2);
   });
 
   it("still succeeds (201) when the groupedWith computation fails", async () => {
