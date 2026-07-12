@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.5.1...v0.6.0) (2026-07-12)
+
+
+### Features
+
+* Manage Library bulk-select mode (BOOKSHELF-59) ([#122](https://github.com/whoiskevinrich/bookshelf/issues/122)) ([9285117](https://github.com/whoiskevinrich/bookshelf/commit/928511742da4dd6553e2735fd251f7ae33bc8f41))
+
+
+### Bug Fixes
+
+* **books:** retry transient Google Books errors (BOOKSHELF-95) ([#124](https://github.com/whoiskevinrich/bookshelf/issues/124)) ([c10b8d7](https://github.com/whoiskevinrich/bookshelf/commit/c10b8d707d93a4ac5a087231a569e2428093097b))
+
 ## [0.5.1](https://github.com/whoiskevinrich/bookshelf/compare/v0.5.0...v0.5.1) (2026-07-12)
 
 
