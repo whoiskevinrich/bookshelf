@@ -6,6 +6,7 @@ import {
   useShelf,
   useFilteredShelf,
   useAddToShelf,
+  useKeepEditionSeparate,
   useAddAnotherCopy,
   useMoveShelfEntry,
   useRemoveFromShelf,
@@ -55,6 +56,7 @@ import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { entryMatchesQuery } from "../lib/search";
 import { BookSearch } from "../components/BookSearch";
 import { Button } from "../components/ui/Button";
+import { Callout } from "../components/ui/Callout";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ScanModal } from "../components/scanner/ScanModal";
 import { supportsCameraScan } from "../lib/device";
@@ -351,6 +353,7 @@ export function ShelfPage() {
   const shelfQuery = useShelf();
   const shelvesQuery = useShelves();
   const addMutation = useAddToShelf();
+  const keepSeparateMutation = useKeepEditionSeparate();
   const addAnotherCopyMutation = useAddAnotherCopy();
   const moveMutation = useMoveShelfEntry();
   const removeMutation = useRemoveFromShelf();
@@ -377,6 +380,13 @@ export function ShelfPage() {
   // Duplicate-add "add another copy" prompt (BOOKSHELF-60) — set only once the
   // duplicate is confirmed to be an owned book (see handleAdd).
   const [copyPrompt, setCopyPrompt] = useState<{ isbn: string; title: string } | null>(null);
+  // Add-time edition-grouping notice (BOOKSHELF-91): set when an add auto-joins an
+  // existing edition, cleared on dismiss or "Keep separate".
+  const [groupPrompt, setGroupPrompt] = useState<{
+    isbn: string;
+    title: string;
+    count: number;
+  } | null>(null);
 
   // Free-text search over the loaded library (BOOKSHELF-52). Client-side and
   // debounced so filtering the whole library stays off the typing hot path; it
@@ -588,9 +598,17 @@ export function ShelfPage() {
 
   function handleAdd(isbn: string, status: ShelfStatus, book: BookSearchResult) {
     setShowSearch(false);
+    setGroupPrompt(null);
     addMutation.mutate(
       { isbn, status, book },
       {
+        onSuccess: (result) => {
+          // Auto-joined an existing edition (BOOKSHELF-91): surface a visible,
+          // reversible notice. The group metric is fired centrally in useAddToShelf.
+          if (result.groupedWith.length > 0) {
+            setGroupPrompt({ isbn, title: book.title, count: result.groupedWith.length + 1 });
+          }
+        },
         onError: (err) => {
           // Duplicate add (BOOKSHELF-60): a 409 means the book is already on the
           // shelf. Offer "add another copy" only when it's actually *owned* — copies
@@ -749,6 +767,35 @@ export function ShelfPage() {
               ? "That book is already on your shelf."
               : `Couldn't add book — ${addMutation.error.message}`}
           </p>
+        )}
+
+        {/* Add-time edition-grouping notice (BOOKSHELF-91) — visible + reversible. */}
+        {groupPrompt && (
+          <div className="mb-4">
+            <Callout
+              title={`Grouped as one of ${groupPrompt.count} editions`}
+              onDismiss={() => setGroupPrompt(null)}
+              dismissLabel="Dismiss grouping notice"
+              actions={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={keepSeparateMutation.isPending}
+                  onClick={() =>
+                    keepSeparateMutation.mutate(groupPrompt.isbn, {
+                      onSuccess: () => setGroupPrompt(null),
+                    })
+                  }
+                >
+                  Keep separate
+                </Button>
+              }
+            >
+              <span className="font-medium">{groupPrompt.title}</span> was grouped with your other
+              edition{groupPrompt.count > 2 ? "s" : ""} of this work. You can switch between
+              editions from the book&apos;s page.
+            </Callout>
+          </div>
         )}
 
         <ConfirmDialog

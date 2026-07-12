@@ -90,6 +90,8 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     item: AddedItem;
     key: number;
     kind: "added" | "duplicate";
+    /** Add auto-joined an existing edition (BOOKSHELF-91) — shown in the pill. */
+    grouped?: boolean;
   } | null>(null);
 
   // OCR text-scan state
@@ -152,9 +154,9 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     setAdded((prev) => [item, ...prev]);
   }
 
-  function showFlash(item: AddedItem, kind: "added" | "duplicate") {
+  function showFlash(item: AddedItem, kind: "added" | "duplicate", grouped = false) {
     flashKey.current += 1;
-    setFlash({ item, key: flashKey.current, kind });
+    setFlash({ item, key: flashKey.current, kind, grouped });
     if (kind === "added" && typeof navigator.vibrate === "function") navigator.vibrate(40);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setFlash(null), FLASH_MS);
@@ -190,7 +192,8 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await addMutation.mutateAsync({ isbn, status, ...(book ? { book } : {}) });
+      const addResult = await addMutation.mutateAsync({ isbn, status, ...(book ? { book } : {}) });
+      const grouped = addResult.groupedWith.length > 0;
       // Shelf membership is additive to status, not an alternative — applies
       // regardless of which status button triggered the add (BOOKSHELF-85). Its
       // own try/catch keeps a shelf-link failure from being misreported as a
@@ -210,7 +213,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
         setView("added");
         if (typeof navigator.vibrate === "function") navigator.vibrate(40);
       } else {
-        showFlash(item, "added");
+        showFlash(item, "added", grouped);
         resumeScanning();
       }
     } catch (err) {
@@ -476,7 +479,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
                 {flash.kind === "added" ? <CheckIcon /> : <InfoIcon />}
                 <span className="truncate">
                   {flash.kind === "added"
-                    ? `Added "${flash.item.title}"`
+                    ? `Added "${flash.item.title}"${flash.grouped ? " · grouped with an edition" : ""}`
                     : `Already on your shelf — "${flash.item.title}"`}
                 </span>
                 {flash.kind === "added" && (

@@ -92,7 +92,9 @@ beforeEach(() => {
     notes: null,
     copies: 1,
     status: "want",
+    format: null,
     book: null,
+    editions: [],
   });
 });
 
@@ -100,7 +102,7 @@ describe("ScanModal — manual entry via Enter", () => {
   it("looks up on Enter, unmounts the manual panel, and focuses the confirm action", async () => {
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(BOOK);
-    mockAdd.mockResolvedValue({} as never);
+    mockAdd.mockResolvedValue({ groupedWith: [] } as never);
     renderModal();
 
     expect(screen.getByText("Camera unavailable")).toBeInTheDocument();
@@ -124,7 +126,7 @@ describe("ScanModal — manual entry via Enter", () => {
     window.localStorage.setItem("scanner:destination", "want");
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(BOOK);
-    mockAdd.mockResolvedValue({} as never);
+    mockAdd.mockResolvedValue({ groupedWith: [] } as never);
     renderModal();
 
     await lookUpViaEnter(user);
@@ -193,7 +195,9 @@ describe("ScanModal — add another copy (BOOKSHELF-60)", () => {
       notes: null,
       copies: 2,
       status: "owned",
+      format: null,
       book: null,
+      editions: [],
     });
     mockUpdateAttrs.mockResolvedValue({} as never);
     renderModal();
@@ -238,7 +242,9 @@ describe("ScanModal — add another copy (BOOKSHELF-60)", () => {
       notes: null,
       copies: 1,
       status: "want",
+      format: null,
       book: null,
+      editions: [],
     });
     renderModal();
 
@@ -260,7 +266,7 @@ describe("ScanModal — remembered shelf (BOOKSHELF-85)", () => {
     mockAddBookToShelf.mockResolvedValue(undefined);
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(BOOK);
-    mockAdd.mockResolvedValue({} as never);
+    mockAdd.mockResolvedValue({ groupedWith: [] } as never);
     renderModal();
 
     await lookUpViaEnter(user);
@@ -276,7 +282,7 @@ describe("ScanModal — remembered shelf (BOOKSHELF-85)", () => {
     mockFetchShelves.mockResolvedValue([SCI_FI_SHELF]);
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(BOOK);
-    mockAdd.mockResolvedValue({} as never);
+    mockAdd.mockResolvedValue({ groupedWith: [] } as never);
     renderModal();
 
     await lookUpViaEnter(user);
@@ -290,7 +296,7 @@ describe("ScanModal — remembered shelf (BOOKSHELF-85)", () => {
     mockFetchShelves.mockResolvedValue([SCI_FI_SHELF]);
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(BOOK);
-    mockAdd.mockResolvedValue({} as never);
+    mockAdd.mockResolvedValue({ groupedWith: [] } as never);
     renderModal();
 
     await lookUpViaEnter(user);
@@ -306,7 +312,7 @@ describe("ScanModal — remembered shelf (BOOKSHELF-85)", () => {
     mockAddBookToShelf.mockRejectedValue(new Error("network down"));
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(BOOK);
-    mockAdd.mockResolvedValue({} as never);
+    mockAdd.mockResolvedValue({ groupedWith: [] } as never);
     renderModal();
 
     await lookUpViaEnter(user);

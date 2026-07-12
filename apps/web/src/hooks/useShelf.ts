@@ -19,6 +19,7 @@ import {
   type ShelfPage,
   type ShelfStatus,
 } from "../lib/api-client";
+import { track } from "../lib/analytics";
 
 function shelfKey(status?: ShelfStatus) {
   return status ? (["shelf", { status }] as const) : (["shelf"] as const);
@@ -64,7 +65,33 @@ export function useAddToShelf() {
       status: ShelfStatus;
       book?: BookMetadata;
     }) => addToShelf(isbn, status, book),
-    onSuccess: () => qc.invalidateQueries({ queryKey: shelfKey() }),
+    onSuccess: (result) => {
+      // Edition grouping (BOOKSHELF-91): fire the group metric here so it's counted
+      // regardless of add surface (search or scanner). Surfaces render their own
+      // "grouped with …" notice from the returned `groupedWith`.
+      if (result.groupedWith.length > 0) {
+        track("edition_grouped", { editions: result.groupedWith.length + 1 });
+      }
+      return qc.invalidateQueries({ queryKey: shelfKey() });
+    },
+  });
+}
+
+/**
+ * "Keep separate" from the add-time grouping notice (BOOKSHELF-91): detach a
+ * just-added edition from the work it auto-joined. Not bound to a single isbn (the
+ * add surface knows the isbn only at notice time), unlike the Book Details grouping
+ * hook.
+ */
+export function useKeepEditionSeparate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (isbn: string) => updateShelfAttributes(isbn, { grouped: false }),
+    onSuccess: (_result, isbn) => {
+      track("edition_ungrouped");
+      void qc.invalidateQueries({ queryKey: shelfKey() });
+      void qc.invalidateQueries({ queryKey: ["book", isbn] });
+    },
   });
 }
 

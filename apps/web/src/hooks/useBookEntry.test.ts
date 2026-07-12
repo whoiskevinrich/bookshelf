@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { createQueryWrapper, makeEntry } from "../test/utils";
+import { createQueryWrapper, makeEntry, makeEntryDetail } from "../test/utils";
 import type { ShelfEntry } from "../lib/api-client";
 
 vi.mock("../lib/api-client", async (importOriginal) => {
@@ -48,7 +48,7 @@ beforeEach(() => {
 
 describe("useBookEntry", () => {
   it("fetches the entry by isbn", async () => {
-    mockFetchEntry.mockResolvedValue(makeEntry({ isbn: ISBN }));
+    mockFetchEntry.mockResolvedValue(makeEntryDetail({ isbn: ISBN }));
     const { Wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useBookEntry(ISBN), { wrapper: Wrapper });
 
