@@ -60,11 +60,6 @@ export interface WebStackProps extends cdk.StackProps {
     /** "/api" (same-origin) or the absolute execute-api URL (dev). */
     apiBaseUrl: string;
     /**
-     * Mobile camera ISBN scanner feature flag, written to `config.json` as
-     * `features.scanner`. Omitted → false, so the feature ships dark by default.
-     */
-    featureScanner?: boolean;
-    /**
      * OCR text-scan feature flag, written to `config.json` as `features.ocrScan`.
      * Omitted → false. Ships dark; enable alongside the server-side `ocrScanEnabled`.
      */
@@ -239,7 +234,6 @@ export class WebStack extends cdk.Stack {
           },
           apiBaseUrl: props.runtimeConfig.apiBaseUrl,
           features: {
-            scanner: props.runtimeConfig.featureScanner ?? false,
             ocrScan: props.runtimeConfig.featureOcrScan ?? false,
           },
         }),

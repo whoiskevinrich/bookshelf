@@ -121,7 +121,7 @@ describe("MCP protocol conformance (stateless Streamable HTTP)", () => {
     expect(body.error).toBeUndefined();
     expect(body.result?.["isError"]).toBeFalsy();
     expect(firstText(body.result)).toContain("9780441013593");
-    expect(apiFetch).toHaveBeenCalledWith("http://api.test/v1/shelf?status=owned", "good.token");
+    expect(apiFetch).toHaveBeenCalledWith("http://api.test/v1/shelf?owned=true", "good.token");
   });
 
   it("invokes a write tool (add_book) and surfaces the 409 duplicate message", async () => {

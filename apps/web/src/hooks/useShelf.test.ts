@@ -66,7 +66,7 @@ describe("flattenShelf", () => {
 });
 
 describe("useShelf", () => {
-  it("requests the first page with limit 40 and no status filter", async () => {
+  it("requests the first page with limit 40", async () => {
     mockFetchShelf.mockResolvedValue(makeShelfPage([makeEntry()]));
     const { Wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useShelf(), { wrapper: Wrapper });
@@ -74,20 +74,11 @@ describe("useShelf", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockFetchShelf).toHaveBeenCalledWith({ limit: 40 });
   });
-
-  it("forwards the status filter when provided", async () => {
-    mockFetchShelf.mockResolvedValue(makeShelfPage([]));
-    const { Wrapper } = createQueryWrapper();
-    const { result } = renderHook(() => useShelf({ status: "want" }), { wrapper: Wrapper });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockFetchShelf).toHaveBeenCalledWith({ limit: 40, status: "want" });
-  });
 });
 
 describe("useMoveShelfEntry — optimistic owned/want sync", () => {
   it("flips the cached entry to owned and clears want before the request resolves", async () => {
-    const entry = makeEntry({ isbn: "9780441013593", owned: false, want: true, status: "want" });
+    const entry = makeEntry({ isbn: "9780441013593", owned: false, want: true });
     const { Wrapper, client } = createQueryWrapper();
     seedShelf(client, makeShelfPage([entry]));
 
@@ -115,7 +106,7 @@ describe("useMoveShelfEntry — optimistic owned/want sync", () => {
   });
 
   it("rolls the cache back to the previous state when the request fails", async () => {
-    const entry = makeEntry({ isbn: "9780441013593", owned: false, want: true, status: "want" });
+    const entry = makeEntry({ isbn: "9780441013593", owned: false, want: true });
     const { Wrapper, client } = createQueryWrapper();
     seedShelf(client, makeShelfPage([entry]));
 

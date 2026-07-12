@@ -21,17 +21,16 @@ import {
 } from "../lib/api-client";
 import { track } from "../lib/analytics";
 
-function shelfKey(status?: ShelfStatus) {
-  return status ? (["shelf", { status }] as const) : (["shelf"] as const);
+function shelfKey() {
+  return ["shelf"] as const;
 }
 
-export function useShelf(opts?: { status?: ShelfStatus }) {
-  const key = shelfKey(opts?.status);
+export function useShelf() {
+  const key = shelfKey();
   return useInfiniteQuery<ShelfPage, Error, InfiniteData<ShelfPage>, typeof key, string | null>({
     queryKey: key,
     queryFn: ({ pageParam }) => {
-      const params: { status?: ShelfStatus; cursor?: string; limit: number } = { limit: 40 };
-      if (opts?.status) params.status = opts.status;
+      const params: { cursor?: string; limit: number } = { limit: 40 };
       if (pageParam) params.cursor = pageParam;
       return fetchShelf(params);
     },
@@ -133,9 +132,7 @@ export function useMoveShelfEntry() {
             // Keep the derived booleans in sync so the card's state pills update
             // optimistically too (status auto-clears want on owned — ADR-019 Q1).
             entries: page.entries.map((e) =>
-              e.isbn === isbn
-                ? { ...e, status, owned: status === "owned", want: status === "want" }
-                : e,
+              e.isbn === isbn ? { ...e, owned: status === "owned", want: status === "want" } : e,
             ),
           })),
         };

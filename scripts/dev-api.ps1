@@ -9,4 +9,14 @@ if (Test-Path $PROFILE) { . $PROFILE }
 
 assume dev/AWSPowerUserAccess
 
+# `assume`'s failure is non-terminating in PowerShell, so a stale/expired SSO
+# session doesn't stop the script here — it would otherwise fall through to
+# `pnpm dev` and serve a credential-less API where every DynamoDB call 500s.
+# Verify the credentials actually resolve before starting the server.
+aws sts get-caller-identity | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "AWS credentials are missing or expired. Run 'assume dev/AWSPowerUserAccess' and try again."
+    exit 1
+}
+
 pnpm --filter @bookshelf/api run dev

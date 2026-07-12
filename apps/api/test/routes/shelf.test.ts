@@ -23,9 +23,7 @@ vi.mock("../../src/lib/dynamo.js", async (importOriginal) => {
     updateBookEntryNotes: vi.fn(),
     updateBookEntryTags: vi.fn(),
     putBookMetadata: vi.fn(),
-    isValidStatus: mod.isValidStatus,
     isValidReadingStatus: mod.isValidReadingStatus,
-    derivedStatus: mod.derivedStatus,
     normalizeTag: mod.normalizeTag,
     InvalidCursorError: mod.InvalidCursorError,
   };
@@ -72,14 +70,12 @@ const ENTRY: ShelfEntry = {
   copies: 1,
   format: null,
   workKey: null,
-  status: "owned",
 };
 
 const WANT_ENTRY: ShelfEntry = {
   ...ENTRY,
   owned: false,
   want: true,
-  status: "want",
 };
 
 const SHELF_RESULT = {
@@ -114,16 +110,6 @@ describe("GET /v1/shelf", () => {
     expect(body.total).toBe(1);
   });
 
-  it("maps deprecated ?status=owned onto the owned filter", async () => {
-    vi.mocked(queryBookEntries).mockResolvedValueOnce(SHELF_RESULT);
-    const app = makeApp();
-    const res = await app.request("/v1/shelf?status=owned");
-    expect(res.status).toBe(200);
-    expect(vi.mocked(queryBookEntries)).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: expect.objectContaining({ owned: true }) }),
-    );
-  });
-
   it("accepts owned/want/readingStatus filters", async () => {
     vi.mocked(queryBookEntries).mockResolvedValueOnce(SHELF_RESULT);
     const app = makeApp();
@@ -134,12 +120,6 @@ describe("GET /v1/shelf", () => {
         filter: expect.objectContaining({ owned: true, readingStatus: "reading" }),
       }),
     );
-  });
-
-  it("returns 400 for invalid status filter", async () => {
-    const app = makeApp();
-    const res = await app.request("/v1/shelf?status=reading");
-    expect(res.status).toBe(400);
   });
 
   it("returns 400 for a non-boolean owned filter", async () => {
@@ -257,28 +237,6 @@ describe("GET /v1/shelf/:isbn", () => {
 });
 
 describe("POST /v1/shelf", () => {
-  it("adds a book via the deprecated status field", async () => {
-    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
-    const app = makeApp();
-    const res = await app.request("/v1/shelf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isbn: "9780441013593", status: "owned" }),
-    });
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as ShelfEntry;
-    expect(body.isbn).toBe("9780441013593");
-    expect(body.owned).toBe(true);
-    expect(body.want).toBe(false);
-    expect(body.status).toBe("owned");
-    expect(vi.mocked(putBookEntry)).toHaveBeenCalledWith(
-      "test-user-sub",
-      "9780441013593",
-      expect.objectContaining({ owned: true, want: false }),
-      expect.any(String),
-    );
-  });
-
   it("adds a book via owned boolean", async () => {
     vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
     const app = makeApp();
@@ -515,12 +473,12 @@ describe("POST /v1/shelf", () => {
     expect(res.status).toBe(409);
   });
 
-  it("returns 400 for invalid status", async () => {
+  it("returns 400 when neither owned nor want is set", async () => {
     const app = makeApp();
     const res = await app.request("/v1/shelf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isbn: "9780441013593", status: "reading" }),
+      body: JSON.stringify({ isbn: "9780441013593" }),
     });
     expect(res.status).toBe(400);
   });
@@ -562,7 +520,6 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
     const body = (await res.json()) as ShelfEntry;
     expect(body.notes).toBe("A great book.");
     expect(body.owned).toBe(true);
-    expect(body.status).toBe("owned");
   });
 
   it("returns 400 for invalid ISBN in path", async () => {
@@ -587,22 +544,6 @@ describe("PATCH /v1/shelf/:isbn/notes", () => {
 });
 
 describe("PATCH /v1/shelf/:isbn", () => {
-  it("updates status from owned to want (deprecated field)", async () => {
-    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
-    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
-    const app = makeApp();
-    const res = await app.request("/v1/shelf/9780441013593", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "want" }),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as ShelfEntry;
-    expect(body.owned).toBe(false);
-    expect(body.want).toBe(true);
-    expect(body.status).toBe("want");
-  });
-
   it("auto-clears want when a wishlist book is marked owned (Q1)", async () => {
     vi.mocked(getBookEntry).mockResolvedValueOnce(WANT_ENTRY);
     vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);

@@ -22,7 +22,7 @@ export function registerShelfTools(server: McpServer, idToken: string, apiBase: 
     },
     async ({ status, limit, cursor }) => {
       const params = new URLSearchParams();
-      if (status !== undefined) params.set("status", status);
+      if (status !== undefined) params.set(status, "true");
       if (limit !== undefined) params.set("limit", String(limit));
       if (cursor !== undefined) params.set("cursor", cursor);
       const qs = params.size > 0 ? `?${params.toString()}` : "";
@@ -46,7 +46,7 @@ export function registerShelfTools(server: McpServer, idToken: string, apiBase: 
         data,
       } = await apiFetch(`${apiBase}/v1/shelf`, idToken, {
         method: "POST",
-        body: { isbn, status },
+        body: { isbn, owned: status === "owned", want: status === "want" },
       });
       if (httpStatus === 409) {
         return {
@@ -73,7 +73,7 @@ export function registerShelfTools(server: McpServer, idToken: string, apiBase: 
         data,
       } = await apiFetch(url, idToken, {
         method: "PATCH",
-        body: { status },
+        body: { owned: status === "owned", want: status === "want" },
       });
       if (!ok) return errResult(httpStatus, data);
       return okResult(data);

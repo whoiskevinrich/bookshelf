@@ -62,7 +62,6 @@ import { Callout } from "../components/ui/Callout";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ScanModal } from "../components/scanner/ScanModal";
 import { supportsCameraScan } from "../lib/device";
-import { getRuntimeConfig } from "../lib/runtime-config";
 import { isConflictError, fetchShelfEntry } from "../lib/api-client";
 import type { ShelfEntry, ShelfStatus, BookSearchResult, Shelf } from "../lib/api-client";
 
@@ -358,9 +357,8 @@ export function ShelfPage() {
   const [showScanner, setShowScanner] = useState(false);
   const searchPanelRef = useRef<HTMLDivElement>(null);
 
-  // Show the Scan button only where it makes sense: the feature is enabled for
-  // this environment AND the device has a touch screen + camera.
-  const canScan = useMemo(() => getRuntimeConfig().features.scanner && supportsCameraScan(), []);
+  // Show the Scan button only where it makes sense: the device has a touch screen + camera.
+  const canScan = useMemo(() => supportsCameraScan(), []);
 
   const shelfQuery = useShelf();
   const shelvesQuery = useShelves();

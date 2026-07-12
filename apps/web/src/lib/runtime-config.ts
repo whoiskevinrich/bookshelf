@@ -26,8 +26,6 @@ export interface RuntimeConfig {
    * "dark" in one environment while another keeps it hidden, no rebuild required.
    */
   features: {
-    /** Mobile camera ISBN barcode scanner (per-env; see `bin/bookshelf.ts`). */
-    scanner: boolean;
     /** OCR text-scan mode for printed ISBNs (ships dark; see `bin/bookshelf.ts`). */
     ocrScan: boolean;
   };
@@ -57,7 +55,6 @@ function fromEnv(): RuntimeConfig {
     },
     apiBaseUrl: (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "",
     features: {
-      scanner: import.meta.env.VITE_FEATURE_SCANNER === "true",
       ocrScan: import.meta.env.VITE_FEATURE_OCR_SCAN === "true",
     },
   };
@@ -79,7 +76,6 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         cached = {
           ...data,
           features: {
-            scanner: data.features?.scanner ?? false,
             ocrScan: data.features?.ocrScan ?? false,
           },
         };

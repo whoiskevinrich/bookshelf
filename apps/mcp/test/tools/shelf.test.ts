@@ -51,7 +51,7 @@ describe("registerShelfTools", () => {
       mockApi({ ok: true, status: 200, data: { items: [] } });
       await call("list_shelf", { status: "owned", limit: 50, cursor: "abc" });
       const [url] = vi.mocked(apiFetch).mock.calls[0] as [string];
-      expect(url).toBe(`${API}/v1/shelf?status=owned&limit=50&cursor=abc`);
+      expect(url).toBe(`${API}/v1/shelf?owned=true&limit=50&cursor=abc`);
     });
 
     it("surfaces an API error as an isError result", async () => {
@@ -68,7 +68,7 @@ describe("registerShelfTools", () => {
       await call("add_book", { isbn: "9780441013593", status: "owned" });
       expect(apiFetch).toHaveBeenCalledWith(`${API}/v1/shelf`, TOKEN, {
         method: "POST",
-        body: { isbn: "9780441013593", status: "owned" },
+        body: { isbn: "9780441013593", owned: true, want: false },
       });
     });
 
@@ -92,7 +92,7 @@ describe("registerShelfTools", () => {
       await call("update_book_status", { isbn: "978-0-441-01359-3", status: "owned" });
       expect(apiFetch).toHaveBeenCalledWith(`${API}/v1/shelf/9780441013593`, TOKEN, {
         method: "PATCH",
-        body: { status: "owned" },
+        body: { owned: true, want: false },
       });
     });
   });
