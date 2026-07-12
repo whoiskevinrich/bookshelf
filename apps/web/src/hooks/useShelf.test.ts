@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { InfiniteData } from "@tanstack/react-query";
-import { createQueryWrapper, makeEntry, makeShelfPage } from "../test/utils";
+import { createQueryWrapper, makeEntry, makeEntryDetail, makeShelfPage } from "../test/utils";
 import type { ShelfPage } from "../lib/api-client";
 
 // Mock the api-client module the hooks call into.
@@ -135,7 +135,7 @@ describe("useMoveShelfEntry — optimistic owned/want sync", () => {
 
 describe("useAddAnotherCopy (BOOKSHELF-60)", () => {
   it("reads the current count and PATCHes the incremented absolute value", async () => {
-    mockFetchEntry.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 2 }));
+    mockFetchEntry.mockResolvedValue(makeEntryDetail({ isbn: "1", owned: true, copies: 2 }));
     mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 3 }));
     const { Wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useAddAnotherCopy(), { wrapper: Wrapper });
@@ -148,7 +148,7 @@ describe("useAddAnotherCopy (BOOKSHELF-60)", () => {
   });
 
   it("clamps at the 99 ceiling so a maxed-out book is a no-op, not a 400", async () => {
-    mockFetchEntry.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 99 }));
+    mockFetchEntry.mockResolvedValue(makeEntryDetail({ isbn: "1", owned: true, copies: 99 }));
     mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: "1", owned: true, copies: 99 }));
     const { Wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useAddAnotherCopy(), { wrapper: Wrapper });

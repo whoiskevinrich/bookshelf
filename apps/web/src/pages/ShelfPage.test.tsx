@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { renderWithProviders, makeEntry, makeShelfPage } from "../test/utils";
+import { renderWithProviders, makeEntry, makeEntryDetail, makeShelfPage } from "../test/utils";
 import type { BookSearchResult, Shelf, TagCount } from "../lib/api-client";
 
 // AppHeader pulls in the auth context / Amplify; stub it for page tests.
@@ -95,7 +95,7 @@ describe("ShelfPage — duplicate add offers 'add another copy' (BOOKSHELF-60)",
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(bookResult(OWNED_ISBN, "Dune"));
     mockAdd.mockRejectedValue(new ApiError(409, "Book already exists on your shelf"));
-    mockFetchEntry.mockResolvedValue(makeEntry({ isbn: OWNED_ISBN, owned: true, copies: 1 }));
+    mockFetchEntry.mockResolvedValue(makeEntryDetail({ isbn: OWNED_ISBN, owned: true, copies: 1 }));
     mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: OWNED_ISBN, owned: true, copies: 2 }));
 
     renderPage();
@@ -118,7 +118,7 @@ describe("ShelfPage — duplicate add offers 'add another copy' (BOOKSHELF-60)",
     // The 409 fires for a wishlisted book too — but copies is owned-only, so the
     // ownership lookup must gate the offer off.
     mockFetchEntry.mockResolvedValue(
-      makeEntry({ isbn: WISH_ISBN, owned: false, want: true, status: "want", copies: 1 }),
+      makeEntryDetail({ isbn: WISH_ISBN, owned: false, want: true, status: "want", copies: 1 }),
     );
 
     renderPage();
@@ -134,7 +134,7 @@ describe("ShelfPage — duplicate add offers 'add another copy' (BOOKSHELF-60)",
     const user = userEvent.setup();
     mockGetBook.mockResolvedValue(bookResult(OWNED_ISBN, "Dune"));
     mockAdd.mockRejectedValue(new ApiError(409, "Book already exists on your shelf"));
-    mockFetchEntry.mockResolvedValue(makeEntry({ isbn: OWNED_ISBN, owned: true, copies: 1 }));
+    mockFetchEntry.mockResolvedValue(makeEntryDetail({ isbn: OWNED_ISBN, owned: true, copies: 1 }));
     mockUpdateAttrs.mockRejectedValue(new Error("network"));
 
     renderPage();
@@ -149,5 +149,35 @@ describe("ShelfPage — duplicate add offers 'add another copy' (BOOKSHELF-60)",
         within(screen.getByRole("dialog")).getByText(/Couldn't add another copy/i),
       ).toBeInTheDocument(),
     );
+  });
+});
+
+describe("ShelfPage — add-time edition grouping (BOOKSHELF-91)", () => {
+  it("shows a grouped notice with Keep separate when an add auto-joins a work", async () => {
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(bookResult(OWNED_ISBN, "Dune"));
+    mockAdd.mockResolvedValue({ ...makeEntry({ isbn: OWNED_ISBN }), groupedWith: [WISH_ISBN] });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: OWNED_ISBN }));
+    renderPage();
+
+    await addOwnedViaSearch(user, OWNED_ISBN);
+
+    expect(await screen.findByText(/Grouped as one of 2 editions/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep separate" }));
+    await waitFor(() =>
+      expect(mockUpdateAttrs).toHaveBeenCalledWith(OWNED_ISBN, { grouped: false }),
+    );
+  });
+
+  it("shows no grouped notice for a solo add", async () => {
+    const user = userEvent.setup();
+    mockGetBook.mockResolvedValue(bookResult(OWNED_ISBN, "Dune"));
+    mockAdd.mockResolvedValue({ ...makeEntry({ isbn: OWNED_ISBN }), groupedWith: [] });
+    renderPage();
+
+    await addOwnedViaSearch(user, OWNED_ISBN);
+
+    await waitFor(() => expect(mockAdd).toHaveBeenCalled());
+    expect(screen.queryByText(/Grouped as one of/)).not.toBeInTheDocument();
   });
 });

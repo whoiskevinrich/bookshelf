@@ -177,6 +177,22 @@ function CopiesIcon() {
   );
 }
 
+/** Three shelved spines — distinct from {@link CopiesIcon}'s overlapping squares. */
+function EditionsIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-2.5 h-2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path d="M3 3v10M8 2v11M13 4v9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function TagIcon() {
   return (
     <svg
@@ -364,7 +380,7 @@ export function ShelfBookCard({
   error,
   staggerIndex,
 }: ShelfBookCardProps) {
-  const { isbn, owned, want, readingStatus, tags, copies, book } = entry;
+  const { isbn, owned, want, readingStatus, tags, copies, editionCount, book } = entry;
   const title = book?.title ?? isbn;
   const authors = book?.authors ?? [];
 
@@ -485,6 +501,17 @@ export function ShelfBookCard({
           {owned && copies > 1 && (
             <div className="absolute top-1.5 right-1.5">
               <StatePill icon={<CopiesIcon />} label={`×${copies}`} />
+            </div>
+          )}
+          {/* "N editions" affordance (BOOKSHELF-93) — only when this work has more than
+              one edition on the shelf; zero visual change for the common single-edition
+              case. Not a shelf collapse: this card still represents just this ISBN, the
+              badge links into the work via the card's existing navigate-to-detail click
+              (Book Details shows the full edition switcher). Bottom-right avoids the
+              copies badge's top-right corner when both apply. */}
+          {editionCount > 1 && (
+            <div className="absolute bottom-1.5 right-1.5">
+              <StatePill icon={<EditionsIcon />} label={`${editionCount} editions`} />
             </div>
           )}
         </div>

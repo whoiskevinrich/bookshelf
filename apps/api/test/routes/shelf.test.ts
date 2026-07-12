@@ -15,7 +15,8 @@ vi.mock("../../src/lib/dynamo.js", async (importOriginal) => {
   return {
     queryBookEntries: vi.fn(),
     getBookEntry: vi.fn(),
-    batchGetBookEntries: vi.fn(),
+    queryEditionsForIsbn: vi.fn(),
+    queryGroupedWith: vi.fn(),
     putBookEntry: vi.fn(),
     deleteBookEntry: vi.fn(),
     updateBookEntryAttributes: vi.fn(),
@@ -40,7 +41,8 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import {
   queryBookEntries,
   getBookEntry,
-  batchGetBookEntries,
+  queryEditionsForIsbn,
+  queryGroupedWith,
   putBookEntry,
   deleteBookEntry,
   updateBookEntryAttributes,
@@ -50,6 +52,7 @@ import {
   InvalidCursorError,
   type ShelfEntry,
 } from "../../src/lib/dynamo.js";
+import { getBookByIsbn } from "../../src/lib/books/search.js";
 import { shelfRouter } from "../../src/routes/shelf.js";
 
 function makeApp() {
@@ -67,6 +70,8 @@ const ENTRY: ShelfEntry = {
   addedAt: "2026-05-14T10:00:00.000Z",
   notes: null,
   copies: 1,
+  format: null,
+  workKey: null,
   status: "owned",
 };
 
@@ -86,13 +91,16 @@ const SHELF_RESULT = {
 beforeEach(() => {
   vi.mocked(queryBookEntries).mockReset();
   vi.mocked(getBookEntry).mockReset();
-  vi.mocked(batchGetBookEntries).mockReset();
+  vi.mocked(queryEditionsForIsbn).mockReset();
+  vi.mocked(queryGroupedWith).mockReset();
+  vi.mocked(queryGroupedWith).mockResolvedValue([]);
   vi.mocked(putBookEntry).mockReset();
   vi.mocked(deleteBookEntry).mockReset();
   vi.mocked(updateBookEntryAttributes).mockReset();
   vi.mocked(updateBookEntryNotes).mockReset();
   vi.mocked(updateBookEntryTags).mockReset();
   vi.mocked(putBookMetadata).mockReset();
+  vi.mocked(getBookByIsbn).mockReset();
 });
 
 describe("GET /v1/shelf", () => {
@@ -181,18 +189,61 @@ describe("GET /v1/shelf", () => {
 });
 
 describe("GET /v1/shelf/:isbn", () => {
-  it("returns a single entry with book metadata", async () => {
-    vi.mocked(batchGetBookEntries).mockResolvedValueOnce([{ ...ENTRY, book: null }]);
+  it("returns a single entry with book metadata and its edition set", async () => {
+    vi.mocked(queryEditionsForIsbn).mockResolvedValueOnce({
+      entry: { ...ENTRY, book: null },
+      editions: [
+        {
+          isbn: "9780441013593",
+          format: null,
+          owned: true,
+          want: false,
+          readingStatus: null,
+          book: null,
+        },
+      ],
+    });
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as ShelfEntry;
+    const body = (await res.json()) as ShelfEntry & { editions: unknown[] };
     expect(body.isbn).toBe("9780441013593");
     expect(body.owned).toBe(true);
+    expect(body.editions).toHaveLength(1);
+  });
+
+  it("returns the multi-edition set for a grouped work", async () => {
+    vi.mocked(queryEditionsForIsbn).mockResolvedValueOnce({
+      entry: { ...ENTRY, book: null },
+      editions: [
+        {
+          isbn: "9780441013593",
+          format: "paperback",
+          owned: true,
+          want: false,
+          readingStatus: null,
+          book: null,
+        },
+        {
+          isbn: "9780593099322",
+          format: "audiobook",
+          owned: true,
+          want: false,
+          readingStatus: null,
+          book: null,
+        },
+      ],
+    });
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { editions: Array<{ isbn: string; format: string | null }> };
+    expect(body.editions).toHaveLength(2);
+    expect(body.editions.map((e) => e.format)).toEqual(["paperback", "audiobook"]);
   });
 
   it("returns 404 when the book is not on the shelf", async () => {
-    vi.mocked(batchGetBookEntries).mockResolvedValueOnce([]);
+    vi.mocked(queryEditionsForIsbn).mockResolvedValueOnce(null);
     const app = makeApp();
     const res = await app.request("/v1/shelf/9780441013593");
     expect(res.status).toBe(404);
@@ -241,6 +292,41 @@ describe("POST /v1/shelf", () => {
     expect(body.owned).toBe(true);
     expect(body.readingStatus).toBe("reading");
     expect(body.copies).toBe(1);
+    expect((body as unknown as { editionCount: number }).editionCount).toBe(1);
+  });
+
+  it("returns groupedWith listing existing editions the add auto-joined", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(queryGroupedWith).mockResolvedValueOnce(["9780593099322"]);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      format: null;
+      groupedWith: string[];
+      editionCount: number;
+    };
+    expect(body.format).toBeNull();
+    expect(body.groupedWith).toEqual(["9780593099322"]);
+    expect(body.editionCount).toBe(2);
+  });
+
+  it("still succeeds (201) when the groupedWith computation fails", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(queryGroupedWith).mockRejectedValueOnce(new Error("boom"));
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { groupedWith: string[] };
+    expect(body.groupedWith).toEqual([]);
   });
 
   it("returns 400 when neither owned, want, nor status is provided", async () => {
@@ -281,6 +367,103 @@ describe("POST /v1/shelf", () => {
       body: JSON.stringify({ isbn: "9780441013593", owned: true, readingStatus: "halfway" }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("auto-fills format from the provider's format hint on a fresh add", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookByIsbn).mockResolvedValueOnce({
+      isbn: "9780441013593",
+      title: "Dune",
+      authors: ["Frank Herbert"],
+      coverUrl: null,
+      publishedYear: 1965,
+      description: null,
+      formatHint: "ebook",
+    });
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBe("ebook");
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { format: "ebook" },
+    );
+  });
+
+  it("does not auto-fill format when the client supplies its own book metadata", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        isbn: "9780441013593",
+        owned: true,
+        book: { title: "Dune", authors: ["Frank Herbert"], coverUrl: null, publishedYear: 1965 },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBeNull();
+    expect(vi.mocked(getBookByIsbn)).not.toHaveBeenCalled();
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("leaves format null when the provider gives no format hint", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookByIsbn).mockResolvedValueOnce({
+      isbn: "9780441013593",
+      title: "Dune",
+      authors: ["Frank Herbert"],
+      coverUrl: null,
+      publishedYear: 1965,
+      description: null,
+      formatHint: null,
+    });
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBeNull();
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("still succeeds (201) with format null when the format auto-fill write fails", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    vi.mocked(updateBookEntryAttributes).mockRejectedValueOnce(new Error("boom"));
+    vi.mocked(getBookByIsbn).mockResolvedValueOnce({
+      isbn: "9780441013593",
+      title: "Dune",
+      authors: ["Frank Herbert"],
+      coverUrl: null,
+      publishedYear: 1965,
+      description: null,
+      formatHint: "audiobook",
+    });
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBeNull();
   });
 
   it("truncates description to 4000 chars before caching", async () => {
@@ -676,6 +859,119 @@ describe("PATCH /v1/shelf/:isbn — copies (BOOKSHELF-60)", () => {
       "test-user-sub",
       "9780441013593",
       expect.objectContaining({ copies: 1 }),
+    );
+  });
+});
+
+describe("PATCH /v1/shelf/:isbn — format & grouping (BOOKSHELF-90)", () => {
+  it("sets a valid format", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format: "audiobook" }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBe("audiobook");
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { format: "audiobook" },
+    );
+  });
+
+  it("clears the format when null is passed", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, format: "hardcover" });
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format: null }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBeNull();
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { format: null },
+    );
+  });
+
+  it("returns 400 for an invalid format value", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format: "kindle" }),
+    });
+    expect(res.status).toBe(400);
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("ungroups an edition — grouped:false writes the solo work key", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grouped: false }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { workKey: "solo:9780441013593" },
+    );
+  });
+
+  it("regroups an edition — grouped:true removes the override (workKey null)", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce({ ...ENTRY, workKey: "solo:9780441013593" });
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grouped: true }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { workKey: null },
+    );
+  });
+
+  it("returns 400 when grouped is not a boolean", async () => {
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grouped: "yes" }),
+    });
+    expect(res.status).toBe(400);
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("sets format and ungroups together in one patch", async () => {
+    vi.mocked(getBookEntry).mockResolvedValueOnce(ENTRY);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf/9780441013593", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format: "ebook", grouped: false }),
+    });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { format: "ebook", workKey: "solo:9780441013593" },
     );
   });
 });

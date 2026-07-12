@@ -3,16 +3,20 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { BookCover } from "../components/BookCover";
 import { Button } from "../components/ui/Button";
+import { Callout } from "../components/ui/Callout";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { inputClass, labelClass } from "../lib/form-styles";
+import { track } from "../lib/analytics";
 import {
   useBookEntry,
   useTags,
   useUpdateBookAttributes,
   useUpdateBookCopies,
+  useUpdateBookFormat,
+  useUpdateBookGrouping,
   useUpdateBookTags,
   useUpdateBookNotes,
 } from "../hooks/useBookEntry";
@@ -21,10 +25,20 @@ import { useShelves, useAddBookToShelf, useRemoveBookFromShelf } from "../hooks/
 import {
   ApiError,
   COPIES_MAX,
+  type EditionFormat,
+  type EditionSummary,
   type ReadingStatus,
   type Shelf,
   type ShelfEntry,
+  type ShelfEntryDetail,
 } from "../lib/api-client";
+
+const FORMAT_LABELS: Record<EditionFormat, string> = {
+  hardcover: "Hardcover",
+  paperback: "Paperback",
+  ebook: "Ebook",
+  audiobook: "Audiobook",
+};
 
 const NOTES_MAX_LENGTH = 2000;
 const TAGS_MAX_COUNT = 25;
@@ -118,6 +132,142 @@ function CopiesStepper({
         <PlusIcon />
       </button>
     </div>
+  );
+}
+
+// ── Format control (BOOKSHELF-91) ────────────────────────────────────────────
+
+/** Set/clear this edition's format label. "Unspecified" clears it (null). */
+function FormatControl({ isbn, format }: { isbn: string; format: EditionFormat | null }) {
+  const formatMutation = useUpdateBookFormat(isbn);
+  return (
+    <div className="space-y-2">
+      <label htmlFor="book-format" className={labelClass}>
+        Format
+      </label>
+      <select
+        id="book-format"
+        value={format ?? ""}
+        onChange={(e) => {
+          const next = e.target.value === "" ? null : (e.target.value as EditionFormat);
+          formatMutation.mutate(next);
+          if (next) track("edition_format_set", { format: next });
+        }}
+        className={`w-full text-sm ${inputClass}`}
+      >
+        <option value="">Unspecified</option>
+        {(Object.keys(FORMAT_LABELS) as EditionFormat[]).map((f) => (
+          <option key={f} value={f}>
+            {FORMAT_LABELS[f]}
+          </option>
+        ))}
+      </select>
+      {formatMutation.isError && (
+        <p className="text-xs text-red-500 dark:text-red-400">
+          Couldn&apos;t update format — {(formatMutation.error as Error).message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Editions panel (BOOKSHELF-91) ────────────────────────────────────────────
+
+/** A switcher segment's label: format (or "Unspecified") + year + a wishlist marker
+    (text/shape, never color alone — color-blind guideline). */
+function editionLabel(e: EditionSummary): string {
+  const base = e.format ? FORMAT_LABELS[e.format] : "Unspecified";
+  const year = e.book?.publishedYear ? ` · ${e.book.publishedYear}` : "";
+  const wishlist = e.want ? " · Wishlist" : "";
+  return `${base}${year}${wishlist}`;
+}
+
+/**
+ * Book Details editions surface: shown only when this book is part of a multi-edition
+ * work (or the user just ungrouped, to offer undo). A format-labeled switcher to jump
+ * between editions, plus an ungroup action with an inline undo. Grouping membership is
+ * server-derived, so both actions refetch to reconcile.
+ */
+function EditionsSection({ entry, isbn }: { entry: ShelfEntryDetail; isbn: string }) {
+  const navigate = useNavigate();
+  const groupingMutation = useUpdateBookGrouping(isbn);
+  const [undoOffer, setUndoOffer] = useState(false);
+
+  const editions = entry.editions;
+  const isGrouped = editions.length > 1;
+  if (!isGrouped && !undoOffer) return null;
+
+  const title = entry.book?.title ?? "this book";
+
+  return (
+    <section className="border-t border-paper-400 dark:border-slate-700 pt-6 mt-6 space-y-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+        Editions
+      </h2>
+
+      {undoOffer ? (
+        <Callout
+          title="Separated from the other editions"
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={groupingMutation.isPending}
+              onClick={() =>
+                groupingMutation.mutate(true, { onSuccess: () => setUndoOffer(false) })
+              }
+            >
+              Undo
+            </Button>
+          }
+        >
+          This edition now stands on its own.
+        </Callout>
+      ) : (
+        <>
+          <Callout title={`${editions.length} editions of this work`}>
+            You have {editions.length} editions of <span className="font-medium">{title}</span> —
+            switch between them below.
+          </Callout>
+
+          <div className="space-y-2">
+            <span className={labelClass}>Switch edition</span>
+            <div>
+              <SegmentedControl<string>
+                label="Switch edition"
+                value={isbn}
+                options={editions.map((e) => ({ value: e.isbn, label: editionLabel(e) }))}
+                onChange={(next) => {
+                  if (next !== isbn) {
+                    track("edition_switched");
+                    navigate(`/book/${next}`);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={groupingMutation.isPending}
+              onClick={() => {
+                track("edition_ungrouped");
+                groupingMutation.mutate(false, { onSuccess: () => setUndoOffer(true) });
+              }}
+            >
+              Ungroup this edition
+            </Button>
+            {groupingMutation.isError && (
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                Couldn&apos;t update grouping — please try again.
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -221,6 +371,9 @@ function YourCopyPanel({ entry, isbn }: { entry: ShelfEntry; isbn: string }) {
           />
         </div>
       </div>
+
+      {/* Format (BOOKSHELF-91) — the edition label; independent of owned/wishlist. */}
+      <FormatControl isbn={isbn} format={entry.format} />
 
       {/* Tags */}
       <div className="space-y-2">
@@ -525,6 +678,7 @@ export function BookDetailPage() {
               </div>
             </div>
 
+            <EditionsSection entry={entry} isbn={isbn} />
             <YourCopyPanel entry={entry} isbn={isbn} />
             <ShelvesPanel isbn={isbn} shelves={shelvesQuery.data ?? []} />
             <RemovePanel isbn={isbn} title={title} />

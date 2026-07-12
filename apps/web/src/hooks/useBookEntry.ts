@@ -5,8 +5,10 @@ import {
   updateShelfTags,
   updateShelfNotes,
   fetchTags,
+  type EditionFormat,
   type EntryAttributes,
   type ShelfEntry,
+  type ShelfEntryDetail,
   type TagCount,
 } from "../lib/api-client";
 
@@ -17,7 +19,7 @@ function bookKey(isbn: string) {
 const TAGS_KEY = ["tags"] as const;
 
 export function useBookEntry(isbn: string) {
-  return useQuery<ShelfEntry>({
+  return useQuery<ShelfEntryDetail>({
     queryKey: bookKey(isbn),
     queryFn: () => fetchShelfEntry(isbn),
     enabled: !!isbn,
@@ -81,6 +83,29 @@ export function useUpdateBookCopies(isbn: string) {
     isbn,
     (copies) => updateShelfAttributes(isbn, { copies }),
     (prev, copies) => ({ ...prev, copies }),
+  );
+}
+
+/** Set or clear this edition's format label (BOOKSHELF-91); null clears it. */
+export function useUpdateBookFormat(isbn: string) {
+  return useEntryMutation<EditionFormat | null>(
+    isbn,
+    (format) => updateShelfAttributes(isbn, { format }),
+    (prev, format) => ({ ...prev, format }),
+  );
+}
+
+/**
+ * Ungroup (`grouped:false`) / regroup (`grouped:true`) this edition (BOOKSHELF-91).
+ * Membership of the edition set is server-derived, so there's no meaningful
+ * optimistic patch to the current entry — `onSettled` refetches the detail (with
+ * its `editions`) to reconcile.
+ */
+export function useUpdateBookGrouping(isbn: string) {
+  return useEntryMutation<boolean>(
+    isbn,
+    (grouped) => updateShelfAttributes(isbn, { grouped }),
+    (prev) => prev,
   );
 }
 

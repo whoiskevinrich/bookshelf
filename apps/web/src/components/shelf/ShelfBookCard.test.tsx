@@ -70,6 +70,24 @@ describe("ShelfBookCard — copies badge (BOOKSHELF-60)", () => {
   });
 });
 
+describe("ShelfBookCard — editions affordance (BOOKSHELF-93)", () => {
+  it("shows an 'N editions' badge when editionCount > 1", () => {
+    renderCard({ editionCount: 2 });
+    expect(screen.getByText("2 editions")).toBeInTheDocument();
+  });
+
+  it("renders no badge for a solo edition", () => {
+    renderCard({ editionCount: 1 });
+    expect(screen.queryByText(/editions$/)).not.toBeInTheDocument();
+  });
+
+  it("shows both the copies and editions badges when both apply", () => {
+    renderCard({ owned: true, want: false, copies: 2, editionCount: 3 });
+    expect(screen.getByText("×2")).toBeInTheDocument();
+    expect(screen.getByText("3 editions")).toBeInTheDocument();
+  });
+});
+
 describe("ShelfBookCard — tags", () => {
   it("shows the first tag and a +N overflow badge", () => {
     renderCard({ tags: ["fiction", "sci-fi", "owned-copy"] });

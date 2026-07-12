@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Routes, Route } from "react-router-dom";
-import { renderWithProviders, makeEntry } from "../test/utils";
+import { renderWithProviders, makeEntry, makeEntryDetail } from "../test/utils";
+import type { EditionSummary } from "../lib/api-client";
 import type { Shelf, ShelfEntry, TagCount } from "../lib/api-client";
 
 // AppHeader pulls in the auth context / Amplify; stub it out for page tests.
@@ -60,8 +61,8 @@ function renderPage() {
   );
 }
 
-function resolveEntry(overrides: Partial<ShelfEntry> = {}) {
-  mockFetchEntry.mockResolvedValue(makeEntry({ isbn: ISBN, ...overrides }));
+function resolveEntry(overrides: Partial<ShelfEntry> & { editions?: EditionSummary[] } = {}) {
+  mockFetchEntry.mockResolvedValue(makeEntryDetail({ isbn: ISBN, ...overrides }));
 }
 
 beforeEach(() => {
@@ -333,5 +334,118 @@ describe("BookDetailPage — remove from library", () => {
 
     expect(mockRemoveEntry).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("BookDetailPage — format control (BOOKSHELF-91)", () => {
+  it("reflects the current format and sets a new one", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ format: null });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN, format: "hardcover" }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.selectOptions(screen.getByLabelText("Format"), "hardcover");
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { format: "hardcover" });
+  });
+
+  it("clears the format when Unspecified is chosen", async () => {
+    const user = userEvent.setup();
+    resolveEntry({ format: "ebook" });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN, format: null }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.selectOptions(screen.getByLabelText("Format"), "");
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { format: null });
+  });
+});
+
+describe("BookDetailPage — editions (BOOKSHELF-91)", () => {
+  const OTHER_ISBN = "9780593099322";
+
+  function edition(isbn: string, over: Partial<EditionSummary> = {}): EditionSummary {
+    return {
+      isbn,
+      format: null,
+      owned: true,
+      want: false,
+      readingStatus: null,
+      book: null,
+      ...over,
+    };
+  }
+
+  it("shows no editions section for a solo book", async () => {
+    resolveEntry();
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("heading", { name: "Editions" })).not.toBeInTheDocument();
+  });
+
+  it("shows the grouped callout and a format-labeled switcher for a multi-edition work", async () => {
+    resolveEntry({
+      format: "paperback",
+      editions: [
+        edition(ISBN, { format: "paperback" }),
+        edition(OTHER_ISBN, { format: "audiobook" }),
+      ],
+    });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getByText(/2 editions of this work/)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Paperback" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Audiobook" })).toBeInTheDocument();
+  });
+
+  it("distinguishes a wishlist edition by label, not color alone", async () => {
+    resolveEntry({
+      editions: [
+        edition(ISBN, { format: "hardcover" }),
+        edition(OTHER_ISBN, { format: "ebook", owned: false, want: true }),
+      ],
+    });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getByRole("radio", { name: "Ebook · Wishlist" })).toBeInTheDocument();
+  });
+
+  it("navigates to another edition when its segment is clicked", async () => {
+    const user = userEvent.setup();
+    resolveEntry({
+      editions: [
+        edition(ISBN, { format: "paperback" }),
+        edition(OTHER_ISBN, { format: "audiobook" }),
+      ],
+    });
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("radio", { name: "Audiobook" }));
+    // Selecting a sibling navigates to its detail route → a fresh fetch for that ISBN.
+    await waitFor(() => expect(mockFetchEntry).toHaveBeenCalledWith(OTHER_ISBN));
+  });
+
+  it("ungroups an edition, then offers undo", async () => {
+    const user = userEvent.setup();
+    resolveEntry({
+      editions: [
+        edition(ISBN, { format: "paperback" }),
+        edition(OTHER_ISBN, { format: "audiobook" }),
+      ],
+    });
+    mockUpdateAttrs.mockResolvedValue(makeEntry({ isbn: ISBN }));
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(screen.getByRole("button", { name: "Ungroup this edition" }));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { grouped: false });
+
+    // Undo appears in place of the switcher.
+    await user.click(await screen.findByRole("button", { name: "Undo" }));
+    expect(mockUpdateAttrs).toHaveBeenCalledWith(ISBN, { grouped: true });
   });
 });

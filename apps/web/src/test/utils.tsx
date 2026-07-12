@@ -8,7 +8,14 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
-import type { BookMetadata, ShelfEntry, ShelfPage, SmartShelfWithCount } from "../lib/api-client";
+import type {
+  BookMetadata,
+  EditionSummary,
+  ShelfEntry,
+  ShelfEntryDetail,
+  ShelfPage,
+  SmartShelfWithCount,
+} from "../lib/api-client";
 
 /**
  * A QueryClient tuned for tests: retries off (so a rejected mutation surfaces an
@@ -75,10 +82,34 @@ export function makeEntry(overrides: Partial<ShelfEntry> = {}): ShelfEntry {
     addedAt: "2026-01-01T00:00:00.000Z",
     notes: null,
     copies: 1,
+    format: null,
+    editionCount: 1,
     status: "owned",
     book: makeBook(),
     ...overrides,
   };
+}
+
+/** A single edition summary derived from an entry (self-edition by default). */
+function selfEdition(entry: ShelfEntry): EditionSummary {
+  return {
+    isbn: entry.isbn,
+    format: entry.format,
+    owned: entry.owned,
+    want: entry.want,
+    readingStatus: entry.readingStatus,
+    book: entry.book,
+  };
+}
+
+/**
+ * A book-detail payload (BOOKSHELF-91). Defaults `editions` to just this entry (a
+ * solo work); pass `editions` to simulate a multi-edition work.
+ */
+export function makeEntryDetail(overrides: Partial<ShelfEntryDetail> = {}): ShelfEntryDetail {
+  const { editions, ...entryOverrides } = overrides;
+  const entry = makeEntry(entryOverrides);
+  return { ...entry, editions: editions ?? [selfEdition(entry)] };
 }
 
 export function makeShelfPage(

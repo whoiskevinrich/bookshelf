@@ -27,6 +27,11 @@ const ALLOWED_EVENTS = [
   "shelf_opened",
   "shelf_renamed",
   "shelf_deleted",
+  // Edition grouping (BOOKSHELF-91). ungroup ÷ group is the precision proxy metric.
+  "edition_grouped",
+  "edition_ungrouped",
+  "edition_switched",
+  "edition_format_set",
 ] as const;
 const ALLOWED_EVENT_SET: ReadonlySet<string> = new Set(ALLOWED_EVENTS);
 

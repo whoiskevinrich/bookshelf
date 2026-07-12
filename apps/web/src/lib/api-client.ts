@@ -7,6 +7,9 @@ export type ShelfStatus = "owned" | "want";
 
 export type ReadingStatus = "unread" | "reading" | "finished";
 
+/** Per-edition format label (BOOKSHELF-91). Mirrors the API's EditionFormat. */
+export type EditionFormat = "hardcover" | "paperback" | "ebook" | "audiobook";
+
 /** Upper bound on a book's copy count (BOOKSHELF-60). Mirrors the API's COPIES_MAX. */
 export const COPIES_MAX = 99;
 
@@ -31,6 +34,14 @@ export interface ShelfEntry {
   notes: string | null;
   /** Copies owned (1–99, BOOKSHELF-60). Only meaningful when owned; defaults to 1. */
   copies: number;
+  /** Per-edition format label (BOOKSHELF-91); null when unspecified. */
+  format: EditionFormat | null;
+  /**
+   * Size of this entry's edition group, including itself (BOOKSHELF-93). 1 for solo
+   * entries — the common case. `> 1` means "this is part of a multi-edition work,"
+   * mirroring `ShelfEntryDetail.editions.length > 1`.
+   */
+  editionCount: number;
   /** @deprecated Derived from owned/want during the transition (ADR-019). */
   status: ShelfStatus;
   book: BookMetadata | null;
@@ -40,6 +51,31 @@ export interface ShelfPage {
   entries: ShelfEntry[];
   nextCursor: string | null;
   total: number;
+}
+
+/** One member of a work's edition set (BOOKSHELF-91) — a sibling sharing the work key. */
+export interface EditionSummary {
+  isbn: string;
+  format: EditionFormat | null;
+  owned: boolean;
+  want: boolean;
+  readingStatus: ReadingStatus | null;
+  book: BookMetadata | null;
+}
+
+/**
+ * The book-detail payload: a shelf entry plus its edition set (BOOKSHELF-91).
+ * `editions` always includes this entry; `editions.length > 1` means the book is
+ * part of a multi-edition work.
+ */
+export interface ShelfEntryDetail extends ShelfEntry {
+  editions: EditionSummary[];
+}
+
+/** POST /v1/shelf response: the new entry plus any existing editions it auto-joined. */
+export interface AddToShelfResult extends ShelfEntry {
+  /** ISBNs of existing editions the add grouped with; empty when the add is solo. */
+  groupedWith: string[];
 }
 
 export interface BookSearchResult {
@@ -135,13 +171,13 @@ export async function addToShelf(
   isbn: string,
   status: ShelfStatus,
   book?: BookMetadata,
-): Promise<ShelfEntry> {
+): Promise<AddToShelfResult> {
   const res = await authedFetch("/v1/shelf", {
     method: "POST",
     body: JSON.stringify({ isbn, status, ...(book ? { book } : {}) }),
   });
   await throwIfError(res);
-  return res.json() as Promise<ShelfEntry>;
+  return res.json() as Promise<AddToShelfResult>;
 }
 
 export async function updateShelfStatus(isbn: string, status: ShelfStatus): Promise<ShelfEntry> {
@@ -153,10 +189,10 @@ export async function updateShelfStatus(isbn: string, status: ShelfStatus): Prom
   return res.json() as Promise<ShelfEntry>;
 }
 
-export async function fetchShelfEntry(isbn: string): Promise<ShelfEntry> {
+export async function fetchShelfEntry(isbn: string): Promise<ShelfEntryDetail> {
   const res = await authedFetch(`/v1/shelf/${encodeURIComponent(isbn)}`);
   await throwIfError(res);
-  return res.json() as Promise<ShelfEntry>;
+  return res.json() as Promise<ShelfEntryDetail>;
 }
 
 export interface EntryAttributes {
@@ -164,6 +200,10 @@ export interface EntryAttributes {
   want?: boolean;
   readingStatus?: ReadingStatus | null;
   copies?: number;
+  /** Set/clear this edition's format (BOOKSHELF-91); null clears it. */
+  format?: EditionFormat | null;
+  /** Edition grouping verb (BOOKSHELF-91): false detaches this edition, true re-attaches it. */
+  grouped?: boolean;
 }
 
 export async function updateShelfAttributes(
@@ -355,7 +395,11 @@ export type AnalyticsEvent =
   | "scan_text_miss"
   | "shelf_opened"
   | "shelf_renamed"
-  | "shelf_deleted";
+  | "shelf_deleted"
+  | "edition_grouped"
+  | "edition_ungrouped"
+  | "edition_switched"
+  | "edition_format_set";
 
 /**
  * Record a client analytics event (ADR-016). Resolves on 204; throws ApiError

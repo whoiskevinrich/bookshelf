@@ -10,6 +10,7 @@ import {
   BatchWriteCommand,
   type NativeAttributeValue,
 } from "@aws-sdk/lib-dynamodb";
+import { deriveWorkKey, isValidFormat, type EditionFormat } from "./works.js";
 
 // Lazy-initialized so that env vars loaded by dotenv in server.ts take effect
 // before the client is constructed. ESM imports are hoisted, so top-level
@@ -92,6 +93,18 @@ export interface ShelfEntry {
    * `owned` is true. Absent/legacy items dual-read as 1 — no backfill.
    */
   copies: number;
+  /**
+   * Per-edition format label (BOOKSHELF-90). One of the {@link EditionFormat}
+   * values, or `null` when unspecified. Absent/legacy items dual-read as `null`.
+   */
+  format: EditionFormat | null;
+  /**
+   * Work-key override for edition grouping (BOOKSHELF-90). Absent (the default,
+   * and all legacy items) means the group is *derived* from book metadata; a
+   * present value overrides it (a solo sentinel from ungroup, or — future — a
+   * shared manual-merge value). Server-internal; never surfaced to clients raw.
+   */
+  workKey: string | null;
   /** @deprecated Derived from `owned`/`want` for one transition release (ADR-019). */
   status: ShelfStatus;
 }
@@ -103,12 +116,19 @@ export interface NewEntryAttributes {
   readingStatus?: ReadingStatus | null;
 }
 
-/** Partial attribute update for an existing entry; only present fields are written. */
+/**
+ * Partial attribute update for an existing entry; only present fields are written.
+ * For `format` and `workKey`, `null` means **REMOVE the attribute** (clear the
+ * format / drop the grouping override so it falls back to the derived key); a
+ * non-null value is written as-is.
+ */
 export interface EntryAttributePatch {
   owned?: boolean;
   want?: boolean;
   readingStatus?: ReadingStatus | null;
   copies?: number;
+  format?: EditionFormat | null;
+  workKey?: string | null;
 }
 
 /** In-memory filter applied to the user's entries (ADR-019 — no GSI). */
@@ -130,6 +150,13 @@ export interface BookMetadata {
 
 export interface ShelfEntryWithBook extends ShelfEntry {
   book: BookMetadata | null;
+  /**
+   * Size of this entry's edition group, including itself (BOOKSHELF-93). 1 for solo
+   * entries — the common case. Same effective-work-key grouping as
+   * {@link queryEditionsForIsbn}; `> 1` is exactly "this is part of a multi-edition
+   * work," mirroring the detail view's `editions.length > 1` check.
+   */
+  editionCount: number;
 }
 
 export interface ShelfMeta {
@@ -183,6 +210,9 @@ function toShelfEntry(item: Record<string, unknown>): ShelfEntry {
     notes: str(item["notes"]),
     // Dual-read default (BOOKSHELF-60): legacy/absent items read as 1, no backfill.
     copies: num(item["copies"]) ?? 1,
+    // Dual-read defaults (BOOKSHELF-90): legacy/absent items read as null, no backfill.
+    format: isValidFormat(item["format"]) ? item["format"] : null,
+    workKey: str(item["workKey"]),
     status: derivedStatus(owned),
   };
 }
@@ -274,16 +304,38 @@ function hasAnyFilter(filter?: EntryFilter): filter is EntryFilter {
   );
 }
 
+// DynamoDB's BatchGetItem hard-caps a single request at 100 keys (across all
+// tables); requesting more throws ValidationException. Shelves can exceed 100
+// ISBNs, so chunk the request and retry any UnprocessedKeys (BatchGetItem can
+// return them under throttling even within a single chunk).
+const BATCH_GET_CHUNK_SIZE = 100;
+
 async function fetchBookMetadataMap(isbns: string[]): Promise<Record<string, BookMetadata>> {
   if (isbns.length === 0) return {};
   const bookMap: Record<string, BookMetadata> = {};
-  const keys = isbns.map((isbn) => ({ PK: bookPk(isbn), SK: BOOK_SK }));
-  const batchResult = await dynamo().send(
-    new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }),
-  );
-  for (const book of (batchResult.Responses?.[TABLE_NAME] ?? []) as Record<string, unknown>[]) {
-    bookMap[String(book["isbn"])] = toBookMetadata(book);
+  const chunks: string[][] = [];
+  for (let i = 0; i < isbns.length; i += BATCH_GET_CHUNK_SIZE) {
+    chunks.push(isbns.slice(i, i + BATCH_GET_CHUNK_SIZE));
   }
+
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      let keys = chunk.map((isbn) => ({ PK: bookPk(isbn), SK: BOOK_SK }));
+      while (keys.length > 0) {
+        const batchResult = await dynamo().send(
+          new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }),
+        );
+        for (const book of (batchResult.Responses?.[TABLE_NAME] ?? []) as Record<
+          string,
+          unknown
+        >[]) {
+          bookMap[String(book["isbn"])] = toBookMetadata(book);
+        }
+        keys = (batchResult.UnprocessedKeys?.[TABLE_NAME]?.Keys ?? []) as typeof keys;
+      }
+    }),
+  );
+
   return bookMap;
 }
 
@@ -314,9 +366,20 @@ export async function queryBookEntries(
     const items = (queryResult.Items ?? []) as Record<string, unknown>[];
     const entries = items.map(toShelfEntry);
     const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
+    // Page-local edition counts (BOOKSHELF-93): grouped only within this page, not
+    // scanned across the whole shelf, so the paginated list stays bounded — a
+    // sibling edition on another page won't be counted here. Acceptable for the
+    // affordance's "nice-to-have" precision; shelves small enough to fit one page
+    // (the common case) get exact counts. The filtered path below already has every
+    // entry in hand and computes exact whole-shelf counts.
+    const editionCounts = editionCountsFor(entries, bookMap);
 
     return {
-      entries: entries.map((e) => ({ ...e, book: bookMap[e.isbn] ?? null })),
+      entries: entries.map((e) => ({
+        ...e,
+        book: bookMap[e.isbn] ?? null,
+        editionCount: editionCounts[e.isbn] ?? 1,
+      })),
       nextCursor: queryResult.LastEvaluatedKey ? encodeCursor(queryResult.LastEvaluatedKey) : null,
       total: countResult.Count ?? 0,
     };
@@ -343,11 +406,20 @@ export async function queryBookEntries(
     lastKey = result.LastEvaluatedKey as Record<string, NativeAttributeValue> | undefined;
   } while (lastKey);
 
-  const entries = allItems.map(toShelfEntry).filter((e) => matchesFilter(e, filter));
-  const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
+  // allItems already covers the whole shelf (the loop above pages through every
+  // ENTRY# item), so edition counts computed here are exact — unlike the page-local
+  // counts in the unfiltered branch above.
+  const allEntries = allItems.map(toShelfEntry);
+  const entries = allEntries.filter((e) => matchesFilter(e, filter));
+  const bookMap = await fetchBookMetadataMap(allEntries.map((e) => e.isbn));
+  const editionCounts = editionCountsFor(allEntries, bookMap);
 
   return {
-    entries: entries.map((e) => ({ ...e, book: bookMap[e.isbn] ?? null })),
+    entries: entries.map((e) => ({
+      ...e,
+      book: bookMap[e.isbn] ?? null,
+      editionCount: editionCounts[e.isbn] ?? 1,
+    })),
     nextCursor: null,
     total: entries.length,
   };
@@ -388,9 +460,11 @@ export async function putBookEntry(
 }
 
 /**
- * Apply a partial attribute update (owned / want / readingStatus / copies). Only the
- * fields present in `patch` are written; `readingStatus: null` is stored as NULL
- * (consistent with create), not removed. No-op if `patch` is empty.
+ * Apply a partial attribute update (owned / want / readingStatus / copies / format /
+ * workKey). Only the fields present in `patch` are written; `readingStatus: null` is
+ * stored as NULL (consistent with create), while `format: null` / `workKey: null`
+ * **REMOVE** the attribute (so it dual-reads back to its default). No-op if `patch`
+ * is empty.
  */
 export async function updateBookEntryAttributes(
   userId: string,
@@ -398,6 +472,7 @@ export async function updateBookEntryAttributes(
   patch: EntryAttributePatch,
 ): Promise<void> {
   const sets: string[] = [];
+  const removes: string[] = [];
   const names: Record<string, string> = {};
   const values: Record<string, NativeAttributeValue> = {};
 
@@ -421,16 +496,40 @@ export async function updateBookEntryAttributes(
     names["#copies"] = "copies";
     values[":copies"] = patch.copies;
   }
+  // format / workKey: null means REMOVE (clear format / drop grouping override).
+  if (patch.format !== undefined) {
+    names["#format"] = "format";
+    if (patch.format === null) {
+      removes.push("#format");
+    } else {
+      sets.push("#format = :format");
+      values[":format"] = patch.format;
+    }
+  }
+  if (patch.workKey !== undefined) {
+    names["#workKey"] = "workKey";
+    if (patch.workKey === null) {
+      removes.push("#workKey");
+    } else {
+      sets.push("#workKey = :workKey");
+      values[":workKey"] = patch.workKey;
+    }
+  }
 
-  if (sets.length === 0) return;
+  if (sets.length === 0 && removes.length === 0) return;
+
+  const clauses: string[] = [];
+  if (sets.length > 0) clauses.push("SET " + sets.join(", "));
+  if (removes.length > 0) clauses.push("REMOVE " + removes.join(", "));
 
   await dynamo().send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { PK: userPk(userId), SK: entrySk(isbn) },
-      UpdateExpression: "SET " + sets.join(", "),
+      UpdateExpression: clauses.join(" "),
       ExpressionAttributeNames: names,
-      ExpressionAttributeValues: values,
+      // A REMOVE-only update has no values; DynamoDB rejects an empty value map.
+      ...(Object.keys(values).length > 0 ? { ExpressionAttributeValues: values } : {}),
       ConditionExpression: "attribute_exists(PK)",
     }),
   );
@@ -515,6 +614,124 @@ export async function queryDistinctTags(userId: string): Promise<TagCount[]> {
   return [...counts.entries()]
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+// ── Edition grouping (BOOKSHELF-90) ───────────────────────────────────────
+//
+// Grouping is *computed*, not stored: an entry's editions are its siblings whose
+// effective work key matches, where effective key = `workKey ?? deriveWorkKey(book)`.
+// See lib/works.ts and docs/specs/edition-grouping.md.
+
+/** A member of a work's edition set (a sibling entry sharing the effective work key). */
+export interface Edition {
+  isbn: string;
+  format: EditionFormat | null;
+  owned: boolean;
+  want: boolean;
+  readingStatus: ReadingStatus | null;
+  book: BookMetadata | null;
+}
+
+/** The work key this entry groups under: explicit override, else derived from metadata. */
+function effectiveWorkKey(entry: ShelfEntry, book: BookMetadata | null): string | null {
+  return entry.workKey ?? deriveWorkKey(book);
+}
+
+/**
+ * Edition-group sizes, keyed by ISBN, for a set of entries (BOOKSHELF-93). Missing
+ * metadata (a `null` effective key) short-circuits to a count of 1 directly. An
+ * ungrouped solo sentinel is a non-null string, so it doesn't take that shortcut —
+ * it flows through the normal grouping below and lands in a singleton group of its
+ * own (also count 1), since the sentinel is unique per entry. Pure/synchronous:
+ * callers decide how much of the shelf `entries`/`bookMap` cover (a page vs. the
+ * whole shelf).
+ */
+export function editionCountsFor(
+  entries: ShelfEntry[],
+  bookMap: Record<string, BookMetadata>,
+): Record<string, number> {
+  const groups = new Map<string, string[]>();
+  const counts: Record<string, number> = {};
+  for (const entry of entries) {
+    const key = effectiveWorkKey(entry, bookMap[entry.isbn] ?? null);
+    if (key === null) {
+      counts[entry.isbn] = 1;
+      continue;
+    }
+    const group = groups.get(key) ?? [];
+    group.push(entry.isbn);
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) {
+    for (const isbn of group) counts[isbn] = group.length;
+  }
+  return counts;
+}
+
+/**
+ * The edition set for one ISBN on the user's shelf: the entry itself (with book
+ * metadata) plus every sibling entry sharing its effective work key. Returns
+ * `null` when the ISBN is not on the shelf. A solo work (null effective key, or no
+ * siblings) yields an `editions` array of length 1 — the entry alone.
+ *
+ * O(shelf size) — one entry scan + one metadata batch-get. Shelves are small; if
+ * this shows up in latency it graduates to a dedicated works index (spec Q3).
+ */
+export async function queryEditionsForIsbn(
+  userId: string,
+  isbn: string,
+): Promise<{ entry: ShelfEntryWithBook; editions: Edition[] } | null> {
+  const entries = await queryAllEntries(userId);
+  const self = entries.find((e) => e.isbn === isbn);
+  if (!self) return null;
+
+  const bookMap = await fetchBookMetadataMap(entries.map((e) => e.isbn));
+  const selfBook = bookMap[isbn] ?? null;
+  const selfKey = effectiveWorkKey(self, selfBook);
+
+  // A null effective key never groups (missing metadata / ungrouped-to-solo edge):
+  // the work is just this one edition.
+  const siblings =
+    selfKey === null
+      ? [self]
+      : entries.filter((e) => effectiveWorkKey(e, bookMap[e.isbn] ?? null) === selfKey);
+
+  siblings.sort((a, b) => a.addedAt.localeCompare(b.addedAt) || a.isbn.localeCompare(b.isbn));
+
+  const editions: Edition[] = siblings.map((e) => ({
+    isbn: e.isbn,
+    format: e.format,
+    owned: e.owned,
+    want: e.want,
+    readingStatus: e.readingStatus,
+    book: bookMap[e.isbn] ?? null,
+  }));
+
+  return { entry: { ...self, book: selfBook, editionCount: editions.length }, editions };
+}
+
+/**
+ * The ISBNs of existing editions a just-added book auto-joins — the `groupedWith`
+ * signal for the add-time notification. The new entry has no override, so its
+ * effective key is `deriveWorkKey(meta)`; returns `[]` when that is null (missing
+ * metadata → never auto-group) or when no sibling shares it. Excludes the book
+ * itself. `meta` is the metadata resolved at add time (client-supplied or fetched).
+ */
+export async function queryGroupedWith(
+  userId: string,
+  isbn: string,
+  meta: BookMetadata | null,
+): Promise<string[]> {
+  const newKey = deriveWorkKey(meta);
+  if (newKey === null) return [];
+
+  const others = (await queryAllEntries(userId)).filter((e) => e.isbn !== isbn);
+  if (others.length === 0) return [];
+
+  const bookMap = await fetchBookMetadataMap(others.map((e) => e.isbn));
+  return others
+    .filter((e) => effectiveWorkKey(e, bookMap[e.isbn] ?? null) === newKey)
+    .map((e) => e.isbn);
 }
 
 export async function deleteBookEntry(userId: string, isbn: string): Promise<void> {
@@ -684,10 +901,19 @@ export async function batchGetBookEntries(
     bookMap[String(book["isbn"])] = toBookMetadata(book);
   }
 
-  return (entryResult.Responses?.[TABLE_NAME] ?? []).map((item) => {
-    const entry = toShelfEntry(item as Record<string, unknown>);
-    return { ...entry, book: bookMap[entry.isbn] ?? null };
-  });
+  const entries = (entryResult.Responses?.[TABLE_NAME] ?? []).map((item) =>
+    toShelfEntry(item as Record<string, unknown>),
+  );
+  // Page-local edition counts (BOOKSHELF-93) — see the same caveat on the
+  // unfiltered branch of queryBookEntries: grouped only within this batch, not the
+  // whole shelf.
+  const editionCounts = editionCountsFor(entries, bookMap);
+
+  return entries.map((entry) => ({
+    ...entry,
+    book: bookMap[entry.isbn] ?? null,
+    editionCount: editionCounts[entry.isbn] ?? 1,
+  }));
 }
 
 export async function queryShelfMemberIsns(userId: string, shelfId: string): Promise<string[]> {

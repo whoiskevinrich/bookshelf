@@ -1,4 +1,5 @@
 import type { BookProvider, BookSearchResult } from "../types.js";
+import type { EditionFormat } from "../../works.js";
 
 const BASE_URL = "https://www.googleapis.com/books/v1/volumes";
 
@@ -17,6 +18,9 @@ interface GoogleBooksVolume {
       type: string;
       identifier: string;
     }>;
+  };
+  saleInfo?: {
+    isEbook?: boolean;
   };
 }
 
@@ -48,6 +52,21 @@ function extractCoverUrl(volume: GoogleBooksVolume): string | null {
   return raw.replace(/^http:\/\//, "https://");
 }
 
+/**
+ * Best-effort edition format hint from Google Books signals (BOOKSHELF-92). Only
+ * fires for signals the API expresses unambiguously: `saleInfo.isEbook` is a
+ * structured field, and "audiobook" is inferable from explicit wording Google
+ * Books includes in the title for audio editions. There's no structured signal
+ * for hardcover vs. paperback, so binding type is never guessed — silence over a
+ * wrong label. Never overrides a user-set format; only consulted on a fresh add.
+ */
+function extractFormatHint(volume: GoogleBooksVolume): EditionFormat | null {
+  const title = volume.volumeInfo.title ?? "";
+  if (/audiobook|audio\s*book|unabridged/i.test(title)) return "audiobook";
+  if (volume.saleInfo?.isEbook) return "ebook";
+  return null;
+}
+
 function toSearchResult(volume: GoogleBooksVolume): BookSearchResult {
   return {
     isbn: extractIsbn(volume),
@@ -56,6 +75,7 @@ function toSearchResult(volume: GoogleBooksVolume): BookSearchResult {
     coverUrl: extractCoverUrl(volume),
     publishedYear: extractYear(volume.volumeInfo.publishedDate),
     description: volume.volumeInfo.description ?? null,
+    formatHint: extractFormatHint(volume),
   };
 }
 
