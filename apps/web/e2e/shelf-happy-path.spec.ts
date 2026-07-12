@@ -47,15 +47,16 @@ test.describe("Shelf — happy path", () => {
     await addBookByIsbn(page, NEUROMANCER, "want");
 
     const card = cardByIsbn(page, NEUROMANCER);
-    await expect(card.getByText("Want", { exact: true })).toBeVisible();
+    // Pill label is "Wishlist" for want (display-only rename, ADR-021).
+    await expect(card.getByText("Wishlist", { exact: true })).toBeVisible();
 
     // The "Mark as Owned" overlay action only renders for wishlist books. Reveal
     // the hover overlay, then promote it.
     await card.hover();
     await card.getByRole("button", { name: "Mark as Owned" }).click();
 
-    // After the optimistic move, the pill flips from Want → Owned.
+    // After the optimistic move, the pill flips from Wishlist → Owned.
     await expect(card.getByText("Owned", { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(card.getByText("Want", { exact: true })).toHaveCount(0);
+    await expect(card.getByText("Wishlist", { exact: true })).toHaveCount(0);
   });
 });

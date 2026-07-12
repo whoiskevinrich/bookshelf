@@ -108,7 +108,13 @@ export function createGoogleBooksProvider(apiKey: string): BookProvider {
 
     async getByIsbn(isbn: string): Promise<BookSearchResult | null> {
       const results = await fetchVolumes(`isbn:${isbn}`, apiKey, 1);
-      return results[0] ?? null;
+      const result = results[0];
+      if (!result) return null;
+      // Some Google Books records omit industryIdentifiers, in which case
+      // extractIsbn falls back to the opaque volume id — but we already know the
+      // real ISBN (this is the isbn:${isbn} query that found the record), so use
+      // it directly rather than trusting a possibly-missing extracted value.
+      return { ...result, isbn };
     },
 
     async getByAsin(asin: string): Promise<BookSearchResult | null> {

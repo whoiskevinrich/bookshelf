@@ -39,11 +39,12 @@ test.describe("Book detail — your copy", () => {
     // The "Your copy" panel confirms the editor loaded.
     await expect(page.getByRole("heading", { name: "Your copy" })).toBeVisible();
 
-    // ── Owned / Want (mutually exclusive radiogroup) ─────────────────────────
+    // ── Owned / Wishlist (mutually exclusive radiogroup; wire value stays
+    // `want`, only the display label is "Wishlist" — ADR-021) ────────────────
     const ownership = page.getByRole("radiogroup", { name: "Owned or wishlist" });
     await expect(ownership.getByRole("radio", { name: "Owned" })).toBeChecked();
-    await ownership.getByRole("radio", { name: "Want" }).click();
-    await expect(ownership.getByRole("radio", { name: "Want" })).toBeChecked();
+    await ownership.getByRole("radio", { name: "Wishlist" }).click();
+    await expect(ownership.getByRole("radio", { name: "Wishlist" })).toBeChecked();
     await expect(ownership.getByRole("radio", { name: "Owned" })).not.toBeChecked();
 
     // ── Reading status ───────────────────────────────────────────────────────
