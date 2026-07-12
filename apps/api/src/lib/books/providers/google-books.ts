@@ -6,8 +6,8 @@ const BASE_URL = "https://www.googleapis.com/books/v1/volumes";
 // Google Books occasionally returns transient errors under load (BOOKSHELF-95). Retry those;
 // a 4xx like a bad key or malformed query never resolves on retry, so fail fast instead.
 const MAX_ATTEMPTS = 3;
-// Delay doubles each retry (300ms, 600ms) — worst case ~900ms across 3 attempts, well under
-// the E2E suite's 15s per-assertion timeout (apps/web/e2e/helpers.ts).
+// Delay grows with each retry (300ms, then 600ms) — worst case ~900ms across 3 attempts,
+// well under the E2E suite's 15s per-assertion timeout (apps/web/e2e/helpers.ts).
 const RETRY_BASE_DELAY_MS = 300;
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 
@@ -104,7 +104,14 @@ async function fetchVolumes(
 
   let res: Response;
   for (let attempt = 1; ; attempt++) {
-    res = await fetch(url.toString());
+    try {
+      res = await fetch(url.toString());
+    } catch (err) {
+      // A thrown fetch (DNS/connection reset) is as transient as a 5xx response.
+      if (attempt === MAX_ATTEMPTS) throw err;
+      await sleep(RETRY_BASE_DELAY_MS * attempt);
+      continue;
+    }
     if (res.ok || !RETRYABLE_STATUS_CODES.has(res.status) || attempt === MAX_ATTEMPTS) {
       break;
     }

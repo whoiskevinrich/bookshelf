@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createGoogleBooksProvider } from "../../../src/lib/books/providers/google-books.js";
 
 const mockFetch = vi.fn();
@@ -68,20 +68,91 @@ describe("createGoogleBooksProvider.search", () => {
 });
 
 describe("createGoogleBooksProvider retry (BOOKSHELF-95)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Fires the request, then fast-forwards every pending backoff timer (rather than waiting
+  // out real wall-clock delays) before resolving/rejecting the outcome.
+  async function runToCompletion<T>(promise: Promise<T>): Promise<T> {
+    const timers = vi.runAllTimersAsync();
+    const [result] = await Promise.all([promise, timers]);
+    return result;
+  }
+
   it("retries a transient 503 and succeeds", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" });
     mockResponse([makeVolume()]);
     const provider = createGoogleBooksProvider("key");
-    const results = await provider.search("dune");
+    const results = await runToCompletion(provider.search("dune"));
     expect(results).toHaveLength(1);
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it("gives up after the max attempts and throws the last error", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 503, statusText: "Service Unavailable" });
+  it("retries each retryable status code (429, 502, 503, 504)", async () => {
+    for (const status of [429, 502, 503, 504]) {
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValueOnce({ ok: false, status, statusText: "retryable" });
+      mockResponse([makeVolume()]);
+      const provider = createGoogleBooksProvider("key");
+      const results = await runToCompletion(provider.search("dune"));
+      expect(results).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    }
+  });
+
+  it("succeeds on the final allowed attempt (2 failures then success)", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" });
+    mockResponse([makeVolume()]);
     const provider = createGoogleBooksProvider("key");
-    await expect(provider.search("dune")).rejects.toThrow("503");
+    const results = await runToCompletion(provider.search("dune"));
+    expect(results).toHaveLength(1);
     expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up after the max attempts and throws the last attempt's error", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 429, statusText: "Too Many Requests" });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 502, statusText: "Bad Gateway" });
+    const provider = createGoogleBooksProvider("key");
+    await expect(runToCompletion(provider.search("dune"))).rejects.toThrow("502");
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries a thrown network error and succeeds", async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
+    mockResponse([makeVolume()]);
+    const provider = createGoogleBooksProvider("key");
+    const results = await runToCompletion(provider.search("dune"));
+    expect(results).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up and rethrows after exhausting attempts on a persistent network error", async () => {
+    mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+    const provider = createGoogleBooksProvider("key");
+    await expect(runToCompletion(provider.search("dune"))).rejects.toThrow("fetch failed");
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("actually waits out the backoff delay between retries", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" });
+    mockResponse([makeVolume()]);
+    const provider = createGoogleBooksProvider("key");
+    const promise = provider.search("dune");
+
+    // Only the first attempt should have fired before the backoff delay elapses.
+    await vi.advanceTimersByTimeAsync(100);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(300);
+    await promise;
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 
