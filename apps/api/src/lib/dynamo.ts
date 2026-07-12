@@ -362,11 +362,10 @@ export async function queryBookEntries(
     };
   }
 
-  // Filtered: loop all pages, then filter in memory on the *derived* attributes
-  // (ADR-019). A server-side FilterExpression on `owned`/`want` would miss legacy
-  // un-migrated items that still carry only the `status` enum; filtering after
-  // toShelfEntry's dual-read keeps results correct across the migration window.
-  // Filtered queries return all matching items at once (no cursor pagination).
+  // Filtered: loop all pages, then filter in memory (ADR-019) — no GSI on
+  // owned/want/readingStatus/tag, so a server-side FilterExpression isn't
+  // available; filtering happens after toShelfEntry instead. Filtered queries
+  // return all matching items at once (no cursor pagination).
   const filter = opts.filter;
   const allItems: Record<string, unknown>[] = [];
   let lastKey: Record<string, NativeAttributeValue> | undefined;
