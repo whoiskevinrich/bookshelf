@@ -211,3 +211,46 @@ describe("ShelfBookCard — links, shelves and error", () => {
     expect(screen.getByText("Couldn't move that book")).toBeInTheDocument();
   });
 });
+
+describe("ShelfBookCard — Manage mode selection (BOOKSHELF-59)", () => {
+  it("renders no selection checkbox and no navigate-away when manageMode is off", () => {
+    renderCard({ isbn: "9780441013593" });
+    expect(screen.queryByRole("checkbox", { name: 'Select "Dune"' })).not.toBeInTheDocument();
+  });
+
+  it("shows an always-visible selection checkbox in Manage mode", () => {
+    renderCard({ isbn: "9780441013593" }, { manageMode: true, selected: false });
+    expect(screen.getByRole("checkbox", { name: 'Select "Dune"' })).not.toBeChecked();
+  });
+
+  it("toggles selection via the checkbox without navigating to detail", async () => {
+    const user = userEvent.setup();
+    const onToggleSelect = vi.fn();
+    renderCard({ isbn: "9780441013593" }, { manageMode: true, selected: false, onToggleSelect });
+    await user.click(screen.getByRole("checkbox", { name: 'Select "Dune"' }));
+    expect(onToggleSelect).toHaveBeenCalledWith("9780441013593");
+  });
+
+  it("clicking the cover toggles selection instead of navigating in Manage mode", async () => {
+    const user = userEvent.setup();
+    const onToggleSelect = vi.fn();
+    renderCard({ isbn: "9780441013593" }, { manageMode: true, selected: false, onToggleSelect });
+    await user.click(screen.getByRole("img", { name: "Dune" }));
+    expect(onToggleSelect).toHaveBeenCalledWith("9780441013593");
+    expect(screen.queryByText("Detail route")).not.toBeInTheDocument();
+  });
+
+  it("clicking the title toggles selection instead of navigating in Manage mode", async () => {
+    const user = userEvent.setup();
+    const onToggleSelect = vi.fn();
+    renderCard({ isbn: "9780441013593" }, { manageMode: true, selected: false, onToggleSelect });
+    await user.click(screen.getByRole("button", { name: "Dune" }));
+    expect(onToggleSelect).toHaveBeenCalledWith("9780441013593");
+  });
+
+  it("hides the per-card hover overlay actions while in Manage mode", () => {
+    renderCard({ isbn: "9780441013593", owned: false, want: true }, { manageMode: true });
+    expect(screen.queryByRole("button", { name: "Mark as Owned" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove from library" })).not.toBeInTheDocument();
+  });
+});

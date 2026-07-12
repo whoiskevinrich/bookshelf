@@ -27,6 +27,8 @@ vi.mock("../lib/api-client", async (importOriginal) => {
     addToShelf: vi.fn(),
     fetchShelfEntry: vi.fn(),
     updateShelfAttributes: vi.fn(),
+    removeFromShelf: vi.fn(),
+    updateShelfStatus: vi.fn(),
   };
 });
 
@@ -39,6 +41,8 @@ import {
   addToShelf,
   fetchShelfEntry,
   updateShelfAttributes,
+  removeFromShelf,
+  updateShelfStatus,
   ApiError,
 } from "../lib/api-client";
 import { ShelfPage } from "./ShelfPage";
@@ -54,6 +58,8 @@ const mockGetBook = vi.mocked(getBookByIsbn);
 const mockAdd = vi.mocked(addToShelf);
 const mockFetchEntry = vi.mocked(fetchShelfEntry);
 const mockUpdateAttrs = vi.mocked(updateShelfAttributes);
+const mockRemove = vi.mocked(removeFromShelf);
+const mockUpdateStatus = vi.mocked(updateShelfStatus);
 
 function bookResult(isbn: string, title: string): BookSearchResult {
   return {
@@ -179,5 +185,70 @@ describe("ShelfPage — add-time edition grouping (BOOKSHELF-91)", () => {
 
     await waitFor(() => expect(mockAdd).toHaveBeenCalled());
     expect(screen.queryByText(/Grouped as one of/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ShelfPage — Manage mode bulk actions (BOOKSHELF-59)", () => {
+  it("enters/exits Manage mode with a header swap and a sticky action bar", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Manage" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Manage" }));
+
+    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add a book" })).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Manage library" })).toBeInTheDocument();
+    expect(screen.getByText("0 selected")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("group", { name: "Manage library" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a book" })).toBeInTheDocument();
+  });
+
+  it("selects a book and bulk-deletes it, confirming the count and reporting the result", async () => {
+    const user = userEvent.setup();
+    mockRemove.mockResolvedValue(undefined);
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Manage" }));
+    await user.click(screen.getByRole("checkbox", { name: /Select/ }));
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Delete 1 book?");
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith(OWNED_ISBN));
+    expect(await screen.findByText("Deleted 1 of 1 books")).toBeInTheDocument();
+  });
+
+  it("bulk-moves the selection to Owned via updateShelfStatus", async () => {
+    const user = userEvent.setup();
+    mockUpdateStatus.mockResolvedValue(makeEntry({ isbn: OWNED_ISBN, owned: true }));
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Manage" }));
+    await user.click(screen.getByRole("checkbox", { name: /Select/ }));
+    await user.click(screen.getByRole("button", { name: "Move to Owned" }));
+
+    await waitFor(() => expect(mockUpdateStatus).toHaveBeenCalledWith(OWNED_ISBN, "owned"));
+  });
+
+  it("clears the selection when the active view changes (facet filter)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Manage" }));
+    await user.click(screen.getByRole("checkbox", { name: /Select/ }));
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+
+    // Switching the facet filter changes which entry set is "visible" — a stale
+    // selection could otherwise merge bulk-tag changes against a book the new
+    // view never loaded, silently wiping its existing tags.
+    await user.click(screen.getByRole("button", { name: "Owned" }));
+
+    await waitFor(() => expect(screen.getByText("0 selected")).toBeInTheDocument());
   });
 });
