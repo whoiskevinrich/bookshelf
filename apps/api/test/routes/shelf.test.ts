@@ -93,6 +93,7 @@ beforeEach(() => {
   vi.mocked(getBookEntry).mockReset();
   vi.mocked(queryEditionsForIsbn).mockReset();
   vi.mocked(queryGroupedWith).mockReset();
+  vi.mocked(queryGroupedWith).mockResolvedValue([]);
   vi.mocked(putBookEntry).mockReset();
   vi.mocked(deleteBookEntry).mockReset();
   vi.mocked(updateBookEntryAttributes).mockReset();

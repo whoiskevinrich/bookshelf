@@ -304,16 +304,38 @@ function hasAnyFilter(filter?: EntryFilter): filter is EntryFilter {
   );
 }
 
+// DynamoDB's BatchGetItem hard-caps a single request at 100 keys (across all
+// tables); requesting more throws ValidationException. Shelves can exceed 100
+// ISBNs, so chunk the request and retry any UnprocessedKeys (BatchGetItem can
+// return them under throttling even within a single chunk).
+const BATCH_GET_CHUNK_SIZE = 100;
+
 async function fetchBookMetadataMap(isbns: string[]): Promise<Record<string, BookMetadata>> {
   if (isbns.length === 0) return {};
   const bookMap: Record<string, BookMetadata> = {};
-  const keys = isbns.map((isbn) => ({ PK: bookPk(isbn), SK: BOOK_SK }));
-  const batchResult = await dynamo().send(
-    new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }),
-  );
-  for (const book of (batchResult.Responses?.[TABLE_NAME] ?? []) as Record<string, unknown>[]) {
-    bookMap[String(book["isbn"])] = toBookMetadata(book);
+  const chunks: string[][] = [];
+  for (let i = 0; i < isbns.length; i += BATCH_GET_CHUNK_SIZE) {
+    chunks.push(isbns.slice(i, i + BATCH_GET_CHUNK_SIZE));
   }
+
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      let keys = chunk.map((isbn) => ({ PK: bookPk(isbn), SK: BOOK_SK }));
+      while (keys.length > 0) {
+        const batchResult = await dynamo().send(
+          new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }),
+        );
+        for (const book of (batchResult.Responses?.[TABLE_NAME] ?? []) as Record<
+          string,
+          unknown
+        >[]) {
+          bookMap[String(book["isbn"])] = toBookMetadata(book);
+        }
+        keys = (batchResult.UnprocessedKeys?.[TABLE_NAME]?.Keys ?? []) as typeof keys;
+      }
+    }),
+  );
+
   return bookMap;
 }
 
@@ -616,10 +638,13 @@ function effectiveWorkKey(entry: ShelfEntry, book: BookMetadata | null): string 
 }
 
 /**
- * Edition-group sizes, keyed by ISBN, for a set of entries (BOOKSHELF-93). A `null`
- * effective key (missing metadata, or an ungrouped solo sentinel) never groups —
- * that entry's count is always 1. Pure/synchronous: callers decide how much of the
- * shelf `entries`/`bookMap` cover (a page vs. the whole shelf).
+ * Edition-group sizes, keyed by ISBN, for a set of entries (BOOKSHELF-93). Missing
+ * metadata (a `null` effective key) short-circuits to a count of 1 directly. An
+ * ungrouped solo sentinel is a non-null string, so it doesn't take that shortcut —
+ * it flows through the normal grouping below and lands in a singleton group of its
+ * own (also count 1), since the sentinel is unique per entry. Pure/synchronous:
+ * callers decide how much of the shelf `entries`/`bookMap` cover (a page vs. the
+ * whole shelf).
  */
 export function editionCountsFor(
   entries: ShelfEntry[],
