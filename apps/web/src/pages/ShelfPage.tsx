@@ -837,12 +837,20 @@ export function ShelfPage() {
               onConfirmDelete={() => {
                 void bulk.bulkDelete(Array.from(selectedIsbns)).then(clearSelection);
               }}
-              onMove={(status) => void bulk.bulkMove(Array.from(selectedIsbns), status)}
+              onMove={(status) =>
+                // Cleared after every bulk op, not just delete — a move/tag/shelf-add can
+                // drop a selected book out of the active view (e.g. moving out of a facet
+                // filter), and a stale selection re-used by a later bulk tag add would
+                // merge against a book this view no longer has real tag data for.
+                void bulk.bulkMove(Array.from(selectedIsbns), status).then(clearSelection)
+              }
               onAddToShelf={(shelfId) =>
-                void bulk.bulkAddToShelf(Array.from(selectedIsbns), shelfId)
+                void bulk.bulkAddToShelf(Array.from(selectedIsbns), shelfId).then(clearSelection)
               }
               onAddTag={(tag) =>
-                void bulk.bulkAddTag(Array.from(selectedIsbns), tag, visibleEntries)
+                void bulk
+                  .bulkAddTag(Array.from(selectedIsbns), tag, visibleEntries)
+                  .then(clearSelection)
               }
               onRetry={bulk.retry}
               onDismissResult={bulk.dismiss}

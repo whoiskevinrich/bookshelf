@@ -27,21 +27,40 @@ export interface BulkResult {
 export function useBulkShelfActions() {
   const qc = useQueryClient();
   const [pending, setPending] = useState(false);
+  // A ref (not just the `pending` state) guards re-entrancy: two `run()` calls close
+  // together would otherwise both pass the check before either state update lands.
+  const pendingRef = useRef(false);
   const [result, setResult] = useState<BulkResult | null>(null);
   const lastFnRef = useRef<((isbn: string) => Promise<unknown>) | null>(null);
 
   const run = useCallback(
     async (op: BulkOp, isbns: string[], fn: (isbn: string) => Promise<unknown>) => {
+      if (pendingRef.current) return;
+      pendingRef.current = true;
       setPending(true);
       lastFnRef.current = fn;
-      const settled = await Promise.allSettled(isbns.map((isbn) => fn(isbn)));
-      const failed = isbns.filter((_, i) => settled[i]!.status === "rejected");
-      setResult({ op, total: isbns.length, failed });
-      setPending(false);
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["shelf"] }),
-        qc.invalidateQueries({ queryKey: ["shelves"] }),
-      ]);
+      try {
+        const settled = await Promise.allSettled(isbns.map((isbn) => fn(isbn)));
+        const failed: string[] = [];
+        settled.forEach((s, i) => {
+          if (s.status === "rejected") {
+            failed.push(isbns[i]!);
+            console.error(`[useBulkShelfActions] ${op} failed for ${isbns[i]}`, s.reason);
+          }
+        });
+        setResult({ op, total: isbns.length, failed });
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ["shelf"] }),
+          qc.invalidateQueries({ queryKey: ["shelves"] }),
+        ]);
+      } catch (err) {
+        console.error(`[useBulkShelfActions] ${op} batch failed unexpectedly`, err);
+      } finally {
+        // Cleared after invalidation settles (not right after the fan-out) so the
+        // action bar's buttons stay disabled until the refreshed data has landed.
+        pendingRef.current = false;
+        setPending(false);
+      }
     },
     [qc],
   );
@@ -67,8 +86,12 @@ export function useBulkShelfActions() {
     (isbns: string[], tag: string, entries: ShelfEntry[]) => {
       const byIsbn = new Map(entries.map((e) => [e.isbn, e]));
       return run("add-tag", isbns, (isbn) => {
-        const existing = byIsbn.get(isbn)?.tags ?? [];
-        const next = existing.includes(tag) ? existing : [...existing, tag];
+        const entry = byIsbn.get(isbn);
+        // No local copy of this book's current tags — refuse instead of merging
+        // against an empty list, which would replace (not append to) its real
+        // tags once sent (updateShelfTags is a full replace, not additive).
+        if (!entry) return Promise.reject(new Error(`No cached entry for ${isbn}`));
+        const next = entry.tags.includes(tag) ? entry.tags : [...entry.tags, tag];
         return updateShelfTags(isbn, next);
       });
     },

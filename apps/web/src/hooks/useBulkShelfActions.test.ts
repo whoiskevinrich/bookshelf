@@ -133,3 +133,84 @@ describe("useBulkShelfActions — bulkAddToShelf", () => {
     expect(mockAddToShelf).toHaveBeenCalledWith("shelf-1", "2");
   });
 });
+
+describe("useBulkShelfActions — bulkAddTag defensive skip", () => {
+  it("refuses (rather than clobbers) tags for an ISBN with no cached entry", async () => {
+    mockUpdateTags.mockResolvedValue(makeEntry());
+    const entries = [makeEntry({ isbn: "1", tags: ["fiction"] })];
+    const { Wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useBulkShelfActions(), { wrapper: Wrapper });
+
+    // "2" isn't in `entries` — e.g. it scrolled out of the currently-visible view.
+    await act(async () => {
+      await result.current.bulkAddTag(["1", "2"], "read-again", entries);
+    });
+
+    expect(mockUpdateTags).toHaveBeenCalledWith("1", ["fiction", "read-again"]);
+    expect(mockUpdateTags).not.toHaveBeenCalledWith("2", expect.anything());
+    // Reported as a failure, not silently dropped or falsely counted as success.
+    expect(result.current.result).toEqual({ op: "add-tag", total: 2, failed: ["2"] });
+  });
+});
+
+describe("useBulkShelfActions — cache invalidation", () => {
+  it("invalidates the shelf and shelves query keys once the batch settles", async () => {
+    mockRemove.mockResolvedValue(undefined);
+    const { Wrapper, client } = createQueryWrapper();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useBulkShelfActions(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.bulkDelete(["1"]);
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["shelf"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["shelves"] });
+  });
+});
+
+describe("useBulkShelfActions — pending state", () => {
+  it("is true while the batch is in flight and false once invalidation settles", async () => {
+    let resolveRemove!: () => void;
+    mockRemove.mockReturnValue(
+      new Promise<void>((r) => {
+        resolveRemove = r;
+      }),
+    );
+    const { Wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useBulkShelfActions(), { wrapper: Wrapper });
+
+    expect(result.current.pending).toBe(false);
+    act(() => {
+      void result.current.bulkDelete(["1"]);
+    });
+    await waitFor(() => expect(result.current.pending).toBe(true));
+
+    resolveRemove();
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    expect(result.current.result?.failed).toEqual([]);
+  });
+
+  it("ignores a second call while a batch is still in flight (no double fan-out)", async () => {
+    let resolveRemove!: () => void;
+    mockRemove.mockReturnValue(
+      new Promise<void>((r) => {
+        resolveRemove = r;
+      }),
+    );
+    const { Wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useBulkShelfActions(), { wrapper: Wrapper });
+
+    act(() => {
+      void result.current.bulkDelete(["1"]);
+      void result.current.bulkMove(["2"], "owned"); // ignored — a batch is already running
+    });
+    await waitFor(() => expect(result.current.pending).toBe(true));
+
+    expect(mockRemove).toHaveBeenCalledTimes(1);
+    expect(mockUpdateStatus).not.toHaveBeenCalled();
+
+    resolveRemove();
+    await waitFor(() => expect(result.current.pending).toBe(false));
+  });
+});

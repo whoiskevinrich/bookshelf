@@ -126,4 +126,17 @@ describe("BulkActionBar — partial-failure result", () => {
     await user.click(screen.getByRole("button", { name: "Retry 2 failed" }));
     expect(handlers.onRetry).toHaveBeenCalled();
   });
+
+  it("reports a total failure (0 succeeded) without dividing by a wrong count", () => {
+    const result: BulkResult = { op: "delete", total: 3, failed: ["a", "b", "c"] };
+    renderBar({ result });
+    expect(screen.getByText("Deleted 0 of 3 books")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry 3 failed" })).toBeInTheDocument();
+  });
+
+  it("announces the result to assistive tech via an aria-live region", () => {
+    const result: BulkResult = { op: "delete", total: 1, failed: [] };
+    renderBar({ result });
+    expect(screen.getByRole("status")).toHaveTextContent("Deleted 1 of 1 books");
+  });
 });

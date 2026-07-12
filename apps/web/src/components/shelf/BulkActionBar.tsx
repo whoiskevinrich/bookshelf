@@ -179,28 +179,32 @@ export function BulkActionBar({
       </div>
 
       {result && (
-        <Callout
-          title={
-            result.failed.length === 0
-              ? `${OP_LABEL[result.op]} ${result.total} of ${result.total} books`
-              : `${OP_LABEL[result.op]} ${result.total - result.failed.length} of ${result.total} books`
-          }
-          onDismiss={onDismissResult}
-          dismissLabel="Dismiss result"
-          {...(result.failed.length > 0
-            ? {
-                actions: (
-                  <Button variant="secondary" size="sm" onClick={onRetry} disabled={pending}>
-                    Retry {result.failed.length} failed
-                  </Button>
-                ),
-              }
-            : {})}
-        >
-          {result.failed.length > 0
-            ? `${result.failed.length} book${result.failed.length === 1 ? "" : "s"} couldn't be updated.`
-            : "All done."}
-        </Callout>
+        // aria-live so the result — including a failure — reaches screen-reader
+        // users too, not just the visual Callout.
+        <div aria-live="polite" role="status">
+          <Callout
+            title={
+              result.failed.length === 0
+                ? `${OP_LABEL[result.op]} ${result.total} of ${result.total} books`
+                : `${OP_LABEL[result.op]} ${result.total - result.failed.length} of ${result.total} books`
+            }
+            onDismiss={onDismissResult}
+            dismissLabel="Dismiss result"
+            {...(result.failed.length > 0
+              ? {
+                  actions: (
+                    <Button variant="secondary" size="sm" onClick={onRetry} disabled={pending}>
+                      Retry {result.failed.length} failed
+                    </Button>
+                  ),
+                }
+              : {})}
+          >
+            {result.failed.length > 0
+              ? `${result.failed.length} book${result.failed.length === 1 ? "" : "s"} couldn't be updated.`
+              : "All done."}
+          </Callout>
+        </div>
       )}
 
       <ConfirmDialog

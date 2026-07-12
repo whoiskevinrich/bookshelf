@@ -223,6 +223,11 @@ describe("ShelfBookCard — Manage mode selection (BOOKSHELF-59)", () => {
     expect(screen.getByRole("checkbox", { name: 'Select "Dune"' })).not.toBeChecked();
   });
 
+  it("shows the checkbox checked when the book is selected", () => {
+    renderCard({ isbn: "9780441013593" }, { manageMode: true, selected: true });
+    expect(screen.getByRole("checkbox", { name: 'Select "Dune"' })).toBeChecked();
+  });
+
   it("toggles selection via the checkbox without navigating to detail", async () => {
     const user = userEvent.setup();
     const onToggleSelect = vi.fn();
