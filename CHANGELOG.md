@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.4.0...v0.5.0) (2026-07-12)
+
+
+### Features
+
+* edition grouping — relate multiple editions of one work (BOOKSHELF-90, BOOKSHELF-91, BOOKSHELF-92, BOOKSHELF-93) ([#119](https://github.com/whoiskevinrich/bookshelf/issues/119)) ([6d0be11](https://github.com/whoiskevinrich/bookshelf/commit/6d0be112aab561916353708056fad387bb707d81))
+* **shelf:** multiple copies of the same book (BOOKSHELF-60) ([#115](https://github.com/whoiskevinrich/bookshelf/issues/115)) ([043c26d](https://github.com/whoiskevinrich/bookshelf/commit/043c26daea8110f604bf11629a3e1478f60d4007))
+
+
+### Bug Fixes
+
+* **deps:** bump transitive hono to patched 4.12.27 (BOOKSHELF-43) ([#116](https://github.com/whoiskevinrich/bookshelf/issues/116)) ([d08517f](https://github.com/whoiskevinrich/bookshelf/commit/d08517f8bc9adfc67bcfa4e72f1cb8e5e70b465d))
+
 ## [0.4.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.3.0...v0.4.0) (2026-07-09)
 
 
