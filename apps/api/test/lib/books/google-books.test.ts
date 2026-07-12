@@ -58,6 +58,31 @@ describe("createGoogleBooksProvider.search", () => {
     const provider = createGoogleBooksProvider("bad-key");
     await expect(provider.search("anything")).rejects.toThrow("403");
   });
+
+  it("does not retry a non-retryable status", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403, statusText: "Forbidden" });
+    const provider = createGoogleBooksProvider("bad-key");
+    await expect(provider.search("anything")).rejects.toThrow("403");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createGoogleBooksProvider retry (BOOKSHELF-95)", () => {
+  it("retries a transient 503 and succeeds", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" });
+    mockResponse([makeVolume()]);
+    const provider = createGoogleBooksProvider("key");
+    const results = await provider.search("dune");
+    expect(results).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after the max attempts and throws the last error", async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 503, statusText: "Service Unavailable" });
+    const provider = createGoogleBooksProvider("key");
+    await expect(provider.search("dune")).rejects.toThrow("503");
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("createGoogleBooksProvider.getByIsbn", () => {
