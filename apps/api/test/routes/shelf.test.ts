@@ -52,6 +52,7 @@ import {
   InvalidCursorError,
   type ShelfEntry,
 } from "../../src/lib/dynamo.js";
+import { getBookByIsbn } from "../../src/lib/books/search.js";
 import { shelfRouter } from "../../src/routes/shelf.js";
 
 function makeApp() {
@@ -98,6 +99,7 @@ beforeEach(() => {
   vi.mocked(updateBookEntryNotes).mockReset();
   vi.mocked(updateBookEntryTags).mockReset();
   vi.mocked(putBookMetadata).mockReset();
+  vi.mocked(getBookByIsbn).mockReset();
 });
 
 describe("GET /v1/shelf", () => {
@@ -358,6 +360,103 @@ describe("POST /v1/shelf", () => {
       body: JSON.stringify({ isbn: "9780441013593", owned: true, readingStatus: "halfway" }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("auto-fills format from the provider's format hint on a fresh add", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    vi.mocked(updateBookEntryAttributes).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookByIsbn).mockResolvedValueOnce({
+      isbn: "9780441013593",
+      title: "Dune",
+      authors: ["Frank Herbert"],
+      coverUrl: null,
+      publishedYear: 1965,
+      description: null,
+      formatHint: "ebook",
+    });
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBe("ebook");
+    expect(vi.mocked(updateBookEntryAttributes)).toHaveBeenCalledWith(
+      "test-user-sub",
+      "9780441013593",
+      { format: "ebook" },
+    );
+  });
+
+  it("does not auto-fill format when the client supplies its own book metadata", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        isbn: "9780441013593",
+        owned: true,
+        book: { title: "Dune", authors: ["Frank Herbert"], coverUrl: null, publishedYear: 1965 },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBeNull();
+    expect(vi.mocked(getBookByIsbn)).not.toHaveBeenCalled();
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("leaves format null when the provider gives no format hint", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    vi.mocked(getBookByIsbn).mockResolvedValueOnce({
+      isbn: "9780441013593",
+      title: "Dune",
+      authors: ["Frank Herbert"],
+      coverUrl: null,
+      publishedYear: 1965,
+      description: null,
+      formatHint: null,
+    });
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBeNull();
+    expect(vi.mocked(updateBookEntryAttributes)).not.toHaveBeenCalled();
+  });
+
+  it("still succeeds (201) with format null when the format auto-fill write fails", async () => {
+    vi.mocked(putBookEntry).mockResolvedValueOnce(undefined);
+    vi.mocked(putBookMetadata).mockResolvedValueOnce(undefined);
+    vi.mocked(updateBookEntryAttributes).mockRejectedValueOnce(new Error("boom"));
+    vi.mocked(getBookByIsbn).mockResolvedValueOnce({
+      isbn: "9780441013593",
+      title: "Dune",
+      authors: ["Frank Herbert"],
+      coverUrl: null,
+      publishedYear: 1965,
+      description: null,
+      formatHint: "audiobook",
+    });
+    const app = makeApp();
+    const res = await app.request("/v1/shelf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn: "9780441013593", owned: true }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { format: string | null };
+    expect(body.format).toBeNull();
   });
 
   it("truncates description to 4000 chars before caching", async () => {

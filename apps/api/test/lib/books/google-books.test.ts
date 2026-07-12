@@ -75,3 +75,52 @@ describe("createGoogleBooksProvider.getByIsbn", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("format hint (BOOKSHELF-92)", () => {
+  it("hints ebook from saleInfo.isEbook", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        totalItems: 1,
+        items: [{ ...makeVolume(), saleInfo: { isEbook: true } }],
+      }),
+    });
+    const provider = createGoogleBooksProvider("key");
+    const result = await provider.getByIsbn("9780441013593");
+    expect(result?.formatHint).toBe("ebook");
+  });
+
+  it("hints audiobook from explicit title wording", async () => {
+    mockResponse([makeVolume({ title: "Dune (Audiobook)" })]);
+    const provider = createGoogleBooksProvider("key");
+    const results = await provider.search("dune audiobook");
+    expect(results[0]?.formatHint).toBe("audiobook");
+  });
+
+  it("hints audiobook from 'Unabridged' in the title", async () => {
+    mockResponse([makeVolume({ title: "Dune: Unabridged" })]);
+    const provider = createGoogleBooksProvider("key");
+    const results = await provider.search("dune unabridged");
+    expect(results[0]?.formatHint).toBe("audiobook");
+  });
+
+  it("prefers the audiobook title signal over saleInfo.isEbook", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        totalItems: 1,
+        items: [{ ...makeVolume({ title: "Dune (Audiobook)" }), saleInfo: { isEbook: true } }],
+      }),
+    });
+    const provider = createGoogleBooksProvider("key");
+    const result = await provider.getByIsbn("9780441013593");
+    expect(result?.formatHint).toBe("audiobook");
+  });
+
+  it("returns null when there is no unambiguous signal (never guesses hardcover/paperback)", async () => {
+    mockResponse([makeVolume()]);
+    const provider = createGoogleBooksProvider("key");
+    const results = await provider.search("dune");
+    expect(results[0]?.formatHint).toBeNull();
+  });
+});

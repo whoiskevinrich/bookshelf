@@ -262,9 +262,19 @@ shelfRouter.post("/", async (c) => {
       ? (rawBook as BookMetadata)
       : null;
 
+  // Provider format hint (BOOKSHELF-92): only consulted when metadata comes fresh
+  // from the provider, never from client-supplied `book` JSON — the hint reflects
+  // signals *we* trust from Google Books, not arbitrary client input.
   let resolvedMeta: BookMetadata | null = null;
+  let providerFormatHint: EditionFormat | null = null;
   try {
-    resolvedMeta = clientBook ?? (await getBookByIsbn(isbn));
+    if (clientBook) {
+      resolvedMeta = clientBook;
+    } else {
+      const fetched = await getBookByIsbn(isbn);
+      resolvedMeta = fetched;
+      providerFormatHint = fetched?.formatHint ?? null;
+    }
     if (resolvedMeta) await putBookMetadata(isbn, sanitizeBookMetadata(resolvedMeta), addedAt);
   } catch (err) {
     console.error("Book metadata cache error:", err);
@@ -280,6 +290,19 @@ shelfRouter.post("/", async (c) => {
     console.error("Grouped-with computation error:", err);
   }
 
+  // Format auto-fill (BOOKSHELF-92): best-effort, and only on this fresh entry — it
+  // can never overwrite a user-set format since the entry was just created (dual-read
+  // default is null). A failure here must not fail the add.
+  let format: EditionFormat | null = null;
+  if (providerFormatHint) {
+    try {
+      await updateBookEntryAttributes(userId, isbn, { format: providerFormatHint });
+      format = providerFormatHint;
+    } catch (err) {
+      console.error("Format auto-fill error:", err);
+    }
+  }
+
   return c.json(
     {
       isbn,
@@ -290,7 +313,7 @@ shelfRouter.post("/", async (c) => {
       addedAt,
       notes: null,
       copies: 1,
-      format: null,
+      format,
       status: derivedStatus(owned),
       groupedWith,
     },
