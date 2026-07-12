@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/whoiskevinrich/bookshelf/compare/v0.5.0...v0.5.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* **e2e:** repair E2E pipeline - stale Wishlist assertions, missing remove-confirm click, ISBN fallback bug (BOOKSHELF-94) ([#120](https://github.com/whoiskevinrich/bookshelf/issues/120)) ([3a34142](https://github.com/whoiskevinrich/bookshelf/commit/3a34142840acebffab79b803e40f8346af549fc5))
+
 ## [0.5.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.4.0...v0.5.0) (2026-07-12)
 
 
