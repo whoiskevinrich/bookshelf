@@ -47,6 +47,8 @@ import {
   useReorderShelves,
 } from "../hooks/useShelves";
 import { ShelfBookCard } from "../components/shelf/ShelfBookCard";
+import { BulkActionBar } from "../components/shelf/BulkActionBar";
+import { useBulkShelfActions } from "../hooks/useBulkShelfActions";
 import { ShelfSkeleton } from "../components/shelf/ShelfSkeleton";
 import { ShelfErrorState } from "../components/shelf/ShelfErrorState";
 import { ShelfEmptyState } from "../components/shelf/ShelfEmptyState";
@@ -249,6 +251,10 @@ interface ShelfSectionProps {
   onDrop?: (e: React.DragEvent) => void;
   isDragging?: boolean;
   isDropTarget?: boolean;
+  // Manage mode (BOOKSHELF-59)
+  manageMode?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (isbn: string) => void;
 }
 
 function ShelfSection({
@@ -267,6 +273,9 @@ function ShelfSection({
   onDrop,
   isDragging,
   isDropTarget,
+  manageMode = false,
+  selected,
+  onToggleSelect,
 }: ShelfSectionProps) {
   const scrollRef = useHorizontalScrollOnWheel();
   return (
@@ -325,6 +334,9 @@ function ShelfSection({
                       ? "Couldn't remove book — please try again."
                       : null
                 }
+                manageMode={manageMode}
+                selected={selected?.has(entry.isbn) ?? false}
+                {...(onToggleSelect ? { onToggleSelect } : {})}
               />
             ))}
             {/* Trailing gutter — flex padding-right collapses at scroll-end, so a
@@ -360,6 +372,27 @@ export function ShelfPage() {
   const addToShelfMutation = useAddBookToShelf();
   const removeFromShelfMutation = useRemoveBookFromShelf();
   const reorderMutation = useReorderShelves();
+
+  // Manage mode (BOOKSHELF-59) — explicit bulk-select mode, off by default. Selection
+  // is cleared on exit so re-entering always starts from a clean slate.
+  const [manageMode, setManageMode] = useState(false);
+  const [selectedIsbns, setSelectedIsbns] = useState<Set<string>>(new Set());
+  const bulk = useBulkShelfActions();
+
+  function toggleManageMode() {
+    setManageMode((v) => !v);
+    setSelectedIsbns(new Set());
+    bulk.dismiss();
+  }
+
+  function toggleSelect(isbn: string) {
+    setSelectedIsbns((prev) => {
+      const next = new Set(prev);
+      if (next.has(isbn)) next.delete(isbn);
+      else next.add(isbn);
+      return next;
+    });
+  }
 
   // Phase 3 — system-facet/tag filtering + smart shelves (ADR-019).
   // Filter/view state lives in the URL so views are deep-linkable and shareable
@@ -403,6 +436,14 @@ export function ShelfPage() {
     DEFAULT_SORT,
     parseSortKey,
   );
+
+  // Manage-mode selection (BOOKSHELF-59) is scoped to whichever view is active —
+  // switching facet/tag/author/view/search resets it. Without this, a selection
+  // made in one view could carry ISBNs the next view never loaded, and a bulk tag
+  // add would then merge against an empty tag list instead of the book's real one.
+  useEffect(() => {
+    setSelectedIsbns(new Set());
+  }, [facet, tag, author, view, debouncedSearch]);
 
   // Replace history (not push) so tweaking filters doesn't stack up back-nav.
   const updateParams = useCallback(
@@ -699,6 +740,35 @@ export function ShelfPage() {
 
   const isEmpty = allEntries.length === 0;
 
+  // The entry set "Select all" should select — whichever view is currently active,
+  // mirroring the branch order the body renders below. Selection only ever covers
+  // loaded entries, same as the existing client-side search/author filters.
+  const visibleEntries = useMemo(() => {
+    if (searchActive) return searchResults;
+    if (authorActive) return authorEntries;
+    if (view === "reading-list") return readingListEntries;
+    if (isFiltered) return filteredEntries;
+    return allEntries;
+  }, [
+    searchActive,
+    searchResults,
+    authorActive,
+    authorEntries,
+    view,
+    readingListEntries,
+    isFiltered,
+    filteredEntries,
+    allEntries,
+  ]);
+
+  function selectAllVisible() {
+    setSelectedIsbns(new Set(visibleEntries.map((e) => e.isbn)));
+  }
+
+  function clearSelection() {
+    setSelectedIsbns(new Set());
+  }
+
   return (
     <div className="min-h-screen bg-paper-100 dark:bg-slate-900 transition-colors">
       <AppHeader />
@@ -706,39 +776,87 @@ export function ShelfPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold dark:text-white">My Library</h1>
+          {/* Manage mode (BOOKSHELF-59) swaps out the add/scan/new-shelf actions for a
+              single "Done" button — a clear visual state change that keeps adding
+              books and bulk-editing them from happening at the same time. */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setShowCreateShelf((v) => !v);
-                setShowSearch(false);
-              }}
-            >
-              {showCreateShelf ? "Cancel" : "+ New shelf"}
-            </Button>
-            {canScan && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setShowScanner(true);
-                  setShowSearch(false);
-                  setShowCreateShelf(false);
-                }}
-              >
-                Scan
+            {manageMode ? (
+              <Button variant="app" onClick={toggleManageMode}>
+                Done
               </Button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowCreateShelf((v) => !v);
+                    setShowSearch(false);
+                  }}
+                >
+                  {showCreateShelf ? "Cancel" : "+ New shelf"}
+                </Button>
+                {canScan && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setShowScanner(true);
+                      setShowSearch(false);
+                      setShowCreateShelf(false);
+                    }}
+                  >
+                    Scan
+                  </Button>
+                )}
+                <Button
+                  variant="app"
+                  onClick={() => {
+                    setShowSearch((v) => !v);
+                    setShowCreateShelf(false);
+                  }}
+                >
+                  {showSearch ? "Cancel" : "Add a book"}
+                </Button>
+                <Button variant="secondary" onClick={toggleManageMode} disabled={isEmpty}>
+                  Manage
+                </Button>
+              </>
             )}
-            <Button
-              variant="app"
-              onClick={() => {
-                setShowSearch((v) => !v);
-                setShowCreateShelf(false);
-              }}
-            >
-              {showSearch ? "Cancel" : "Add a book"}
-            </Button>
           </div>
         </div>
+
+        {manageMode && (
+          <div className="mb-8">
+            <BulkActionBar
+              selectedCount={selectedIsbns.size}
+              visibleCount={visibleEntries.length}
+              shelves={orderedShelves}
+              pending={bulk.pending}
+              result={bulk.result}
+              onSelectAll={selectAllVisible}
+              onClear={clearSelection}
+              onConfirmDelete={() => {
+                void bulk.bulkDelete(Array.from(selectedIsbns)).then(clearSelection);
+              }}
+              onMove={(status) =>
+                // Cleared after every bulk op, not just delete — a move/tag/shelf-add can
+                // drop a selected book out of the active view (e.g. moving out of a facet
+                // filter), and a stale selection re-used by a later bulk tag add would
+                // merge against a book this view no longer has real tag data for.
+                void bulk.bulkMove(Array.from(selectedIsbns), status).then(clearSelection)
+              }
+              onAddToShelf={(shelfId) =>
+                void bulk.bulkAddToShelf(Array.from(selectedIsbns), shelfId).then(clearSelection)
+              }
+              onAddTag={(tag) =>
+                void bulk
+                  .bulkAddTag(Array.from(selectedIsbns), tag, visibleEntries)
+                  .then(clearSelection)
+              }
+              onRetry={bulk.retry}
+              onDismissResult={bulk.dismiss}
+            />
+          </div>
+        )}
 
         {showScanner && <ScanModal onClose={() => setShowScanner(false)} />}
 
@@ -909,6 +1027,9 @@ export function ShelfPage() {
                             onRemoveFromShelf={(shelfId, isbn) =>
                               removeFromShelfMutation.mutate({ shelfId, isbn })
                             }
+                            manageMode={manageMode}
+                            selected={selectedIsbns.has(entry.isbn)}
+                            onToggleSelect={toggleSelect}
                           />
                         ))}
                       </div>
@@ -962,6 +1083,9 @@ export function ShelfPage() {
                             onRemoveFromShelf={(shelfId, isbn) =>
                               removeFromShelfMutation.mutate({ shelfId, isbn })
                             }
+                            manageMode={manageMode}
+                            selected={selectedIsbns.has(entry.isbn)}
+                            onToggleSelect={toggleSelect}
                           />
                         ))}
                       </div>
@@ -1006,6 +1130,9 @@ export function ShelfPage() {
                             onRemoveFromShelf={(shelfId, isbn) =>
                               removeFromShelfMutation.mutate({ shelfId, isbn })
                             }
+                            manageMode={manageMode}
+                            selected={selectedIsbns.has(entry.isbn)}
+                            onToggleSelect={toggleSelect}
                           />
                         ))}
                       </div>
@@ -1065,6 +1192,9 @@ export function ShelfPage() {
                             onRemoveFromShelf={(shelfId, isbn) =>
                               removeFromShelfMutation.mutate({ shelfId, isbn })
                             }
+                            manageMode={manageMode}
+                            selected={selectedIsbns.has(entry.isbn)}
+                            onToggleSelect={toggleSelect}
                           />
                         ))}
                       </div>
@@ -1103,6 +1233,9 @@ export function ShelfPage() {
                         onDrop={() => handleDrop(idx)}
                         isDragging={draggingIdx === idx}
                         isDropTarget={dropTargetIdx === idx && draggingIdx !== idx}
+                        manageMode={manageMode}
+                        selected={selectedIsbns}
+                        onToggleSelect={toggleSelect}
                       />
                     ))}
 
@@ -1115,6 +1248,9 @@ export function ShelfPage() {
                         moveMutation={moveMutation}
                         removeMutation={removeMutation}
                         addToShelfMutation={addToShelfMutation}
+                        manageMode={manageMode}
+                        selected={selectedIsbns}
+                        onToggleSelect={toggleSelect}
                         removeFromShelfMutation={removeFromShelfMutation}
                       />
                     )}

@@ -20,6 +20,26 @@ interface ShelfBookCardProps {
   isUpdatingShelves?: boolean;
   error?: string | null;
   staggerIndex?: number;
+  /** Manage mode (BOOKSHELF-59) — shows an always-visible selection checkbox and
+   *  turns the card into a select-on-click target instead of a detail-page link. */
+  manageMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (isbn: string) => void;
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="w-3 h-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      aria-hidden="true"
+    >
+      <path d="M3.5 8.5l2.75 2.75L12.5 5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -379,6 +399,9 @@ export function ShelfBookCard({
   isUpdatingShelves,
   error,
   staggerIndex,
+  manageMode = false,
+  selected = false,
+  onToggleSelect,
 }: ShelfBookCardProps) {
   const { isbn, owned, want, readingStatus, tags, copies, editionCount, book } = entry;
   const title = book?.title ?? isbn;
@@ -409,8 +432,12 @@ export function ShelfBookCard({
       {/* Cover + hover overlay — w-fit + mx-auto so the rounded corners and overlay hug the
           image exactly (not the wider column), and the cover sits centered in the column. */}
       <div
-        className="relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200 w-fit max-w-full mx-auto cursor-pointer"
-        onClick={() => navigate(`/book/${isbn}`)}
+        className={`relative rounded-lg overflow-hidden shadow-sm group-hover/card:shadow-xl transition-shadow duration-200 w-fit max-w-full mx-auto cursor-pointer ${
+          manageMode && selected
+            ? "ring-2 ring-slate-900 ring-offset-2 ring-offset-paper-100 dark:ring-white dark:ring-offset-slate-900"
+            : ""
+        }`}
+        onClick={() => (manageMode ? onToggleSelect?.(isbn) : navigate(`/book/${isbn}`))}
       >
         <BookCover
           key={book?.coverUrl ?? "no-cover"}
@@ -420,54 +447,87 @@ export function ShelfBookCard({
           className="h-[195px]"
         />
 
-        {/* Action overlay — hover (mouse) or focus-within (keyboard) only.
-            pointer-events follow visibility so the buttons can't be blind-tapped while hidden. */}
-        <div
-          className="absolute inset-0 flex flex-col items-center justify-end pb-2
-                     bg-gradient-to-t from-black/75 via-black/20 to-transparent
-                     transition-opacity duration-200 opacity-0 pointer-events-none
-                     group-hover/card:opacity-100 group-hover/card:pointer-events-auto
-                     focus-within:opacity-100 focus-within:pointer-events-auto"
-        >
-          {/* Stop button clicks from bubbling to the cover's navigate handler. */}
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            {/* One-directional quick action: wishlist → owned ("Mark as Owned").
-                Wishlisting an owned book is the confusing direction — that lives in
-                the book-detail view, not a card hover button. */}
-            {want && (
-              <OverlayButton
-                onClick={() => onMove(isbn, "owned")}
-                {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
-                title={isMoving ? "Moving…" : "Mark as Owned"}
-              >
-                {isMoving ? <SpinIcon /> : <MoveIcon toStatus="owned" />}
-              </OverlayButton>
-            )}
-
-            <ShelfPicker
-              isbn={isbn}
-              shelves={shelves}
-              onAdd={(shelfId) => onAddToShelf(shelfId, isbn)}
-              onRemove={(shelfId) => onRemoveFromShelf(shelfId, isbn)}
-              disabled={isUpdatingShelves === true}
+        {/* Manage mode (BOOKSHELF-59) — always-visible selection checkbox, not
+            hover-revealed, so it stays keyboard/touch reachable without competing
+            with the per-card overlay below (which is hidden while selecting). */}
+        {manageMode && (
+          <label
+            className="absolute top-1.5 left-1.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-black/55 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggleSelect?.(isbn)}
+              aria-label={`Select "${title}"`}
+              className="sr-only"
             />
-
-            <OverlayButton
-              onClick={() => setConfirmRemove(true)}
-              {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
-              title={isRemoving ? "Removing…" : "Remove from library"}
-              danger
+            <span
+              className={`grid h-4 w-4 place-items-center rounded border ${
+                selected
+                  ? "bg-white border-white text-slate-900"
+                  : "border-white/80 text-transparent"
+              }`}
             >
-              {isRemoving ? <SpinIcon /> : <TrashIcon />}
-            </OverlayButton>
+              <CheckIcon />
+            </span>
+          </label>
+        )}
+
+        {/* Action overlay — hover (mouse) or focus-within (keyboard) only, and hidden
+            entirely in Manage mode so it never competes with the selection checkbox
+            for the same tap (BOOKSHELF-48 precedent; BOOKSHELF-59 keeps destructive
+            per-card actions and bulk selection mutually exclusive).
+            pointer-events follow visibility so the buttons can't be blind-tapped while hidden. */}
+        {!manageMode && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-end pb-2
+                       bg-gradient-to-t from-black/75 via-black/20 to-transparent
+                       transition-opacity duration-200 opacity-0 pointer-events-none
+                       group-hover/card:opacity-100 group-hover/card:pointer-events-auto
+                       focus-within:opacity-100 focus-within:pointer-events-auto"
+          >
+            {/* Stop button clicks from bubbling to the cover's navigate handler. */}
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              {/* One-directional quick action: wishlist → owned ("Mark as Owned").
+                  Wishlisting an owned book is the confusing direction — that lives in
+                  the book-detail view, not a card hover button. */}
+              {want && (
+                <OverlayButton
+                  onClick={() => onMove(isbn, "owned")}
+                  {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
+                  title={isMoving ? "Moving…" : "Mark as Owned"}
+                >
+                  {isMoving ? <SpinIcon /> : <MoveIcon toStatus="owned" />}
+                </OverlayButton>
+              )}
+
+              <ShelfPicker
+                isbn={isbn}
+                shelves={shelves}
+                onAdd={(shelfId) => onAddToShelf(shelfId, isbn)}
+                onRemove={(shelfId) => onRemoveFromShelf(shelfId, isbn)}
+                disabled={isUpdatingShelves === true}
+              />
+
+              <OverlayButton
+                onClick={() => setConfirmRemove(true)}
+                {...(!!(isMoving || isRemoving) ? { disabled: true } : {})}
+                title={isRemoving ? "Removing…" : "Remove from library"}
+                danger
+              >
+                {isRemoving ? <SpinIcon /> : <TrashIcon />}
+              </OverlayButton>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* State pills — always visible, rendered above the overlay so the reveal
-            doesn't hide them. Non-interactive: taps pass through to the cover. */}
+            doesn't hide them. Non-interactive: taps pass through to the cover.
+            Shifted down in Manage mode so they don't collide with the checkbox. */}
         <div className="pointer-events-none absolute inset-0">
           {(owned || want) && (
-            <div className="absolute top-1.5 left-1.5">
+            <div className={`absolute left-1.5 ${manageMode ? "top-9" : "top-1.5"}`}>
               {/* Owned/Wishlist are mutually exclusive — exactly one renders. Icon color
                   (green/red) reinforces the label; the text keeps it WCAG-safe. */}
               {owned ? (
@@ -519,12 +579,23 @@ export function ShelfBookCard({
 
       {/* Book info */}
       <div className="px-0.5">
-        <Link
-          to={`/book/${isbn}`}
-          className="block text-[13px] font-medium leading-snug line-clamp-2 min-h-[2.3rem] dark:text-white text-slate-900 hover:underline"
-        >
-          {title}
-        </Link>
+        {manageMode ? (
+          <button
+            type="button"
+            onClick={() => onToggleSelect?.(isbn)}
+            aria-pressed={selected}
+            className="block w-full text-left text-[13px] font-medium leading-snug line-clamp-2 min-h-[2.3rem] dark:text-white text-slate-900 hover:underline"
+          >
+            {title}
+          </button>
+        ) : (
+          <Link
+            to={`/book/${isbn}`}
+            className="block text-[13px] font-medium leading-snug line-clamp-2 min-h-[2.3rem] dark:text-white text-slate-900 hover:underline"
+          >
+            {title}
+          </Link>
+        )}
         {authors.length > 0 && (
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 truncate leading-tight">
             {authors.join(", ")}

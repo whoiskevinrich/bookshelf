@@ -319,6 +319,15 @@ The full-screen `ScanModal` (`fixed inset-0`) is the canonical example - its hea
 
 No hover-only affordances. If an element is interactive, it must be visible without hover (e.g., book card action buttons are always rendered, not `opacity-0 group-hover:opacity-100`).
 
+### Bulk selection (Manage mode, BOOKSHELF-59)
+
+`ShelfPage`'s Manage mode is the one pattern in the app where cards render a selection checkbox and a sticky action bar. It's a deliberate exception to the hover-reveal per-card overlay (`ShelfBookCard`'s "Shelf card actions" precedent, above) — the two never render at once:
+
+- The checkbox (`ShelfBookCard`'s top-left corner) is **always visible** while `manageMode` is on, never hover-revealed — required by the no-hover-only rule above and by keyboard/touch access to bulk selection.
+- Selecting toggles the card's whole tap target (cover + title), not just the small checkbox — the checkbox alone is too small a target on touch.
+- A selected card gets a visible `ring-2` in addition to the checked checkbox (shape + state, not color alone — see Color-only information below).
+- The action bar (`BulkActionBar`) follows the existing "active state" bar language (`ActiveFilterBar`/`ReadingListBar` in `ShelfFilterControls.tsx`): `rounded-xl`/sticky variant, `<Button>` throughout, a `Callout` for the post-batch per-item result summary, and `ConfirmDialog` (`danger` variant) gating bulk delete with an explicit count.
+
 ---
 
 ## Animations
