@@ -20,6 +20,54 @@ const UNIT_SEP = "\x1f"; // between fields within a commit
 // whitespace. The captured value is the sentence shown in the feed.
 const TRAILER_RE = /^Release-Note:[ \t]*(.+?)[ \t]*$/i;
 
+// Launch backfill (BOOKSHELF-76 / spec Q4): git history can't be rewritten to add
+// Release-Note trailers retroactively, so this hardcoded list seeds the feed with
+// the ~8 notable pre-convention releases from the brainstorm gut-check. Each id
+// and date is the real squash-merge commit's short SHA and author date, so the
+// entries interleave correctly with trailer-derived ones once sorted.
+const SEED_ENTRIES = [
+  {
+    id: "3d72475",
+    date: "2026-07-03",
+    note: "The app now fits your thumb on phones - bigger tap targets, safe-area padding around notches, and text sized to read comfortably on the go.",
+  },
+  {
+    id: "e188a00",
+    date: "2026-07-03",
+    note: "Find any book you own by title or author, right from the shelf.",
+  },
+  {
+    id: "10ada42",
+    date: "2026-07-02",
+    note: "Barcode scanning now handles books with a price add-on code, so scans that used to fail now go straight in.",
+  },
+  {
+    id: "54381be",
+    date: "2026-07-02",
+    note: "Your reading list is now called Wishlist, with direct nav links to Wishlist and Reading List so you can jump straight to either.",
+  },
+  {
+    id: "5fea76f",
+    date: "2026-07-02",
+    note: "Shelf filters now live in the URL, so you can bookmark or share a filtered view and it loads exactly as you left it.",
+  },
+  {
+    id: "084d9ba",
+    date: "2026-07-02",
+    note: "The light theme got a warmer, paper-like polish instead of stark white.",
+  },
+  {
+    id: "4facc69",
+    date: "2026-06-28",
+    note: "Add tags, a reading status, and other details to any book, and browse smart shelves that auto-organize around them.",
+  },
+  {
+    id: "25d46ca",
+    date: "2026-06-27",
+    note: "Shelves now have their own page with inline rename and a confirmation step before you delete one, so nothing disappears by accident.",
+  },
+];
+
 function git(args) {
   return execFileSync("git", args, {
     encoding: "utf8",
@@ -65,6 +113,17 @@ export function extractEntries(commits) {
   return entries;
 }
 
+// Merges the hardcoded seed list with trailer-derived entries, de-duplicated by
+// `id` (a real trailer wins over a seed entry with the same id), sorted back into
+// reverse-chronological order. Exported for testing.
+export function mergeEntries(derivedEntries, seedEntries) {
+  const byId = new Map();
+  for (const entry of [...seedEntries, ...derivedEntries]) {
+    byId.set(entry.id, entry);
+  }
+  return [...byId.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
 function main() {
   let commits = [];
   try {
@@ -83,7 +142,7 @@ function main() {
     root = join(dirname(fileURLToPath(import.meta.url)), "..");
   }
 
-  const entries = extractEntries(commits);
+  const entries = mergeEntries(extractEntries(commits), SEED_ENTRIES);
   // Derived from history (newest entry's date), never the wall clock, so the
   // file is byte-identical across runs on the same history.
   const generatedAt = entries[0]?.date ?? commits[0]?.date ?? null;
