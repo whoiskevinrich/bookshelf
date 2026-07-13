@@ -16,11 +16,11 @@ import {
   ResourceNotFoundException,
 } from "@aws-sdk/client-dynamodb";
 import {
-  queryShelf,
-  putShelfEntry,
-  getShelfEntry,
-  deleteShelfEntry,
-  updateShelfStatus,
+  queryBookEntries,
+  getBookEntry,
+  putBookEntry,
+  deleteBookEntry,
+  updateBookEntryAttributes,
   putBookMetadata,
   encodeCursor,
   decodeCursor,
@@ -88,103 +88,109 @@ const BOOK_META = {
   description: "A sweeping tale set on Arrakis.",
 };
 
-// ── putShelfEntry ──────────────────────────────────────────────────────────
+// ── putBookEntry ───────────────────────────────────────────────────────────
 
-describe("putShelfEntry", () => {
-  it("adds a shelf entry without error", async () => {
+describe("putBookEntry", () => {
+  it("adds an entry without error", async () => {
     const userId = nextUser();
     await expect(
-      putShelfEntry(userId, ISBN_DUNE, "owned", new Date().toISOString()),
+      putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, new Date().toISOString()),
     ).resolves.toBeUndefined();
   });
 
   it("throws ConditionalCheckFailedException on duplicate", async () => {
     const userId = nextUser();
     const addedAt = new Date().toISOString();
-    await putShelfEntry(userId, ISBN_DUNE, "owned", addedAt);
-    await expect(putShelfEntry(userId, ISBN_DUNE, "owned", addedAt)).rejects.toThrow();
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt);
+    await expect(
+      putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt),
+    ).rejects.toThrow();
   });
 });
 
-// ── getShelfEntry ──────────────────────────────────────────────────────────
+// ── getBookEntry ───────────────────────────────────────────────────────────
 
-describe("getShelfEntry", () => {
+describe("getBookEntry", () => {
   it("returns the entry after put", async () => {
     const userId = nextUser();
     const addedAt = new Date().toISOString();
-    await putShelfEntry(userId, ISBN_DUNE, "owned", addedAt);
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt);
 
-    const entry = await getShelfEntry(userId, ISBN_DUNE);
+    const entry = await getBookEntry(userId, ISBN_DUNE);
     expect(entry).not.toBeNull();
     expect(entry?.isbn).toBe(ISBN_DUNE);
-    expect(entry?.status).toBe("owned");
+    expect(entry?.owned).toBe(true);
+    expect(entry?.want).toBe(false);
     expect(entry?.addedAt).toBe(addedAt);
   });
 
   it("returns null when not on shelf", async () => {
     const userId = nextUser();
-    const entry = await getShelfEntry(userId, ISBN_DUNE);
+    const entry = await getBookEntry(userId, ISBN_DUNE);
     expect(entry).toBeNull();
   });
 
-  it("finds an entry regardless of status (owned or want)", async () => {
+  it("finds an entry regardless of owned/want combination", async () => {
     const userId = nextUser();
-    await putShelfEntry(userId, ISBN_DUNE, "want", new Date().toISOString());
-    const entry = await getShelfEntry(userId, ISBN_DUNE);
-    expect(entry?.status).toBe("want");
+    await putBookEntry(userId, ISBN_DUNE, { owned: false, want: true }, new Date().toISOString());
+    const entry = await getBookEntry(userId, ISBN_DUNE);
+    expect(entry?.owned).toBe(false);
+    expect(entry?.want).toBe(true);
   });
 });
 
-// ── deleteShelfEntry ───────────────────────────────────────────────────────
+// ── deleteBookEntry ────────────────────────────────────────────────────────
 
-describe("deleteShelfEntry", () => {
-  it("removes an entry so getShelfEntry returns null", async () => {
+describe("deleteBookEntry", () => {
+  it("removes an entry so getBookEntry returns null", async () => {
     const userId = nextUser();
-    await putShelfEntry(userId, ISBN_DUNE, "owned", new Date().toISOString());
-    await deleteShelfEntry(userId, ISBN_DUNE, "owned");
-    const entry = await getShelfEntry(userId, ISBN_DUNE);
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, new Date().toISOString());
+    await deleteBookEntry(userId, ISBN_DUNE);
+    const entry = await getBookEntry(userId, ISBN_DUNE);
     expect(entry).toBeNull();
   });
 
   it("is idempotent — deleting a non-existent entry does not throw", async () => {
     const userId = nextUser();
-    await expect(deleteShelfEntry(userId, ISBN_DUNE, "owned")).resolves.toBeUndefined();
+    await expect(deleteBookEntry(userId, ISBN_DUNE)).resolves.toBeUndefined();
   });
 });
 
-// ── updateShelfStatus ──────────────────────────────────────────────────────
+// ── updateBookEntryAttributes ─────────────────────────────────────────────
 
-describe("updateShelfStatus", () => {
+describe("updateBookEntryAttributes", () => {
   it("moves a book from owned to want", async () => {
     const userId = nextUser();
     const addedAt = new Date().toISOString();
-    await putShelfEntry(userId, ISBN_DUNE, "owned", addedAt);
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt);
 
-    await updateShelfStatus(userId, ISBN_DUNE, "owned", "want", addedAt);
+    await updateBookEntryAttributes(userId, ISBN_DUNE, { owned: false, want: true });
 
-    const entry = await getShelfEntry(userId, ISBN_DUNE);
-    expect(entry?.status).toBe("want");
+    const entry = await getBookEntry(userId, ISBN_DUNE);
+    expect(entry?.owned).toBe(false);
+    expect(entry?.want).toBe(true);
   });
 
   it("moves a book from want to owned", async () => {
     const userId = nextUser();
     const addedAt = new Date().toISOString();
-    await putShelfEntry(userId, ISBN_DUNE, "want", addedAt);
+    await putBookEntry(userId, ISBN_DUNE, { owned: false, want: true }, addedAt);
 
-    await updateShelfStatus(userId, ISBN_DUNE, "want", "owned", addedAt);
+    await updateBookEntryAttributes(userId, ISBN_DUNE, { owned: true, want: false });
 
-    const entry = await getShelfEntry(userId, ISBN_DUNE);
-    expect(entry?.status).toBe("owned");
+    const entry = await getBookEntry(userId, ISBN_DUNE);
+    expect(entry?.owned).toBe(true);
+    expect(entry?.want).toBe(false);
   });
 
-  it("preserves addedAt timestamp after move", async () => {
+  it("preserves addedAt timestamp after update", async () => {
     const userId = nextUser();
     const addedAt = "2026-01-15T12:00:00.000Z";
-    await putShelfEntry(userId, ISBN_DUNE, "owned", addedAt);
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt);
 
-    await updateShelfStatus(userId, ISBN_DUNE, "owned", "want", addedAt);
+    await updateBookEntryAttributes(userId, ISBN_DUNE, { owned: false, want: true });
 
-    const entry = await getShelfEntry(userId, ISBN_DUNE);
+    const entry = await getBookEntry(userId, ISBN_DUNE);
     expect(entry?.addedAt).toBe(addedAt);
   });
 });
@@ -192,14 +198,14 @@ describe("updateShelfStatus", () => {
 // ── putBookMetadata ────────────────────────────────────────────────────────
 
 describe("putBookMetadata", () => {
-  it("stores book metadata retrievable via queryShelf", async () => {
+  it("stores book metadata retrievable via queryBookEntries", async () => {
     const userId = nextUser();
     const addedAt = new Date().toISOString();
 
     await putBookMetadata(ISBN_DUNE, BOOK_META, addedAt);
-    await putShelfEntry(userId, ISBN_DUNE, "owned", addedAt);
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt);
 
-    const result = await queryShelf({ userId });
+    const result = await queryBookEntries({ userId });
     const entry = result.entries[0];
     expect(entry?.book?.title).toBe("Dune");
     expect(entry?.book?.authors).toEqual(["Frank Herbert"]);
@@ -207,12 +213,12 @@ describe("putBookMetadata", () => {
   });
 });
 
-// ── queryShelf ─────────────────────────────────────────────────────────────
+// ── queryBookEntries ───────────────────────────────────────────────────────
 
-describe("queryShelf", () => {
+describe("queryBookEntries", () => {
   it("returns empty result for a new user", async () => {
     const userId = nextUser();
-    const result = await queryShelf({ userId });
+    const result = await queryBookEntries({ userId });
     expect(result.entries).toHaveLength(0);
     expect(result.total).toBe(0);
     expect(result.nextCursor).toBeNull();
@@ -221,32 +227,32 @@ describe("queryShelf", () => {
   it("returns all entries for a user", async () => {
     const userId = nextUser();
     const addedAt = new Date().toISOString();
-    await putShelfEntry(userId, ISBN_DUNE, "owned", addedAt);
-    await putShelfEntry(userId, ISBN_NEURO, "want", addedAt);
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt);
+    await putBookEntry(userId, ISBN_NEURO, { owned: false, want: true }, addedAt);
 
-    const result = await queryShelf({ userId });
+    const result = await queryBookEntries({ userId });
     expect(result.total).toBe(2);
     expect(result.entries).toHaveLength(2);
   });
 
   // Both filter tests share one user seeded once — halves the DynamoDB writes.
-  describe("status filter", () => {
+  describe("owned/want filter", () => {
     let sharedUserId: string;
     beforeAll(async () => {
       sharedUserId = nextUser();
       const addedAt = new Date().toISOString();
-      await putShelfEntry(sharedUserId, ISBN_DUNE, "owned", addedAt);
-      await putShelfEntry(sharedUserId, ISBN_NEURO, "want", addedAt);
+      await putBookEntry(sharedUserId, ISBN_DUNE, { owned: true, want: false }, addedAt);
+      await putBookEntry(sharedUserId, ISBN_NEURO, { owned: false, want: true }, addedAt);
     });
 
-    it("filters by status=owned", async () => {
-      const result = await queryShelf({ userId: sharedUserId, status: "owned" });
+    it("filters by owned=true", async () => {
+      const result = await queryBookEntries({ userId: sharedUserId, filter: { owned: true } });
       expect(result.entries).toHaveLength(1);
       expect(result.entries[0]?.isbn).toBe(ISBN_DUNE);
     });
 
-    it("filters by status=want", async () => {
-      const result = await queryShelf({ userId: sharedUserId, status: "want" });
+    it("filters by want=true", async () => {
+      const result = await queryBookEntries({ userId: sharedUserId, filter: { want: true } });
       expect(result.entries).toHaveLength(1);
       expect(result.entries[0]?.isbn).toBe(ISBN_NEURO);
     });
@@ -255,15 +261,15 @@ describe("queryShelf", () => {
   it("paginates with limit and returns a cursor", async () => {
     const userId = nextUser();
     const addedAt = new Date().toISOString();
-    await putShelfEntry(userId, ISBN_DUNE, "owned", addedAt);
-    await putShelfEntry(userId, ISBN_NEURO, "owned", addedAt);
+    await putBookEntry(userId, ISBN_DUNE, { owned: true, want: false }, addedAt);
+    await putBookEntry(userId, ISBN_NEURO, { owned: true, want: false }, addedAt);
 
-    const page1 = await queryShelf({ userId, limit: 1 });
+    const page1 = await queryBookEntries({ userId, limit: 1 });
     expect(page1.entries).toHaveLength(1);
     expect(page1.nextCursor).not.toBeNull();
     expect(page1.total).toBe(2);
 
-    const page2 = await queryShelf({ userId, limit: 1, cursor: page1.nextCursor! });
+    const page2 = await queryBookEntries({ userId, limit: 1, cursor: page1.nextCursor! });
     expect(page2.entries).toHaveLength(1);
     // DynamoDB may return a cursor even on the last page when Limit equals remaining items;
     // verify all items are accounted for instead of asserting cursor is null.
@@ -277,9 +283,9 @@ describe("queryShelf", () => {
   it("returns book=null when metadata is missing", async () => {
     const userId = nextUser();
     const unknownIsbn = "9780000000001";
-    await putShelfEntry(userId, unknownIsbn, "owned", new Date().toISOString());
+    await putBookEntry(userId, unknownIsbn, { owned: true, want: false }, new Date().toISOString());
 
-    const result = await queryShelf({ userId });
+    const result = await queryBookEntries({ userId });
     expect(result.entries[0]?.book).toBeNull();
   });
 
@@ -287,9 +293,9 @@ describe("queryShelf", () => {
     const userA = nextUser();
     const userB = nextUser();
     const addedAt = new Date().toISOString();
-    await putShelfEntry(userA, ISBN_DUNE, "owned", addedAt);
+    await putBookEntry(userA, ISBN_DUNE, { owned: true, want: false }, addedAt);
 
-    const result = await queryShelf({ userId: userB });
+    const result = await queryBookEntries({ userId: userB });
     expect(result.entries).toHaveLength(0);
   });
 });
@@ -298,7 +304,7 @@ describe("queryShelf", () => {
 
 describe("encodeCursor / decodeCursor", () => {
   it("roundtrips a DynamoDB exclusive start key", () => {
-    const key = { PK: "USER#abc", SK: "SHELF#owned#9780441013593" };
+    const key = { PK: "USER#abc", SK: "ENTRY#9780441013593" };
     expect(decodeCursor(encodeCursor(key))).toEqual(key);
   });
 });

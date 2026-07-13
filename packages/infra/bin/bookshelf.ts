@@ -2,7 +2,7 @@
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { AuthStack, AuthPoolPhase, AUTH_POOL_PHASES } from "../lib/auth-stack";
-import { ApiStack, ApiCustomDomainConfig } from "../lib/api-stack";
+import { ApiStack, ApiCustomDomainConfig, API_MAX_CONCURRENCY } from "../lib/api-stack";
 import { McpStack, McpCustomDomainConfig } from "../lib/mcp-stack";
 import { WebStack, WebCustomDomainConfig } from "../lib/web-stack";
 import { CdnCertStack } from "../lib/cdn-cert-stack";
@@ -37,11 +37,6 @@ interface EnvConfig {
   /** Custom domain subtree, e.g. "bookshelf.whoiskevinrich.com" (full prod only). */
   domain?: string;
   /**
-   * Mobile camera ISBN scanner. Verified on a real phone against the dev
-   * CloudFront URL (2026-06-13), then released to prod. On in both environments.
-   */
-  scannerEnabled: boolean;
-  /**
    * OCR text-scan feature (client UI flag + server Rekognition endpoint).
    * Ships dark (false) in all envs; enable here when ready to launch.
    */
@@ -72,7 +67,6 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     // `admin-create-user` to succeed when (re)provisioning the test user. See
     // docs/handoffs/2026-06-29-e2e-unblock-qa-cognito.md.
     googleEmailAllowlist: "whoiskevinrich@gmail.com,whoiskevinrich+bookshelf-qa@gmail.com",
-    scannerEnabled: true,
     ocrScanEnabled: true,
     authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
@@ -81,7 +75,6 @@ const ENVIRONMENTS: Record<string, EnvConfig> = {
     allowSelfSignUp: true,
     apiThroughCloudFront: true,
     domain: "bookshelf.whoiskevinrich.com",
-    scannerEnabled: true,
     authPool: "green", // migrated 2026-06-13 (ADR-015)
   },
 };
@@ -215,6 +208,10 @@ const api = new ApiStack(app, "BookshelfApi", {
   sameOrigin: config.apiThroughCloudFront,
   ocrScanEnabled: config.ocrScanEnabled,
   ...(apiCustomDomain ? { customDomain: apiCustomDomain } : {}),
+  // Both env accounts' concurrency quotas now sit well above the AWS
+  // minimum-unreserved floor (BOOKSHELF-25), so the cost ceiling applies
+  // everywhere again.
+  reservedConcurrency: API_MAX_CONCURRENCY,
 });
 
 // mcpCustomDomain references api.regionalCertificate (the wildcard regional cert
@@ -252,7 +249,6 @@ const web = new WebStack(app, "BookshelfWeb", {
     cognitoRegion: config.region,
     cognitoOauthDomain: auth.hostedUiDomain,
     apiBaseUrl: config.apiThroughCloudFront ? "/api" : api.apiUrl,
-    featureScanner: config.scannerEnabled,
     featureOcrScan: config.ocrScanEnabled,
   },
 });

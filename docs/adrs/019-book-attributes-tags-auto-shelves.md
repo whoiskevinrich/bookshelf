@@ -182,5 +182,5 @@ When a user's shelf genuinely outgrows in-memory filtering, Option B's GSI can b
 5. [ ] Auto-shelf endpoint(s): system + tag/author rules computed server-side (shape decided by Q3).
 6. [ ] Backfill `apps/api/scripts/migrate-status-to-attributes.ts` + `docs/runbooks/` migration runbook.
 7. [ ] Additive API response (`owned`/`want`/`readingStatus`/`tags`, `status` deprecated); update ADR-002 note and web client.
-8. [ ] Follow-up cleanup task: drop the `status` field + dual-read fallback after the transition release.
+8. [x] Follow-up cleanup task: drop the `status` field + dual-read fallback after the transition release (BOOKSHELF-10, 2026-07-12). Both dev and prod confirmed fully migrated (0 legacy items) before removal; the web client and MCP tools now send `owned`/`want` on the wire (the MCP `status` tool argument is unchanged — only its translation to the API changed).
 9. [ ] Record this decision in `docs/decisions.md` and flip Status → Accepted on sign-off.

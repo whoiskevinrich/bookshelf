@@ -15,9 +15,7 @@ import {
   updateBookEntryNotes,
   updateBookEntryTags,
   putBookMetadata,
-  isValidStatus,
   isValidReadingStatus,
-  derivedStatus,
   normalizeTag,
   InvalidCursorError,
   type BookMetadata,
@@ -79,18 +77,8 @@ shelfRouter.get("/", async (c) => {
   const cursor = c.req.query("cursor");
   const rawLimit = c.req.query("limit");
 
-  // Build the in-memory filter (ADR-019). `status` is the deprecated enum kept for
-  // one release; it maps onto the owned/want booleans.
+  // Build the in-memory filter (ADR-019).
   const filter: EntryFilter = {};
-
-  const rawStatus = c.req.query("status");
-  if (rawStatus) {
-    if (!isValidStatus(rawStatus)) {
-      return c.json({ error: "status must be 'owned' or 'want'" }, 400);
-    }
-    if (rawStatus === "owned") filter.owned = true;
-    else filter.want = true;
-  }
 
   const rawOwned = c.req.query("owned");
   if (rawOwned !== undefined) {
@@ -200,18 +188,11 @@ shelfRouter.post("/", async (c) => {
   if (isbnOrErr instanceof Response) return isbnOrErr;
   const isbn = isbnOrErr;
 
-  // Attributes: accept owned/want/readingStatus, or the deprecated `status` enum
-  // (one transition release). At least one of owned/want must end up true.
+  // Attributes: accept owned/want/readingStatus. At least one of owned/want must
+  // end up true.
   let owned = false;
   let want = false;
 
-  if (obj["status"] !== undefined) {
-    if (!isValidStatus(obj["status"])) {
-      return c.json({ error: "status must be 'owned' or 'want'" }, 400);
-    }
-    owned = obj["status"] === "owned";
-    want = obj["status"] === "want";
-  }
   if (obj["owned"] !== undefined) {
     if (typeof obj["owned"] !== "boolean") {
       return c.json({ error: "owned must be a boolean" }, 400);
@@ -317,7 +298,6 @@ shelfRouter.post("/", async (c) => {
       // Self + whatever this add auto-joined (BOOKSHELF-93) — same count the list/
       // detail views would compute, without a second grouping query.
       editionCount: groupedWith.length + 1,
-      status: derivedStatus(owned),
       groupedWith,
     },
     201,
@@ -422,7 +402,7 @@ shelfRouter.patch("/:isbn/tags", async (c) => {
   return c.json({ ...existing, tags: [...normalized].sort() });
 });
 
-// PATCH /v1/shelf/:isbn — update owned / want / readingStatus (or legacy status)
+// PATCH /v1/shelf/:isbn — update owned / want / readingStatus
 shelfRouter.patch("/:isbn", async (c) => {
   const { userId } = c.get("auth");
 
@@ -436,14 +416,6 @@ shelfRouter.patch("/:isbn", async (c) => {
 
   const patch: EntryAttributePatch = {};
 
-  // Deprecated `status` enum (one transition release) → owned/want booleans.
-  if (obj["status"] !== undefined) {
-    if (!isValidStatus(obj["status"])) {
-      return c.json({ error: "status must be 'owned' or 'want'" }, 400);
-    }
-    patch.owned = obj["status"] === "owned";
-    patch.want = obj["status"] === "want";
-  }
   if (obj["owned"] !== undefined) {
     if (typeof obj["owned"] !== "boolean") {
       return c.json({ error: "owned must be a boolean" }, 400);
@@ -573,7 +545,6 @@ shelfRouter.patch("/:isbn", async (c) => {
     notes: existing.notes,
     copies,
     format,
-    status: derivedStatus(owned),
   });
 });
 

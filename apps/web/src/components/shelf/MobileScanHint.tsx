@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react";
 import { Callout } from "../ui/Callout";
 import { QrCode } from "../ui/QrCode";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
-import { getRuntimeConfig } from "../../lib/runtime-config";
 import { supportsCameraScan } from "../../lib/device";
 import { track } from "../../lib/analytics";
 
@@ -19,9 +18,9 @@ const parseDismissed = (raw: string): "yes" | "no" | null =>
 
 /**
  * Points desktop users to the mobile camera scanner, which is hidden on their
- * device (`supportsCameraScan()` is false). Renders nothing when scanning is
- * disabled for the environment, when the current device can already scan, or
- * once the user has dismissed it. See `docs/specs/mobile-scan-discoverability.md`.
+ * device (`supportsCameraScan()` is false). Renders nothing when the current
+ * device can already scan, or once the user has dismissed it. See
+ * `docs/specs/mobile-scan-discoverability.md`.
  *
  * `page` is attached to every analytics event so CloudWatch can attribute
  * shown/clicked/dismissed by where the hint was surfaced.
@@ -33,8 +32,8 @@ export function MobileScanHint({ page }: { page: "shelf" | "wishlist" }) {
     parseDismissed,
   );
 
-  // Eligible = feature on for this env AND this device can't scan itself.
-  const eligible = useMemo(() => getRuntimeConfig().features.scanner && !supportsCameraScan(), []);
+  // Eligible = this device can't scan itself.
+  const eligible = useMemo(() => !supportsCameraScan(), []);
   const show = eligible && dismissed === "no";
 
   useEffect(() => {

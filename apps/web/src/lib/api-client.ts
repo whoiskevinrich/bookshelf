@@ -42,8 +42,6 @@ export interface ShelfEntry {
    * mirroring `ShelfEntryDetail.editions.length > 1`.
    */
   editionCount: number;
-  /** @deprecated Derived from owned/want during the transition (ADR-019). */
-  status: ShelfStatus;
   book: BookMetadata | null;
 }
 
@@ -149,10 +147,9 @@ export interface ShelfFilter {
 }
 
 export async function fetchShelf(
-  opts: ShelfFilter & { status?: ShelfStatus; cursor?: string; limit?: number },
+  opts: ShelfFilter & { cursor?: string; limit?: number },
 ): Promise<ShelfPage> {
   const params = new URLSearchParams();
-  if (opts.status) params.set("status", opts.status);
   if (opts.owned !== undefined) params.set("owned", String(opts.owned));
   if (opts.want !== undefined) params.set("want", String(opts.want));
   if (opts.readingStatus) params.set("readingStatus", opts.readingStatus);
@@ -174,7 +171,12 @@ export async function addToShelf(
 ): Promise<AddToShelfResult> {
   const res = await authedFetch("/v1/shelf", {
     method: "POST",
-    body: JSON.stringify({ isbn, status, ...(book ? { book } : {}) }),
+    body: JSON.stringify({
+      isbn,
+      owned: status === "owned",
+      want: status === "want",
+      ...(book ? { book } : {}),
+    }),
   });
   await throwIfError(res);
   return res.json() as Promise<AddToShelfResult>;
@@ -183,7 +185,7 @@ export async function addToShelf(
 export async function updateShelfStatus(isbn: string, status: ShelfStatus): Promise<ShelfEntry> {
   const res = await authedFetch(`/v1/shelf/${isbn}`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ owned: status === "owned", want: status === "want" }),
   });
   await throwIfError(res);
   return res.json() as Promise<ShelfEntry>;

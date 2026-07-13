@@ -10,9 +10,6 @@ vi.mock("../components/AppHeader", () => ({
 }));
 // Keep the scanner out of the way — no camera in jsdom.
 vi.mock("../lib/device", () => ({ supportsCameraScan: () => false }));
-vi.mock("../lib/runtime-config", () => ({
-  getRuntimeConfig: () => ({ apiBaseUrl: "", features: { scanner: false } }),
-}));
 
 vi.mock("../lib/api-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api-client")>();
@@ -124,7 +121,7 @@ describe("ShelfPage — duplicate add offers 'add another copy' (BOOKSHELF-60)",
     // The 409 fires for a wishlisted book too — but copies is owned-only, so the
     // ownership lookup must gate the offer off.
     mockFetchEntry.mockResolvedValue(
-      makeEntryDetail({ isbn: WISH_ISBN, owned: false, want: true, status: "want", copies: 1 }),
+      makeEntryDetail({ isbn: WISH_ISBN, owned: false, want: true, copies: 1 }),
     );
 
     renderPage();

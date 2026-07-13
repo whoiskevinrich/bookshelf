@@ -46,8 +46,10 @@ path.** Concretely:
    aggregate circuit breaker that sheds floods **before Lambda** (the API is a single
    `/{proxy+}` integration, so the gateway can only throttle in aggregate; per-path
    limits live in the app).
-2. **Lambda `reservedConcurrentExecutions` cap** (default 10) — a hard ceiling on
-   attack-driven Lambda/DynamoDB spend.
+2. **Lambda `reservedConcurrentExecutions` cap** (8) — a hard ceiling on attack-driven
+   Lambda/DynamoDB spend. Removed for a period when dev's account concurrency quota sat
+   below the AWS unreserved floor, blocking deployment; restored for both envs once the
+   quota was raised (BOOKSHELF-25).
 3. **App-level per-user rate cap** — Hono middleware on `/v1/books/*` keyed on the
    authenticated `userId`, returning `429` + `Retry-After`. **Path-independent** (runs
    in-Lambda), so it covers the `execute-api` bypass and the `api.` domain. **Store:

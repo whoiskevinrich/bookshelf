@@ -33,8 +33,10 @@ added`) → `extractIsbn13` (`lib/isbn.ts`) → `getBookByIsbn` → add via
 
 ## Non-negotiables
 
-- **Feature flag**: behind `features.scanner` (dev on, prod off until
-  verified on real hardware) — decode quality isn't unit-testable headlessly.
+- **No feature flag**: the barcode scanner shipped to both envs and the flag
+  was retired (BOOKSHELF-26) — visibility is gated only by
+  `supportsCameraScan()` below. The separate OCR text-scan mode still ships
+  dark behind `features.ocrScan`.
 - **Destination chip is the only setter** (ADR-026): confirm-sheet button
   taps are one-off overrides and must never update the remembered
   `scanner:destination`/shelf preference. Don't reintroduce "last add wins."

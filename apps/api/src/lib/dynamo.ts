@@ -28,25 +28,10 @@ export const TABLE_NAME = process.env["DYNAMODB_TABLE_NAME"] ?? "bookshelf";
 
 // ── Key helpers ────────────────────────────────────────────────────────────
 
-export type ShelfStatus = "owned" | "want";
-
-export function isValidStatus(s: unknown): s is ShelfStatus {
-  return s === "owned" || s === "want";
-}
-
 export type ReadingStatus = "unread" | "reading" | "finished";
 
 export function isValidReadingStatus(s: unknown): s is ReadingStatus {
   return s === "unread" || s === "reading" || s === "finished";
-}
-
-/**
- * The deprecated `status` enum derived from the `owned` attribute (ADR-019):
- * owned → "owned", otherwise "want". Emitted for one transition release so legacy
- * clients keep working; removed once the web client migrates (ADR-019 action item 8).
- */
-export function derivedStatus(owned: boolean): ShelfStatus {
-  return owned ? "owned" : "want";
 }
 
 function userPk(userId: string): string {
@@ -105,8 +90,6 @@ export interface ShelfEntry {
    * shared manual-merge value). Server-internal; never surfaced to clients raw.
    */
   workKey: string | null;
-  /** @deprecated Derived from `owned`/`want` for one transition release (ADR-019). */
-  status: ShelfStatus;
 }
 
 /** Attributes accepted when creating a new entry. At least one of owned/want is true. */
@@ -191,13 +174,8 @@ function toTags(v: unknown): string[] {
 }
 
 function toShelfEntry(item: Record<string, unknown>): ShelfEntry {
-  // Dual-read (ADR-019): migrated items carry `owned`/`want` booleans; legacy
-  // items carry only the `status` enum. Derive from whichever is present so the
-  // API is correct before, during, and after the backfill.
-  const hasNewFields = item["owned"] !== undefined || item["want"] !== undefined;
-  const legacyStatus = item["status"];
-  const owned = hasNewFields ? Boolean(item["owned"]) : legacyStatus === "owned";
-  const want = hasNewFields ? Boolean(item["want"]) : legacyStatus === "want";
+  const owned = Boolean(item["owned"]);
+  const want = Boolean(item["want"]);
   const readingStatus = isValidReadingStatus(item["readingStatus"]) ? item["readingStatus"] : null;
 
   return {
@@ -213,7 +191,6 @@ function toShelfEntry(item: Record<string, unknown>): ShelfEntry {
     // Dual-read defaults (BOOKSHELF-90): legacy/absent items read as null, no backfill.
     format: isValidFormat(item["format"]) ? item["format"] : null,
     workKey: str(item["workKey"]),
-    status: derivedStatus(owned),
   };
 }
 
@@ -385,11 +362,10 @@ export async function queryBookEntries(
     };
   }
 
-  // Filtered: loop all pages, then filter in memory on the *derived* attributes
-  // (ADR-019). A server-side FilterExpression on `owned`/`want` would miss legacy
-  // un-migrated items that still carry only the `status` enum; filtering after
-  // toShelfEntry's dual-read keeps results correct across the migration window.
-  // Filtered queries return all matching items at once (no cursor pagination).
+  // Filtered: loop all pages, then filter in memory (ADR-019) — no GSI on
+  // owned/want/readingStatus/tag, so a server-side FilterExpression isn't
+  // available; filtering happens after toShelfEntry instead. Filtered queries
+  // return all matching items at once (no cursor pagination).
   const filter = opts.filter;
   const allItems: Record<string, unknown>[] = [];
   let lastKey: Record<string, NativeAttributeValue> | undefined;
