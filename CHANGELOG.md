@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.6.0...v0.7.0) (2026-07-13)
+
+
+### Features
+
+* **web:** seed What's New feed with recent releases (BOOKSHELF-76) ([#127](https://github.com/whoiskevinrich/bookshelf/issues/127)) ([13144f1](https://github.com/whoiskevinrich/bookshelf/commit/13144f1a9106835d5c06bd747390acb0f3f3f5da))
+
+
+### Bug Fixes
+
+* v1 tech-debt batch A (BOOKSHELF-6, -10, -24, -25, -26) ([#125](https://github.com/whoiskevinrich/bookshelf/issues/125)) ([aedb0ee](https://github.com/whoiskevinrich/bookshelf/commit/aedb0ee31eebc98c8fa19ce6582036a2c5d9a10f))
+
 ## [0.6.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.5.1...v0.6.0) (2026-07-12)
 
 
