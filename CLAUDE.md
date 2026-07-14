@@ -177,7 +177,7 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 **Auth**
 
 - All routes except `GET /health` must use `authMiddleware` — apply it at the router level (`router.use("*", authMiddleware)`), not per-route
-- Any new unauthenticated endpoint that proxies an external API is a rate-limiting target; note it in the backlog for WAF coverage (see rate-limiting task in `todo/TASKS.md`)
+- Any new endpoint that proxies an external API or calls a paid/metered AWS service (Rekognition, Google Books, etc.) needs a per-user rate limit. **Reuse the existing per-user limiter** — `userRateLimit`/`FixedWindowRateLimiter` (`apps/api/src/middleware/rate-limit.ts`, ADR-018) wired the same way as `routes/books.ts` — rather than building new quota infrastructure (a DynamoDB counter, a new TTL attribute, etc.) from scratch. Check `docs/runbooks/abuse-rate-limiting.md` first: it documents "add `userRateLimit(...)` after `authMiddleware`" as the established, tested, redeploy-only escalation path for exactly this case (BOOKSHELF-99 built a bespoke DynamoDB quota before finding this — don't repeat that)
 
 **Shared data**
 
