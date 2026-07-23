@@ -103,6 +103,46 @@ function ChevronRightIcon() {
   );
 }
 
+function ScanIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
+  );
+}
+
+function ManageIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+      <circle cx="9" cy="7" r="1.75" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.75" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="17" r="1.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 function SectionHeader({
   title,
   count,
@@ -796,13 +836,16 @@ export function ShelfPage() {
                 {canScan && (
                   <Button
                     variant="secondary"
+                    aria-label="Scan"
+                    className="inline-flex items-center gap-1.5"
                     onClick={() => {
                       setShowScanner(true);
                       setShowSearch(false);
                       setShowCreateShelf(false);
                     }}
                   >
-                    Scan
+                    <ScanIcon />
+                    <span className="hidden sm:inline">Scan</span>
                   </Button>
                 )}
                 <Button
@@ -814,8 +857,15 @@ export function ShelfPage() {
                 >
                   {showSearch ? "Cancel" : "Add a book"}
                 </Button>
-                <Button variant="secondary" onClick={toggleManageMode} disabled={isEmpty}>
-                  Manage
+                <Button
+                  variant="secondary"
+                  aria-label="Manage"
+                  className="inline-flex items-center gap-1.5"
+                  onClick={toggleManageMode}
+                  disabled={isEmpty}
+                >
+                  <ManageIcon />
+                  <span className="hidden sm:inline">Manage</span>
                 </Button>
               </>
             )}

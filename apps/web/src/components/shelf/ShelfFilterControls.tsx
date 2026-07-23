@@ -102,30 +102,36 @@ export function FacetBar({
   onSelect: (f: SystemFacet | null) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="Filter by status"
-      className="flex flex-wrap items-center gap-2 overflow-x-auto"
-    >
-      <button
-        type="button"
-        onClick={() => onSelect(null)}
-        aria-pressed={facet === null}
-        className={`${chipBase} ${facet === null ? chipSelected : chipUnselected}`}
+    <div className="relative">
+      <div
+        role="group"
+        aria-label="Filter by status"
+        className="flex items-center gap-2 overflow-x-auto"
       >
-        All
-      </button>
-      {FACETS.map((f) => (
         <button
-          key={f.value}
           type="button"
-          onClick={() => onSelect(facet === f.value ? null : f.value)}
-          aria-pressed={facet === f.value}
-          className={`${chipBase} ${facet === f.value ? chipSelected : chipUnselected}`}
+          onClick={() => onSelect(null)}
+          aria-pressed={facet === null}
+          className={`shrink-0 ${chipBase} ${facet === null ? chipSelected : chipUnselected}`}
         >
-          {f.label}
+          All
         </button>
-      ))}
+        {FACETS.map((f) => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => onSelect(facet === f.value ? null : f.value)}
+            aria-pressed={facet === f.value}
+            className={`shrink-0 ${chipBase} ${facet === f.value ? chipSelected : chipUnselected}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-paper-100 dark:to-slate-900"
+      />
     </div>
   );
 }
