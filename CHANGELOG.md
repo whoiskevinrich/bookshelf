@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.1](https://github.com/whoiskevinrich/bookshelf/compare/v0.7.0...v0.7.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **api:** rate-limit OCR text-scan endpoint (BOOKSHELF-99) ([#128](https://github.com/whoiskevinrich/bookshelf/issues/128)) ([e297e10](https://github.com/whoiskevinrich/bookshelf/commit/e297e1073ce4a6b45fcf73efc44fba13694e11a6))
+* **deps:** patch fast-uri, brace-expansion, body-parser via pnpm overrides ([#133](https://github.com/whoiskevinrich/bookshelf/issues/133)) ([1daa45b](https://github.com/whoiskevinrich/bookshelf/commit/1daa45b22e4525529a6d138881fe76ed79e42853))
+* **web:** keep shelf status pills on one row on narrow viewports ([#129](https://github.com/whoiskevinrich/bookshelf/issues/129)) ([059a097](https://github.com/whoiskevinrich/bookshelf/commit/059a09740e174db80b040925208d5cd4925f140e))
+
 ## [0.7.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.6.0...v0.7.0) (2026-07-13)
 
 
