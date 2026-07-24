@@ -9,6 +9,14 @@ overrides:
   # #7–#11 (CORS wildcard-with-credentials, body-limit bypass, serve-static path
   # traversal, Set-Cookie/header dropping). Direct deps already request ^4.12.27.
   hono@<4.12.25: ">=4.12.25"
+  # Transitive copies with no direct-dep bump available yet. Fixes Dependabot
+  # alerts #17/#15 (fast-uri host-confusion via ajv → @modelcontextprotocol/sdk),
+  # #13 (body-parser limit bypass via express → @modelcontextprotocol/sdk), and
+  # #12 (brace-expansion ReDoS via minimatch → eslint, dev-only). All satisfy
+  # their parents' existing semver ranges.
+  fast-uri: "^3.1.4"
+  body-parser: "^2.3.0"
+  brace-expansion: "^5.0.8"
 
 confirmModulesPurge: false
 
