@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { RekognitionClient, DetectTextCommand } from "@aws-sdk/client-rekognition";
 import { authMiddleware } from "../middleware/auth.js";
+import { FixedWindowRateLimiter, userRateLimit } from "../middleware/rate-limit.js";
 import { emitMetric } from "../lib/metrics.js";
 import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
 
@@ -12,10 +13,24 @@ import { isValidIsbn, normalizeIsbn } from "../lib/isbn.js";
  *
  * Gated behind OCR_SCAN_ENABLED=true (Lambda env var). Returns 404 when the
  * flag is off so the client's three-tier stack stops at the server tier.
- * Future: replace env-flag check with a per-user entitlement check (user tiers).
+ * Also capped by the ADR-018 per-user rate limiter (BOOKSHELF-99) — open
+ * signup + no limit meant any authenticated user could drive up Rekognition
+ * cost with no ceiling. See docs/runbooks/abuse-rate-limiting.md.
+ * Future: replace both with a per-user entitlement check (user tiers).
  */
 
 const OCR_SCAN_ENABLED = process.env["OCR_SCAN_ENABLED"] === "true";
+
+// Per-user rate limit on the OCR fallback tier — it's a paid-per-call Rekognition
+// request, and the client only reaches it when on-device detection fails, so a
+// legitimate session should rarely approach this. Held at module scope so the
+// counter survives across warm Lambda invocations (ADR-018).
+const OCR_SCANS_PER_MINUTE = 10;
+const OCR_SCANS_PER_HOUR = 50;
+const scanLimiter = new FixedWindowRateLimiter([
+  { label: "minute", limit: OCR_SCANS_PER_MINUTE, windowMs: 60_000 },
+  { label: "hour", limit: OCR_SCANS_PER_HOUR, windowMs: 3_600_000 },
+]);
 
 const ISBN_PATTERN = /ISBN[\s-]*([\d-X]{9,13})/i;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -38,7 +53,9 @@ function extractIsbn(lines: string[]): string | null {
 
 export const scanRouter = new Hono();
 
+// Order matters: auth first (sets userId), then the per-user limit reads it.
 scanRouter.use("*", authMiddleware);
+scanRouter.use("*", userRateLimit(scanLimiter, { metricEvent: "rate_limited_scan" }));
 
 // POST /v1/scan/text
 // Per-route body limit: 500 KB — images require more than the global 64 KB cap.

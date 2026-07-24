@@ -7,14 +7,15 @@ escalate to paid AWS WAF **when the data says so** — not before.
 
 ## What's deployed (the free layers)
 
-| Control                                        | Where                                                               | What it does                                                                                                                          |
-| ---------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Stage throttling (50 rps / 100 burst)          | `packages/infra/lib/api-stack.ts` → API GW default stage            | Aggregate circuit breaker; sheds floods with `429` **before Lambda**                                                                  |
-| Lambda `reservedConcurrentExecutions: 10`      | `api-stack.ts` → `ApiFunction`                                      | Hard ceiling on attack-driven Lambda/DynamoDB spend                                                                                   |
-| Per-user cap (30/min, 300/hr) on `/v1/books/*` | `apps/api/src/middleware/rate-limit.ts`, wired in `routes/books.ts` | Protects the shared Google Books quota; `429` + `Retry-After`; path-independent (covers the `execute-api` bypass + `api.` MCP domain) |
-| `Bookshelf/Abuse` EMF metric                   | emitted on every per-user block                                     | The escalation signal                                                                                                                 |
-| AWS Budget alarm                               | account-wide (see below)                                            | Cost insurance — alerts, doesn't block                                                                                                |
-| Shield Standard, Cognito throttling            | AWS-managed, always on                                              | L3/L4 DDoS; account-wide auth RPS quotas                                                                                              |
+| Control                                         | Where                                                               | What it does                                                                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Stage throttling (50 rps / 100 burst)           | `packages/infra/lib/api-stack.ts` → API GW default stage            | Aggregate circuit breaker; sheds floods with `429` **before Lambda**                                                                   |
+| Lambda `reservedConcurrentExecutions: 10`       | `api-stack.ts` → `ApiFunction`                                      | Hard ceiling on attack-driven Lambda/DynamoDB spend                                                                                    |
+| Per-user cap (30/min, 300/hr) on `/v1/books/*`  | `apps/api/src/middleware/rate-limit.ts`, wired in `routes/books.ts` | Protects the shared Google Books quota; `429` + `Retry-After`; path-independent (covers the `execute-api` bypass + `api.` MCP domain)  |
+| Per-user cap (10/min, 50/hr) on `/v1/scan/text` | `apps/api/src/middleware/rate-limit.ts`, wired in `routes/scan.ts`  | Caps paid-per-call Rekognition OCR fallback (BOOKSHELF-99) — open signup + no prior limit meant one user could drive up cost unbounded |
+| `Bookshelf/Abuse` EMF metric                    | emitted on every per-user block                                     | The escalation signal                                                                                                                  |
+| AWS Budget alarm                                | account-wide (see below)                                            | Cost insurance — alerts, doesn't block                                                                                                 |
+| Shield Standard, Cognito throttling             | AWS-managed, always on                                              | L3/L4 DDoS; account-wide auth RPS quotas                                                                                               |
 
 The two infra limits are named constants at the top of `api-stack.ts`; the
 per-user limits are named constants at the top of `routes/books.ts`. To retune,
@@ -33,7 +34,8 @@ valid token) is hitting the books routes hard.
 - **Logs Insights** over `/aws/lambda/bookshelf-api` — the block line carries a
   `window` prop (`minute`|`hour`) but **no userId** (privacy/cardinality, ADR-016).
 - Calibration rule of thumb: if a _legitimate_ session ever trips it, the cap is
-  too low — raise `BOOKS_PER_MINUTE` / `BOOKS_PER_HOUR` in `routes/books.ts`.
+  too low — raise `BOOKS_PER_MINUTE` / `BOOKS_PER_HOUR` in `routes/books.ts`
+  (or `OCR_SCANS_PER_MINUTE` / `OCR_SCANS_PER_HOUR` in `routes/scan.ts`).
   Sustained blocks from many sources = real abuse → consider the WAF escalation.
 
 ---
