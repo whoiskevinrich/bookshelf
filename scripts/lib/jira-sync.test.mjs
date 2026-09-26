@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractKeys, selectTransition, syncKeys } from "./jira-sync.mjs";
+import { extractKeys, makeJiraClient, selectTransition, syncKeys } from "./jira-sync.mjs";
 
 test("extractKeys pulls the key from a squash-commit subject", () => {
   assert.deepEqual(extractKeys("feat(web): What's New panel (BOOKSHELF-75) (#103)"), [
@@ -61,16 +61,19 @@ const CATEGORY = {
   "Won't Do": "done",
 };
 
-// Fake client: one issue at `from`; every target status is reachable.
-function fakeClient(from, { category = CATEGORY[from] } = {}) {
+// Fake client: one issue at `from`; every target status is reachable. `category` /
+// `toCategory` override the current / destination status category.
+function fakeClient(from, target, opts) {
   const calls = [];
+  const category = "category" in opts ? opts.category : CATEGORY[from];
+  const toCategory = "toCategory" in opts ? opts.toCategory : CATEGORY[target];
   return {
     calls,
     async currentStatus() {
       return { status: from, category };
     },
-    async findTransition(_key, target) {
-      return { id: "99", category: CATEGORY[target] };
+    async findTransition() {
+      return { id: "99", category: toCategory };
     },
     async transition(key, id) {
       calls.push({ key, id });
@@ -80,13 +83,14 @@ function fakeClient(from, { category = CATEGORY[from] } = {}) {
 
 function captureLog() {
   const warnings = [];
-  return { warnings, warn: (m) => warnings.push(m), info: () => {} };
+  const infos = [];
+  return { warnings, infos, warn: (m) => warnings.push(m), info: (m) => infos.push(m) };
 }
 
-async function run(from, targetStatus, opts) {
-  const client = fakeClient(from, opts);
+async function run(from, targetStatus, { dryRun = false, ...opts } = {}) {
+  const client = fakeClient(from, targetStatus, opts);
   const log = captureLog();
-  const failures = await syncKeys({ keys: ["BOOKSHELF-1"], targetStatus, client, log });
+  const failures = await syncKeys({ keys: ["BOOKSHELF-1"], targetStatus, client, dryRun, log });
   return { client, log, failures };
 }
 
@@ -100,9 +104,18 @@ test("syncKeys refuses Done → On Dev and warns naming both statuses", async ()
 });
 
 test("syncKeys refuses Won't Do → On Dev", async () => {
-  const { client, log } = await run("Won't Do", "On Dev");
+  const { client, log, failures } = await run("Won't Do", "On Dev");
+  assert.equal(failures, 0);
   assert.equal(client.calls.length, 0);
+  assert.equal(log.warnings.length, 1);
   assert.match(log.warnings[0], /"Won't Do" → "On Dev"/);
+});
+
+test("syncKeys refuses a backward move in dry-run too (never 'would transition')", async () => {
+  const { client, log } = await run("Done", "On Dev", { dryRun: true });
+  assert.equal(client.calls.length, 0);
+  assert.match(log.warnings[0], /never moves an issue backwards/);
+  assert.ok(!log.infos.some((m) => /would transition/.test(m)));
 });
 
 for (const [from, to] of [
@@ -117,7 +130,41 @@ for (const [from, to] of [
   });
 }
 
-test("syncKeys lets an unranked status category through", async () => {
-  const { client } = await run("Triage", "On Dev", { category: "undefined" });
-  assert.equal(client.calls.length, 1);
+test("syncKeys lets an unranked status category through, either side", async () => {
+  for (const opts of [{ category: "undefined" }, { toCategory: "undefined" }]) {
+    const { client, log } = await run("Done", "On Dev", opts);
+    assert.equal(client.calls.length, 1);
+    assert.deepEqual(log.warnings, []);
+  }
+});
+
+test("syncKeys warns (but still transitions) when Jira omits a status category", async () => {
+  for (const opts of [{ category: undefined }, { toCategory: undefined }]) {
+    const { client, log } = await run("Done", "On Dev", opts);
+    assert.equal(client.calls.length, 1);
+    assert.match(log.warnings[0], /status category missing/);
+  }
+});
+
+// End-to-end through the real client with a stubbed fetch: pins that currentStatus /
+// findTransition actually read statusCategory.key off Jira's responses. Without
+// this, a wrong path there would silently disable the guard.
+test("syncKeys + makeJiraClient refuses Done → On Dev from real Jira response shapes", async (t) => {
+  const posts = [];
+  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
+    if (init.method === "POST") posts.push(url);
+    const body = url.includes("/transitions")
+      ? {
+          transitions: [
+            { id: "31", to: { name: "On Dev", statusCategory: { key: "indeterminate" } } },
+          ],
+        }
+      : { fields: { status: { name: "Done", statusCategory: { key: "done" } } } };
+    return { ok: true, status: 200, json: async () => body };
+  });
+  const client = makeJiraClient({ baseUrl: "https://jira.test", email: "e", token: "t" });
+  const log = captureLog();
+  await syncKeys({ keys: ["BOOKSHELF-1"], targetStatus: "On Dev", client, log });
+  assert.deepEqual(posts, []);
+  assert.match(log.warnings[0], /"Done" → "On Dev"/);
 });

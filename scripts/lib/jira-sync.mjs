@@ -38,8 +38,7 @@ export function selectTransition(transitions, targetStatus) {
 // "undefined" category, or anything unexpected) is unranked and never blocks.
 const CATEGORY_RANK = { new: 0, indeterminate: 1, done: 2 };
 
-// True when moving from category `from` to `to` would go backwards, e.g. a
-// Done ticket mentioned in a later commit body being pulled back to On Dev.
+// True when moving from category `from` to `to` would go backwards, e.g. Done → On Dev.
 function isBackwardMove(from, to) {
   const a = CATEGORY_RANK[from];
   const b = CATEGORY_RANK[to];
@@ -98,7 +97,9 @@ async function syncOne({ key, targetStatus, client, dryRun, log, context }) {
       `${key}: no transition to "${targetStatus}" available from "${cur.status}" — skipping`,
     );
   }
-  if (isBackwardMove(cur.category, tr.category)) {
+  if (cur.category === undefined || tr.category === undefined) {
+    log.warn(`${key}: status category missing from Jira response — forward-only check skipped`);
+  } else if (isBackwardMove(cur.category, tr.category)) {
     return log.warn(
       `${key}: refusing "${cur.status}" → "${targetStatus}" — sync never moves an issue ` +
         `backwards (status category "${cur.category}" → "${tr.category}")`,
