@@ -4,7 +4,8 @@
 //   - jira-release-sync.mjs → transitions release tickets to "Done" on prod promote
 //   - jira-dev-sync.mjs      → transitions merged tickets to "On dev" on dev deploy
 //
-// Both are idempotent (skip a ticket already at the target) and SOFT-FAIL by design:
+// Both are idempotent (skip a ticket already at the target), forward-only (never move
+// a ticket to an earlier status category, e.g. Done → On Dev), and SOFT-FAIL by design:
 // a Jira outage, a missing key, or an unreachable transition logs a GitHub
 // `::warning::` and the run continues — a Jira hiccup must never red-build a deploy
 // that already succeeded and smoke-passed. Node 22 global `fetch`/`Buffer`; no deps.
@@ -25,11 +26,23 @@ export function extractKeys(text, prefix = "BOOKSHELF") {
 }
 
 // Pure: pick the transition whose DESTINATION status matches (case-insensitive) —
-// robust to transition naming like "Done" vs "Mark as Done".
-export function selectTransitionId(transitions, targetStatus) {
+// robust to transition naming like "Done" vs "Mark as Done". Returns its id and the
+// destination's status category (so syncOne can refuse a backward move), or null.
+export function selectTransition(transitions, targetStatus) {
   const target = targetStatus.toLowerCase();
   const t = (transitions ?? []).find((tr) => tr.to?.name?.toLowerCase() === target);
-  return t?.id ?? null;
+  return t ? { id: t.id, category: t.to.statusCategory?.key } : null;
+}
+
+// Jira's status categories in workflow order. A key not listed here (Jira's
+// "undefined" category, or anything unexpected) is unranked and never blocks.
+const CATEGORY_RANK = { new: 0, indeterminate: 1, done: 2 };
+
+// True when moving from category `from` to `to` would go backwards, e.g. Done → On Dev.
+function isBackwardMove(from, to) {
+  const a = CATEGORY_RANK[from];
+  const b = CATEGORY_RANK[to];
+  return a !== undefined && b !== undefined && b < a;
 }
 
 export function makeJiraClient({ baseUrl, email, token }) {
@@ -45,14 +58,18 @@ export function makeJiraClient({ baseUrl, email, token }) {
       if (res.status === 404) return { missing: true };
       if (!res.ok) throw new Error(`GET issue ${key} failed: ${res.status} ${res.statusText}`);
       const json = await res.json();
-      return { status: json.fields?.status?.name ?? null };
+      return {
+        status: json.fields?.status?.name ?? null,
+        category: json.fields?.status?.statusCategory?.key,
+      };
     },
-    async findTransitionId(key, targetStatus) {
+    // → { id, category } for the transition reaching targetStatus, or null.
+    async findTransition(key, targetStatus) {
       const res = await fetch(`${base}/rest/api/3/issue/${key}/transitions`, { headers });
       if (!res.ok)
         throw new Error(`GET transitions for ${key} failed: ${res.status} ${res.statusText}`);
       const json = await res.json();
-      return selectTransitionId(json.transitions, targetStatus);
+      return selectTransition(json.transitions, targetStatus);
     },
     async transition(key, transitionId) {
       const res = await fetch(`${base}/rest/api/3/issue/${key}/transitions`, {
@@ -74,12 +91,21 @@ async function syncOne({ key, targetStatus, client, dryRun, log, context }) {
   if (cur.status?.toLowerCase() === targetStatus.toLowerCase()) {
     return log.info(`${key}: already "${targetStatus}" — no-op`);
   }
-  const id = await client.findTransitionId(key, targetStatus);
-  if (!id) {
+  const tr = await client.findTransition(key, targetStatus);
+  if (!tr) {
     return log.warn(
       `${key}: no transition to "${targetStatus}" available from "${cur.status}" — skipping`,
     );
   }
+  if (cur.category === undefined || tr.category === undefined) {
+    log.warn(`${key}: status category missing from Jira response — forward-only check skipped`);
+  } else if (isBackwardMove(cur.category, tr.category)) {
+    return log.warn(
+      `${key}: refusing "${cur.status}" → "${targetStatus}" — sync never moves an issue ` +
+        `backwards (status category "${cur.category}" → "${tr.category}")`,
+    );
+  }
+  const { id } = tr;
   if (dryRun) {
     return log.info(
       `${key}: [dry-run] would transition "${cur.status}" → "${targetStatus}" (id ${id})`,

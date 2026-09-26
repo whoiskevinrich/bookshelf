@@ -3,9 +3,11 @@
 // every Jira ticket referenced in the merge commit to "On dev" (ADR-024). This is
 // the human-QA queue: a saved filter `status = "On dev"` = "what needs QA".
 //
-// Key source is the merge/squash commit subject (COMMIT_MESSAGE) — the same keys
-// jira-release-sync.mjs reads from the release notes at prod time (e.g.
-// "... (BOOKSHELF-75) (#103)"). Shares the idempotent + soft-fail plumbing in
+// Key source is the whole merge/squash commit message (COMMIT_MESSAGE), subject AND
+// body — a squash of several commits often carries the delivered key only in the
+// body. A body can also merely *mention* a finished ticket; the shared lib's
+// forward-only rule stops that from pulling a Done ticket back (BOOKSHELF-107).
+// Shares the idempotent + soft-fail plumbing in
 // ./lib/jira-sync.mjs. Dependency-free (Node 22 global fetch); talks only to Jira.
 //
 // SOFT-FAILS by design: a Jira outage, a missing key, or an unreachable transition
