@@ -3,9 +3,11 @@
 // every Jira ticket referenced in the merge commit to "On dev" (ADR-024). This is
 // the human-QA queue: a saved filter `status = "On dev"` = "what needs QA".
 //
-// Key source is the merge/squash commit subject (COMMIT_MESSAGE) — the same keys
-// jira-release-sync.mjs reads from the release notes at prod time (e.g.
-// "... (BOOKSHELF-75) (#103)"). Shares the idempotent + soft-fail plumbing in
+// Key source is the merge/squash commit SUBJECT only (first line of COMMIT_MESSAGE) —
+// the same keys jira-release-sync.mjs reads from the release notes at prod time (e.g.
+// "... (BOOKSHELF-75) (#103)"). A key in the body is usually a reference ("added by
+// BOOKSHELF-60"), not a claim this commit delivers it; reading the body once pulled
+// Done tickets back to On Dev (BOOKSHELF-107). Shares the idempotent + soft-fail plumbing in
 // ./lib/jira-sync.mjs. Dependency-free (Node 22 global fetch); talks only to Jira.
 //
 // SOFT-FAILS by design: a Jira outage, a missing key, or an unreachable transition
@@ -56,9 +58,10 @@ const missing = Object.entries({
 if (missing.length) bailSoft(`missing required env: ${missing.join(", ")} — skipping Jira sync`);
 
 async function main() {
-  const keys = extractKeys(COMMIT_MESSAGE, JIRA_KEY_PREFIX);
+  const subject = COMMIT_MESSAGE.split("\n", 1)[0];
+  const keys = extractKeys(subject, JIRA_KEY_PREFIX);
   if (keys.length === 0) {
-    info(`no ${JIRA_KEY_PREFIX}-* keys in commit message — nothing to sync`);
+    info(`no ${JIRA_KEY_PREFIX}-* keys in commit subject — nothing to sync`);
     return;
   }
   info(
