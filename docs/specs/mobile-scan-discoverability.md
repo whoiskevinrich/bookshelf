@@ -89,8 +89,8 @@ A composition of `Callout` at `apps/web/src/components/shelf/MobileScanHint.tsx`
 delivers the scan-on-mobile message and instructions.
 
 - Copy (instructions): a short heading + steps — e.g. _"Scan books with your phone.
-  Open bookshelf on your phone, sign in, and tap **Scan** to add a book by pointing
-  the camera at its barcode."_
+  Open bookshelf on your phone, sign in, tap **Add a book**, then **Scan** to add a book
+  by pointing the camera at its barcode."_ (Scan moved inside "Add a book" in BOOKSHELF-112.)
 - Includes the app URL as selectable text **and** a QR code (see P0-4), plus an
   in-app deep target (the shelf).
 - Acceptance:

@@ -38,6 +38,11 @@ existing ISBN lookup.
 Entry point: a **Scan** button on the shelf, shown only when the device has a touch
 screen + camera **and** the `features.scanner` flag is on for the environment.
 
+> **Update (BOOKSHELF-112):** the Scan button now lives inside the "Add a book" panel,
+> next to the search input, instead of in the shelf header — one add-book entry point.
+> It is still gated on `supportsCameraScan()`; the `features.scanner` flag was retired in
+> BOOKSHELF-26. Opening the panel emits `search_opened`; tapping Scan emits `scan_opened`.
+
 States in the full-screen scanner sheet:
 
 1. **Scanning** — live camera, reticle with a sweeping line, "point at the barcode"
