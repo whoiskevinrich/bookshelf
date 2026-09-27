@@ -5,10 +5,10 @@
  * The API smoke (`apps/api` test:smoke) never touches CloudFront/S3, so prod's web
  * front end returned S3 AccessDenied for 6½ weeks unnoticed (BOOKSHELF-109). This
  * checks the web origin itself:
- *   - `/` and `/shelf` (a client route, served via the SPA 403/404 → index.html
- *     fallback) return 200 and contain the React mount point `<div id="root"`;
+ *   - `/` and `/shelf` (a client route, rewritten to index.html by the SpaRouting
+ *     CloudFront Function) return 200 and contain the React mount point `<div id="root"`;
  *   - the entry script and stylesheet that `/` references return 200 with a JS/CSS
- *     content-type (the fallback would otherwise serve them as 200 HTML);
+ *     content-type (so a routing misconfig that serves HTML for them still fails);
  *   - `/config.json` returns 200, parses, and names a Cognito user pool — the exact
  *     pool when EXPECTED_USER_POOL_ID is given.
  *
@@ -53,8 +53,8 @@ export async function checkSite({ baseUrl, expectedUserPoolId, fetchImpl = fetch
     else if (path === "/") indexHtml = res.body;
   }
 
-  // The SPA fallback turns a missing asset into 200 index.html, so a status check
-  // alone passes on a blank page — require the real content-type too.
+  // Require the real content-type, not just 200: any routing rule that serves
+  // index.html for an asset path would otherwise pass on a blank page.
   for (const { path, type } of assetsOf(indexHtml)) {
     const res = await get(path);
     if (!res) continue;

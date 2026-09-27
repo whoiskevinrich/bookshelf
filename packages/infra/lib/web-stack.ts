@@ -142,6 +142,26 @@ export class WebStack extends cdk.Stack {
       };
     }
 
+    // ── SPA routing ────────────────────────────────────────────────────────
+    //
+    // Client routes (`/shelf`, `/book/:isbn`, …) have no file extension; serve them
+    // index.html so React Router handles the path. Scoped to the default (S3)
+    // behavior: distribution-level `errorResponses` also rewrote the API's
+    // 403/404s under `/api/*` into 200 index.html (BOOKSHELF-116). Real files
+    // keep their true status, so a missing asset is a 403, not 200 HTML.
+    const spaRouting = new cloudfront.Function(this, "SpaRouting", {
+      comment: "Serve index.html for extensionless SPA client routes",
+      code: cloudfront.FunctionCode.fromInline(
+        [
+          "function handler(event) {",
+          "  var req = event.request;",
+          "  if (!/\\.[^/]+$/.test(req.uri)) { req.uri = '/index.html'; }",
+          "  return req;",
+          "}",
+        ].join("\n"),
+      ),
+    });
+
     // ── CloudFront distribution ────────────────────────────────────────────
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       comment: "Bookshelf web SPA",
@@ -161,23 +181,11 @@ export class WebStack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         compress: true,
+        functionAssociations: [
+          { function: spaRouting, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
+        ],
       },
       additionalBehaviors: apiBehavior,
-      // SPA routing: all 404s → index.html so React Router handles the path
-      errorResponses: [
-        {
-          httpStatus: 403,
-          responseHttpStatus: 200,
-          responsePagePath: "/index.html",
-          ttl: cdk.Duration.seconds(0),
-        },
-        {
-          httpStatus: 404,
-          responseHttpStatus: 200,
-          responsePagePath: "/index.html",
-          ttl: cdk.Duration.seconds(0),
-        },
-      ],
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 
