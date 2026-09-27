@@ -108,11 +108,8 @@ describe("ShelfPage — one add-a-book entry point (BOOKSHELF-112)", () => {
 
     await user.click(await screen.findByRole("button", { name: "Add a book" }));
     expect(track).toHaveBeenCalledWith("search_opened");
-    // The only Scan button is the one in the panel (the header one is gone).
-    const scanButtons = screen.getAllByRole("button", { name: "Scan" });
-    expect(scanButtons).toHaveLength(1);
-
-    await user.click(scanButtons[0]);
+    // getByRole throws on multiple matches: the panel's is the only Scan button (header one is gone).
+    await user.click(screen.getByRole("button", { name: "Scan" }));
     expect(track).toHaveBeenCalledWith("scan_opened");
     expect(screen.getByRole("dialog", { name: "Scanner" })).toBeInTheDocument();
     // Scanning replaces the search panel.

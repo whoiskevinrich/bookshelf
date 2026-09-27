@@ -9,7 +9,7 @@ interface BookSearchProps {
   onAdd: (isbn: string, status: ShelfStatus, book: BookSearchResult) => void;
   isAdding?: boolean;
   /** Opens the camera scanner. Pass only when the device can scan — omitted means no Scan button. */
-  onScan?: () => void;
+  onScan?: (() => void) | undefined;
 }
 
 function ScanIcon() {
