@@ -37,6 +37,8 @@ describe("MobileScanHint", () => {
     render(<MobileScanHint page="shelf" />);
     expect(screen.getByText("Scan books with your phone")).toBeInTheDocument();
     expect(screen.getByTestId("qr")).toBeInTheDocument();
+    // Points at the single add-a-book flow (BOOKSHELF-112), not a standalone Scan button.
+    expect(screen.getByText(/then/)).toHaveTextContent("tap Add a book, then Scan");
     expect(mockTrack).toHaveBeenCalledWith("hint_shown", { page: "shelf" });
   });
 
