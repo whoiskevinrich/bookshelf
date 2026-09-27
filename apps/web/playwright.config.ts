@@ -47,6 +47,9 @@ loadTestEnv("./.env.test.local");
 
 const APP_BASE_URL = (process.env.APP_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const API_BASE_URL = (process.env.API_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
+// A remote APP_BASE_URL (the deployed dev CloudFront site, BOOKSHELF-111) means the
+// app is already running — don't boot local dev servers.
+const IS_LOCAL_TARGET = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(APP_BASE_URL);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -73,23 +76,26 @@ export default defineConfig({
    * duplicates; in CI it always starts fresh. Both talk to the REAL dev backend —
    * the API needs AWS credentials in the environment (OIDC in CI, `assume` locally)
    * and both read their `.env.local` for Cognito/table config (no mock auth).
+   * Skipped when APP_BASE_URL points at a deployed site.
    */
-  webServer: [
-    {
-      command: "pnpm --filter @bookshelf/api dev",
-      url: `${API_BASE_URL}/health`,
-      reuseExistingServer: !process.env.CI,
-      stdout: "pipe",
-      timeout: 90_000,
-    },
-    {
-      command: "pnpm --filter @bookshelf/web dev",
-      url: APP_BASE_URL,
-      reuseExistingServer: !process.env.CI,
-      stdout: "pipe",
-      timeout: 90_000,
-    },
-  ],
+  webServer: IS_LOCAL_TARGET
+    ? [
+        {
+          command: "pnpm --filter @bookshelf/api dev",
+          url: `${API_BASE_URL}/health`,
+          reuseExistingServer: !process.env.CI,
+          stdout: "pipe",
+          timeout: 90_000,
+        },
+        {
+          command: "pnpm --filter @bookshelf/web dev",
+          url: APP_BASE_URL,
+          reuseExistingServer: !process.env.CI,
+          stdout: "pipe",
+          timeout: 90_000,
+        },
+      ]
+    : undefined,
 
   projects: [
     // 1. Sign in once via the real login page; saves Amplify localStorage tokens

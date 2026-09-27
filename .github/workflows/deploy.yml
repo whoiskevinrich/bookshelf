@@ -151,10 +151,23 @@ jobs:
           API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
         run: pnpm --filter @bookshelf/api run test:smoke
 
-      - name: Rollback to last good dev SHA
-        if: steps.smoke.outcome == 'failure' && steps.last-good.outputs.sha != ''
+      - name: Web smoke
+        # The API smoke never touches CloudFront/S3 (BOOKSHELF-109/111). A failure
+        # here triggers the same rollback as an API smoke failure.
+        id: web-smoke
+        continue-on-error: true
+        env:
+          EXPECTED_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
         run: |
-          echo "Smoke tests failed — rolling back to ${{ steps.last-good.outputs.sha }}"
+          WEB_BASE_URL=$(aws cloudformation describe-stacks \
+            --stack-name BookshelfWeb \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionUrlOutput'].OutputValue" \
+            --output text) node scripts/web-smoke.mjs
+
+      - name: Rollback to last good dev SHA
+        if: (steps.smoke.outcome == 'failure' || steps.web-smoke.outcome == 'failure') && steps.last-good.outputs.sha != ''
+        run: |
+          echo "Smoke tests (API or web) failed — rolling back to ${{ steps.last-good.outputs.sha }}"
           git checkout ${{ steps.last-good.outputs.sha }}
           pnpm install --frozen-lockfile
           pnpm --filter @bookshelf/api run build
@@ -168,13 +181,13 @@ jobs:
             --require-approval never -c env=dev -c version="$ROLLBACK_VERSION"
 
       - name: Fail job after rollback
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.web-smoke.outcome == 'failure'
         run: |
-          echo "Smoke tests failed. Rolled back to ${{ steps.last-good.outputs.sha }}."
+          echo "Smoke tests (API or web) failed. Rolled back to ${{ steps.last-good.outputs.sha }}."
           exit 1
 
       - name: Record last good dev SHA
-        if: steps.smoke.outcome != 'failure'
+        if: steps.smoke.outcome != 'failure' && steps.web-smoke.outcome != 'failure'
         # Smoke passed — this commit becomes the rollback target for the next deploy
         # (ADR-020). Replaces the per-merge version tag the old design pushed here.
         run: |
@@ -184,7 +197,7 @@ jobs:
 
       - name: Detect Jira sync config
         id: jiracfg
-        if: steps.smoke.outcome != 'failure'
+        if: steps.smoke.outcome != 'failure' && steps.web-smoke.outcome != 'failure'
         # Skip the Jira sync entirely when no token is configured, instead of letting
         # the script soft-fail with a ::warning:: on every deploy. Interim guard while
         # the token-auth path is replaced with a token-free mechanism (BOOKSHELF-84);
@@ -201,7 +214,7 @@ jobs:
           fi
 
       - name: Sync Jira tickets → On dev
-        if: steps.smoke.outcome != 'failure' && steps.jiracfg.outputs.enabled == 'true'
+        if: steps.smoke.outcome != 'failure' && steps.web-smoke.outcome != 'failure' && steps.jiracfg.outputs.enabled == 'true'
         # Dev deploy succeeded and smoke passed — move each ticket referenced in the
         # merge commit to "On dev", the human-QA queue (ADR-024). The key is read from
         # the squash-commit subject (same source as the prod → Done sync). Idempotent

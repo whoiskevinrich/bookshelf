@@ -117,3 +117,69 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report/
           retention-days: 14
+
+  # The job above runs the merged code on localhost, so it never touches the
+  # deployed CloudFront/S3 site — dev's own web front end could serve 403s while it
+  # passes (BOOKSHELF-111). This job runs the same suite against the deployed dev
+  # site. Nightly/manual only: on push it would race the dev deploy of that same
+  # commit. `needs` serializes it after the localhost job (both drive the one
+  # shared QA account); `always()` so a localhost failure doesn't skip it.
+  e2e-deployed:
+    name: Playwright → deployed dev site
+    needs: e2e
+    if: ${{ always() && github.event_name != 'push' }}
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (dev)
+        # Only to look up the CloudFront URL; the tests themselves need no AWS creds.
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Resolve deployed dev URL
+        id: site
+        run: |
+          set -euo pipefail
+          URL=$(aws cloudformation describe-stacks --stack-name BookshelfWeb \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionUrlOutput'].OutputValue" \
+            --output text)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed dev site: $URL"
+
+      - name: Install Playwright browser (chromium)
+        run: pnpm --filter @bookshelf/web exec playwright install --with-deps chromium
+
+      - name: Run E2E
+        # A remote APP_BASE_URL makes playwright.config.ts skip its local webServer.
+        # The API is same-origin behind CloudFront at /api.
+        run: pnpm --filter @bookshelf/web run test:e2e
+        env:
+          CI: "true"
+          APP_BASE_URL: ${{ steps.site.outputs.url }}
+          API_BASE_URL: ${{ steps.site.outputs.url }}/api
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-deployed
+          path: apps/web/playwright-report/
+          retention-days: 14
