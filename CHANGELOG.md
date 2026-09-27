@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/whoiskevinrich/bookshelf/compare/v0.7.1...v0.7.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **infra:** scope SPA routing to the S3 behavior so API errors keep their status (BOOKSHELF-116) ([#141](https://github.com/whoiskevinrich/bookshelf/issues/141)) ([eee9ae2](https://github.com/whoiskevinrich/bookshelf/commit/eee9ae2e36165f182272da7a57bb8b708913f9f6))
+
 ## [0.7.1](https://github.com/whoiskevinrich/bookshelf/compare/v0.7.0...v0.7.1) (2026-09-27)
 
 

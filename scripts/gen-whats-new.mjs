@@ -24,8 +24,14 @@ const TRAILER_RE = /^Release-Note:[ \t]*(.+?)[ \t]*$/i;
 // Release-Note trailers retroactively, so this hardcoded list seeds the feed with
 // the ~8 notable pre-convention releases from the brainstorm gut-check. Each id
 // and date is the real squash-merge commit's short SHA and author date, so the
-// entries interleave correctly with trailer-derived ones once sorted.
+// entries interleave correctly with trailer-derived ones once sorted. Also the
+// place to recover a note whose trailer missed its squash commit (76971e1).
 const SEED_ENTRIES = [
+  {
+    id: "76971e1",
+    date: "2026-09-27",
+    note: 'Book lookups no longer hang when the book catalogue is slow to answer. You\'ll get a "Try again" option within seconds instead.',
+  },
   {
     id: "3d72475",
     date: "2026-07-03",

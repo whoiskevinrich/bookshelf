@@ -6,9 +6,13 @@ const BASE_URL = "https://www.googleapis.com/books/v1/volumes";
 // Google Books occasionally returns transient errors under load (BOOKSHELF-95). Retry those;
 // a 4xx like a bad key or malformed query never resolves on retry, so fail fast instead.
 const MAX_ATTEMPTS = 3;
-// Delay grows with each retry (300ms, then 600ms) — worst case ~900ms across 3 attempts,
-// well under the E2E suite's 15s per-assertion timeout (apps/web/e2e/helpers.ts).
+// Delay grows with each retry (300ms, then 600ms) — ~900ms of backoff across 3 attempts.
 const RETRY_BASE_DELAY_MS = 300;
+// Per-attempt cap on the upstream call, body read included. Healthy lookups take well under
+// 1s, but Google Books occasionally stalls a connection without erroring; unbounded, that
+// hung the request until the 29s Lambda timeout (BOOKSHELF-117). Worst case with retries is
+// 3 × 3s + 0.9s ≈ 10s — under the E2E suite's 15s per-assertion timeout (apps/web/e2e/helpers.ts).
+const ATTEMPT_TIMEOUT_MS = 3_000;
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 
 function sleep(ms: number): Promise<void> {
@@ -103,11 +107,19 @@ async function fetchVolumes(
   if (apiKey) url.searchParams.set("key", apiKey);
 
   let res: Response;
+  let timer: ReturnType<typeof setTimeout>;
   for (let attempt = 1; ; attempt++) {
+    const controller = new AbortController();
+    timer = setTimeout(
+      () =>
+        controller.abort(new Error(`Google Books request timed out after ${ATTEMPT_TIMEOUT_MS}ms`)),
+      ATTEMPT_TIMEOUT_MS,
+    );
     try {
-      res = await fetch(url.toString());
+      res = await fetch(url.toString(), { signal: controller.signal });
     } catch (err) {
-      // A thrown fetch (DNS/connection reset) is as transient as a 5xx response.
+      // A thrown fetch (DNS/connection reset, or our timeout) is as transient as a 5xx response.
+      clearTimeout(timer);
       if (attempt === MAX_ATTEMPTS) throw err;
       await sleep(RETRY_BASE_DELAY_MS * attempt);
       continue;
@@ -115,13 +127,19 @@ async function fetchVolumes(
     if (res.ok || !RETRYABLE_STATUS_CODES.has(res.status) || attempt === MAX_ATTEMPTS) {
       break;
     }
+    clearTimeout(timer);
     await sleep(RETRY_BASE_DELAY_MS * attempt);
   }
-  if (!res.ok) {
-    throw new Error(`Google Books API error: ${res.status} ${res.statusText}`);
+  // The final attempt's timer stays armed through the body read, so a stalled body aborts too.
+  try {
+    if (!res.ok) {
+      throw new Error(`Google Books API error: ${res.status} ${res.statusText}`);
+    }
+    const data = (await res.json()) as GoogleBooksResponse;
+    return (data.items ?? []).map(toSearchResult);
+  } finally {
+    clearTimeout(timer);
   }
-  const data = (await res.json()) as GoogleBooksResponse;
-  return (data.items ?? []).map(toSearchResult);
 }
 
 export function createGoogleBooksProvider(apiKey: string): BookProvider {
