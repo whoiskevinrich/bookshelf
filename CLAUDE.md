@@ -60,7 +60,7 @@ This skill checks for active AWS credentials, acquires them via
 - `cdk synth|diff|deploy` fail `CannotFindAsset` unless `apps/{api,mcp,web}/dist` exist — `pnpm -r build` first.
 - Clean no-op `cdk diff`: `-c env=dev -c version=<active> -c cloudfront-domain=d1n55zwqulukok.cloudfront.net` (omitting the last two diffs SPA callback URLs / version tags spuriously).
 - Cognito pool changes are **blue/green** via `-c authPool=legacy|cutover|green` (ADR-015) — never change email mutability or pool-identity props in place. The `green` deploy must run Api/Mcp/Web **before** BookshelfAuth (CFN won't delete still-imported exports).
-- **Release version is CI-derived (ADR-017):** the deploy workflow computes `max(existing v* tags) + 1` at merge time and tags after smoke passes. Never bump `package.json` (pinned to `0.0.0`) or create version tags by hand — there's no pre-PR bump step anymore.
+- **Releases come from Release Please (ADR-020):** every merge to `main` updates a standing `chore: release main` PR. Merging it cuts `vX.Y.Z` and auto-promotes to prod (`release-please.yml` → `promote.yml`). Never bump `package.json` (pinned to `0.0.0`) or create version tags by hand. That PR is opened by `GITHUB_TOKEN`, so CI doesn't run on it: close and reopen it to trigger the required checks before merging.
 
 ## Workflow: Idea to Production
 
@@ -92,7 +92,7 @@ This skill checks for active AWS credentials, acquires them via
 
 1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm preflight`
    (`preflight` includes `pnpm qa:guards` — the same QA Guards check CI runs).
-   No version bump — the deploy workflow derives the version at merge (ADR-017).
+   No version bump — Release Please derives the version from Conventional Commits (ADR-020).
 2. **Decide the Release-Note** (BOOKSHELF-73): if this PR changes something users would
    notice, add a `Release-Note:` trailer to the PR description (app voice — plain,
    present-tense, benefit-first, not the Conventional-Commit subject) so it lands in the
@@ -109,8 +109,8 @@ This skill checks for active AWS credentials, acquires them via
 ### Phase 5 — Merge and Deploy
 
 1. `gh pr create` — then run `/pr-review-toolkit:review-pr all` and `/productivity:update` manually
-2. Merge to `main` → GitHub Actions auto-deploys to **dev** and tags the version (`docs/runbooks/cicd-setup.md`)
-3. Promote to **prod** via the **Promote** workflow (`.github/workflows/promote.yml`) by version tag, or `cdk deploy --all -c env=prod` (`docs/runbooks/prod-domain-setup.md`)
+2. Merge to `main` → GitHub Actions auto-deploys to **dev** and updates the Release Please PR (`docs/runbooks/cicd-setup.md`)
+3. Promote to **prod** by merging the Release Please PR (ADR-020). The **Promote** workflow (`.github/workflows/promote.yml`) can also be run by hand for an existing tag (re-promotes, hotfixes), or use `cdk deploy --all -c env=prod` (`docs/runbooks/prod-domain-setup.md`)
 
 ### Phase 6 — Post-Ship
 
