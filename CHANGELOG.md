@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.1](https://github.com/whoiskevinrich/bookshelf/compare/v0.7.0...v0.7.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** rate-limit OCR text-scan endpoint (BOOKSHELF-99) ([#128](https://github.com/whoiskevinrich/bookshelf/issues/128)) ([e297e10](https://github.com/whoiskevinrich/bookshelf/commit/e297e1073ce4a6b45fcf73efc44fba13694e11a6))
+* **ci:** never move a Jira issue backwards in status sync (BOOKSHELF-107) ([#135](https://github.com/whoiskevinrich/bookshelf/issues/135)) ([a873cc9](https://github.com/whoiskevinrich/bookshelf/commit/a873cc9a8dbd4f8963325323aebd39ccce1cdce7))
+* **ci:** pass secrets to the auto-promote workflow call (BOOKSHELF-109) ([#137](https://github.com/whoiskevinrich/bookshelf/issues/137)) ([85916a6](https://github.com/whoiskevinrich/bookshelf/commit/85916a6626d1047b73da92f5175d24f1094d28dc))
+* **deps:** patch fast-uri, brace-expansion, body-parser via pnpm overrides ([#133](https://github.com/whoiskevinrich/bookshelf/issues/133)) ([1daa45b](https://github.com/whoiskevinrich/bookshelf/commit/1daa45b22e4525529a6d138881fe76ed79e42853))
+* **infra:** stop the web bucket lifecycle rule deleting the live build (BOOKSHELF-109) ([#138](https://github.com/whoiskevinrich/bookshelf/issues/138)) ([4b3b3d3](https://github.com/whoiskevinrich/bookshelf/commit/4b3b3d33173cb957f78b8dda837f3eb765592cf9))
+* **web:** keep shelf status pills on one row on narrow viewports ([#129](https://github.com/whoiskevinrich/bookshelf/issues/129)) ([059a097](https://github.com/whoiskevinrich/bookshelf/commit/059a09740e174db80b040925208d5cd4925f140e))
+
 ## [0.7.0](https://github.com/whoiskevinrich/bookshelf/compare/v0.6.0...v0.7.0) (2026-07-13)
 
 
