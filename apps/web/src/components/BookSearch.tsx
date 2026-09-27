@@ -8,9 +8,29 @@ import type { ShelfStatus } from "../lib/api-client";
 interface BookSearchProps {
   onAdd: (isbn: string, status: ShelfStatus, book: BookSearchResult) => void;
   isAdding?: boolean;
+  /** Opens the camera scanner. Pass only when the device can scan — omitted means no Scan button. */
+  onScan?: () => void;
 }
 
-export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
+function ScanIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
+  );
+}
+
+export function BookSearch({ onAdd, isAdding, onScan }: BookSearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BookSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -131,16 +151,28 @@ export function BookSearch({ onAdd, isAdding }: BookSearchProps) {
 
   return (
     <div className="space-y-4">
-      <input
-        ref={inputRef}
-        autoFocus
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={handleInputKeyDown}
-        placeholder="Search by title, author, or paste an ISBN…"
-        className="w-full border border-paper-400 dark:border-slate-600 bg-paper-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300"
-      />
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          autoFocus
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleInputKeyDown}
+          placeholder="Search by title, author, or paste an ISBN…"
+          className="min-w-0 flex-1 border border-paper-400 dark:border-slate-600 bg-paper-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-300"
+        />
+        {onScan && (
+          <Button
+            variant="secondary"
+            className="inline-flex shrink-0 items-center gap-1.5"
+            onClick={onScan}
+          >
+            <ScanIcon />
+            Scan
+          </Button>
+        )}
+      </div>
 
       <div role="status" aria-live="polite" aria-atomic="true">
         {loading && <p className="text-sm text-slate-600 dark:text-slate-400">Searching…</p>}
