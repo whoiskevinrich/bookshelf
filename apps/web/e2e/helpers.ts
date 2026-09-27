@@ -126,12 +126,19 @@ export async function removeBookByIsbn(page: Page, isbn: string): Promise<void> 
 
   // Removing now opens a ConfirmDialog (BOOKSHELF-60) — confirm before the card
   // is expected to disappear, or this hangs waiting on a dialog no one dismissed.
+  // The card disappears optimistically before the DELETE commits server-side, and
+  // a reload while it's in flight aborts it (seen against the deployed site, where
+  // the DELETE takes longer than the ~30ms before the reload). Wait for it to land.
+  const deleted = page.waitForResponse(
+    (res) =>
+      res.request().method() === "DELETE" && res.url().endsWith(`/v1/shelf/${isbn}`) && res.ok(),
+  );
   await page.getByRole("dialog").getByRole("button", { name: "Remove", exact: true }).click();
   await expect(cardByIsbn(page, isbn)).toHaveCount(0, { timeout: 15_000 });
+  await deleted;
 
-  // The card disappears optimistically before the DELETE commits server-side.
   // Reload and re-settle to confirm the delete is durable, so a following add
-  // can't race the in-flight DELETE and hit a 409 "already exists".
+  // can't hit a 409 "already exists".
   await page.reload();
   await waitShelfSettled(page);
   await expect(cardByIsbn(page, isbn)).toHaveCount(0, { timeout: 15_000 });
