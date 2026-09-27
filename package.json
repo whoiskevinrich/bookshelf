@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "qa:guards": "node scripts/qa-guards.mjs",
-    "preflight": "pnpm format && pnpm lint && pnpm test && pnpm qa:guards && pnpm synth",
+    "preflight": "pnpm format && pnpm lint && pnpm type-check && pnpm test && pnpm qa:guards && pnpm synth",
     "prepare": "husky",
     "dev": "pnpm -r dev"
   },
