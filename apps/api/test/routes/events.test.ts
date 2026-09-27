@@ -40,6 +40,12 @@ describe("POST /v1/events", () => {
     expect(emitMetric).toHaveBeenCalledWith("hint_shown", undefined);
   });
 
+  it.each(["search_opened", "scan_opened"])("accepts the add-a-book event %s", async (name) => {
+    const res = await post({ name });
+    expect(res.status).toBe(204);
+    expect(emitMetric).toHaveBeenCalledWith(name, undefined);
+  });
+
   it("accepts valid props and forwards them to the metric", async () => {
     const res = await post({ name: "hint_link_clicked", props: { page: "shelf" } });
     expect(res.status).toBe(204);

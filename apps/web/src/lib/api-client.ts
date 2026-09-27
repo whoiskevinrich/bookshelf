@@ -395,6 +395,8 @@ export type AnalyticsEvent =
   | "scan_text_mode_accepted"
   | "scan_text_success"
   | "scan_text_miss"
+  | "search_opened"
+  | "scan_opened"
   | "shelf_opened"
   | "shelf_renamed"
   | "shelf_deleted"
