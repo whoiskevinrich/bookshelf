@@ -225,6 +225,14 @@ describe("WebStack", () => {
     });
   });
 
+  it("never expires web builds (the live build is one of them)", () => {
+    // A 30-day `builds/` expiry deleted the live prod build 31 days after the
+    // v0.7.0 deploy and took the site down (BOOKSHELF-109).
+    template.hasResourceProperties("AWS::S3::Bucket", {
+      LifecycleConfiguration: Match.absent(),
+    });
+  });
+
   it("creates a CloudFront distribution", () => {
     template.resourceCountIs("AWS::CloudFront::Distribution", 1);
   });
