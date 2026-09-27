@@ -18,7 +18,7 @@ Follow these steps before running `gh pr create`. All CI checks must be green be
 pnpm preflight
 ```
 
-Runs `format → lint → test → qa:guards → synth` in sequence — a local dry-run of all CI checks. Fix any failures before pushing.
+Runs `format → lint → type-check → test → qa:guards → synth` in sequence — a local dry-run of all CI checks. Fix any failures before pushing.
 
 ### 2. Decide the release note
 
@@ -50,6 +50,7 @@ gh pr create
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | **Format**     | All files pass `prettier --check .`                                                                                                                                             | `pnpm format` then commit                                                                             |
 | **Lint**       | ESLint passes across all packages                                                                                                                                               | Fix lint errors, then commit                                                                          |
+| **Type Check** | `tsc --noEmit` passes in every package (`pnpm type-check`)                                                                                                                      | Run `pnpm type-check`, fix the type errors, then commit                                               |
 | **Unit Tests** | All Vitest suites pass                                                                                                                                                          | Fix failing tests, then commit                                                                        |
 | **CDK Synth**  | Infrastructure can be synthesised                                                                                                                                               | Fix CDK/config errors, then commit                                                                    |
 | **QA Guards**  | `scripts/qa-guards.mjs` finds no `[auto]` violations (auth coverage, body limit, no auth bypass, no committed env, ISBN via `lib/isbn.ts`, banned UI classes, no `console.log`) | Run `pnpm qa:guards`, fix the reported `file:line`, then commit — see `docs/runbooks/qa-checklist.md` |
