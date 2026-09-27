@@ -66,7 +66,17 @@ test.describe("Book detail — your copy", () => {
     const notes = `e2e note ${Date.now()}`;
     const notesField = page.locator("#book-notes");
     await notesField.fill(notes);
+    // Wait for the save to land before reloading. Against the deployed site the
+    // PATCH (CloudFront → API Gateway → Lambda) can lose the race with an
+    // immediate reload, which then shows the old (empty) notes.
+    const saved = page.waitForResponse(
+      (res) =>
+        res.request().method() === "PATCH" &&
+        res.url().endsWith(`/v1/shelf/${HYPERION}/notes`) &&
+        res.ok(),
+    );
     await notesField.blur();
+    await saved;
 
     // Reload and confirm the note round-tripped through the API.
     await page.reload();
