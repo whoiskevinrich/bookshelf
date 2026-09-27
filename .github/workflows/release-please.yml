@@ -46,6 +46,9 @@ jobs:
     uses: ./.github/workflows/promote.yml
     with:
       version: ${{ needs.release-please.outputs.tag_name }}
+    # A called workflow gets no secrets unless passed. Without this, promote.yml's
+    # Jira Done-sync sees empty JIRA_* secrets and skips (v0.7.0, BOOKSHELF-109).
+    secrets: inherit
     permissions:
       id-token: write
       contents: read
