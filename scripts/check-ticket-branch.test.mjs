@@ -31,7 +31,7 @@ test("commandDir prefers git -C over cd", () => {
 });
 
 test("commandDir maps Git Bash drive paths on Windows only", () => {
-  assert.equal(commandDir("cd /g/source/x && git push", CWD, "win32"), resolve("G:/source/x"));
+  assert.equal(commandDir("cd /g/source/x && git push", CWD, "win32"), resolve(CWD, "G:/source/x"));
   assert.equal(commandDir("cd /g/source/x && git push", CWD, "linux"), resolve("/g/source/x"));
 });
 
