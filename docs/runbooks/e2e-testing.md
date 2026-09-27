@@ -49,6 +49,11 @@ the merged code end-to-end against the live dev backend. The job assumes the dev
 role, resolves Cognito/table config from CloudFormation outputs into `.env.local`, then
 runs the same `test:e2e`. The Playwright report is uploaded as an artifact.
 
+That job runs the app on localhost, so it never touches the deployed CloudFront/S3
+site. A second job, **`e2e-deployed`** (nightly + manual only), runs the same suite
+against the deployed dev site by setting `APP_BASE_URL`/`API_BASE_URL`. See
+`docs/runbooks/web-monitoring.md`.
+
 Required config (already provisioned): dev environment `AWS_ROLE_ARN` / `AWS_REGION`
 vars, and `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` (and optional `GOOGLE_BOOKS_API_KEY`)
 secrets.
