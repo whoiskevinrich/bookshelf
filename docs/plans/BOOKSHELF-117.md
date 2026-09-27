@@ -3,14 +3,12 @@
 # Copy to <worklog.dir>/<KEY>.md (SessionStart scaffolds this automatically if missing).
 # Schema + design: see the Flightplan plugin's own README and ADR-001 (in the plugin repo).
 key: BOOKSHELF-117 # the tracker key; must match the branch key regex
-status:
-  in-progress # DERIVED from the Gates below — nothing settled is todo, some movement
+status: in-progress # DERIVED from the Gates below — nothing settled is todo, some movement
   # is in-progress, all settled with a release_note is in-review. Only
   # `done` and `released` are read from here (a merge and a release are
   # facts the checklist can't see). Any other value is ignored, so this
   # field cannot drift. If the status looks wrong, a gate is wrong.
-profile:
-  fix # the gate posture (see flightplan.yaml `postures:`). Which gates this
+profile: fix # the gate posture (see flightplan.yaml `postures:`). Which gates this
   # epic HAS — a judgment, so no hook sets it. SessionStart prompts every
   # session until it does, and the Gates rows below are trimmed to match.
 depends-on: [] # [KEY-…] cross-epic deps that must land first
