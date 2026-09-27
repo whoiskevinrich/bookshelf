@@ -47,3 +47,9 @@ Claude hooks govern the **agent** (the actual actor in this workflow), can disti
 - **Bootstrap deadlock**: the gate hot-reloads and blocks commits on keyless branches, including the branch introducing it and the pre-existing worktree session that authored this ADR (`claude/amazing-heisenberg-f8b2f8`). It was resolved by **dogfooding the intended flow** — create the tracking ticket (BOOKSHELF-70), `git branch -m` to `BOOKSHELF-70-…`, then commit — not by the bypass. (An attempt to self-set `BRANCH_GUARD_BYPASS` via `settings.local.json` was correctly refused by the auto-mode classifier as self-disarming.) The `BRANCH_GUARD_BYPASS=1` valve remains for genuinely ticketless work; thereafter every new worktree is renamed up front.
 - Requires a Jira ticket to exist before implementation can be committed — intended, but it front-loads ticket creation for spikes (use the bypass or a throwaway key).
 - Relies on the `if: <Tool>(git*)` PreToolUse matcher DSL for both tool matchers; if the PowerShell-matcher form ever changes, the script still self-checks the command from stdin, but the entry must fire to run at all.
+
+## Addendum — 2026-09-27: scope to the repo the command targets
+
+The gate read only the session's `cwd`, so a Bookshelf worktree session committing in **another** repo (e.g. `cd G:\source\flightplan\... ; git commit`) was blocked on the Bookshelf branch's missing key. It now resolves the directory the command acts on — `git -C <dir>` first, else a leading `cd`/`pushd`/`Set-Location <dir>`, else `cwd` — and allows any command whose git common dir is not this repo's. The Bookshelf rule itself is unchanged.
+
+The block message also stopped telling agents to "prefix `BRANCH_GUARD_BYPASS=1`": the variable is read from the hook's own environment, which a command-line prefix never reaches. That is deliberate (the agent must not be able to self-disarm the gate, per the trade-off above), so the message now says the user sets it.
