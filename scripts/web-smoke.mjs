@@ -7,6 +7,8 @@
  * checks the web origin itself:
  *   - `/` and `/shelf` (a client route, served via the SPA 403/404 → index.html
  *     fallback) return 200 and contain the React mount point `<div id="root"`;
+ *   - the entry script and stylesheet that `/` references return 200 with a JS/CSS
+ *     content-type (the fallback would otherwise serve them as 200 HTML);
  *   - `/config.json` returns 200, parses, and names a Cognito user pool — the exact
  *     pool when EXPECTED_USER_POOL_ID is given.
  *
@@ -34,18 +36,32 @@ export async function checkSite({ baseUrl, expectedUserPoolId, fetchImpl = fetch
   async function get(path) {
     try {
       const res = await fetchImpl(`${base}${path}`, { redirect: "follow" });
-      return { status: res.status, body: await res.text() };
+      const contentType = res.headers?.get?.("content-type") ?? "";
+      return { status: res.status, contentType, body: await res.text() };
     } catch (err) {
       failures.push(`GET ${path} → request failed: ${err.message}`);
       return null;
     }
   }
 
+  let indexHtml = "";
   for (const path of ["/", "/shelf"]) {
     const res = await get(path);
     if (!res) continue;
     if (res.status !== 200) failures.push(`GET ${path} → ${res.status} (expected 200)`);
     else if (!res.body.includes(ROOT_MARKER)) failures.push(`GET ${path} → missing ${ROOT_MARKER}`);
+    else if (path === "/") indexHtml = res.body;
+  }
+
+  // The SPA fallback turns a missing asset into 200 index.html, so a status check
+  // alone passes on a blank page — require the real content-type too.
+  for (const { path, type } of assetsOf(indexHtml)) {
+    const res = await get(path);
+    if (!res) continue;
+    if (res.status !== 200) failures.push(`GET ${path} → ${res.status} (expected 200)`);
+    else if (!res.contentType.includes(type)) {
+      failures.push(`GET ${path} → content-type ${res.contentType || "(none)"} (expected ${type})`);
+    }
   }
 
   const cfg = await get("/config.json");
@@ -53,6 +69,19 @@ export async function checkSite({ baseUrl, expectedUserPoolId, fetchImpl = fetch
   if (cfgFailure) failures.push(cfgFailure);
 
   return failures;
+}
+
+/** Same-origin entry script(s) and stylesheet(s) that index.html references. */
+function assetsOf(html) {
+  const assets = [];
+  for (const [, src] of html.matchAll(/<script\b[^>]*\bsrc="(\/[^"]+)"/g)) {
+    assets.push({ path: src, type: "javascript" });
+  }
+  for (const [tag] of html.matchAll(/<link\b[^>]*>/g)) {
+    const href = tag.match(/\bhref="(\/[^"]+)"/)?.[1];
+    if (href && /\brel="stylesheet"/.test(tag)) assets.push({ path: href, type: "css" });
+  }
+  return assets;
 }
 
 /** Validate the /config.json response; returns a failure string or null. */

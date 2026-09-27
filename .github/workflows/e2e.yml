@@ -123,11 +123,11 @@ jobs:
   # passes (BOOKSHELF-111). This job runs the same suite against the deployed dev
   # site. Nightly/manual only: on push it would race the dev deploy of that same
   # commit. `needs` serializes it after the localhost job (both drive the one
-  # shared QA account); `always()` so a localhost failure doesn't skip it.
+  # shared QA account); `!cancelled()` so a localhost failure doesn't skip it.
   e2e-deployed:
     name: Playwright → deployed dev site
     needs: e2e
-    if: ${{ always() && github.event_name != 'push' }}
+    if: ${{ !cancelled() && github.event_name != 'push' }}
     runs-on: ubuntu-latest
     environment: dev
     steps:
