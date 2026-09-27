@@ -8,8 +8,12 @@ import type { BookSearchResult, Shelf, TagCount } from "../lib/api-client";
 vi.mock("../components/AppHeader", () => ({
   AppHeader: () => <header data-testid="app-header" />,
 }));
-// Keep the scanner out of the way — no camera in jsdom.
-vi.mock("../lib/device", () => ({ supportsCameraScan: () => false }));
+// No camera in jsdom: default to a non-scanning device; the BOOKSHELF-112 tests flip it.
+vi.mock("../lib/device", () => ({ supportsCameraScan: vi.fn(() => false) }));
+vi.mock("../components/scanner/ScanModal", () => ({
+  ScanModal: () => <div role="dialog" aria-label="Scanner" />,
+}));
+vi.mock("../lib/analytics", () => ({ track: vi.fn() }));
 
 vi.mock("../lib/api-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api-client")>();
@@ -42,6 +46,8 @@ import {
   updateShelfStatus,
   ApiError,
 } from "../lib/api-client";
+import { supportsCameraScan } from "../lib/device";
+import { track } from "../lib/analytics";
 import { ShelfPage } from "./ShelfPage";
 
 const OWNED_ISBN = "9780441013593"; // Dune — seeded as an owned library entry
@@ -91,6 +97,33 @@ beforeEach(() => {
   mockFetchTags.mockResolvedValue([] as TagCount[]);
   mockFetchShelves.mockResolvedValue([] as Shelf[]);
   mockFetchSmartShelves.mockResolvedValue([]);
+  vi.mocked(supportsCameraScan).mockReturnValue(false);
+});
+
+describe("ShelfPage — one add-a-book entry point (BOOKSHELF-112)", () => {
+  it("offers Scan inside the add panel, not in the header, on a camera-capable device", async () => {
+    const user = userEvent.setup();
+    vi.mocked(supportsCameraScan).mockReturnValue(true);
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Add a book" }));
+    expect(track).toHaveBeenCalledWith("search_opened");
+    // getByRole throws on multiple matches: the panel's is the only Scan button (header one is gone).
+    await user.click(screen.getByRole("button", { name: "Scan" }));
+    expect(track).toHaveBeenCalledWith("scan_opened");
+    expect(screen.getByRole("dialog", { name: "Scanner" })).toBeInTheDocument();
+    // Scanning replaces the search panel.
+    expect(screen.queryByPlaceholderText(/paste an ISBN/i)).not.toBeInTheDocument();
+  });
+
+  it("shows search only, with no Scan button, when the device can't scan", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Add a book" }));
+    expect(await screen.findByPlaceholderText(/paste an ISBN/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Scan" })).not.toBeInTheDocument();
+  });
 });
 
 describe("ShelfPage — duplicate add offers 'add another copy' (BOOKSHELF-60)", () => {

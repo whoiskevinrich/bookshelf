@@ -79,7 +79,8 @@ export function MobileScanHint({ page }: { page: "shelf" | "wishlist" }) {
         <div>
           <p>
             Open <span className="font-medium text-slate-900 dark:text-white">bookshelf</span> on
-            your phone, sign in, and tap{" "}
+            your phone, sign in, tap{" "}
+            <span className="font-medium text-slate-900 dark:text-white">Add a book</span>, then{" "}
             <span className="font-medium text-slate-900 dark:text-white">Scan</span> to add a book
             by pointing the camera at its barcode.
           </p>
