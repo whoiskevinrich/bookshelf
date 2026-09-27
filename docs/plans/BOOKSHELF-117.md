@@ -9,10 +9,10 @@ status:
   # `done` and `released` are read from here (a merge and a release are
   # facts the checklist can't see). Any other value is ignored, so this
   # field cannot drift. If the status looks wrong, a gate is wrong.
-profile: # the gate posture (see flightplan.yaml `postures:`). Which gates this
+profile:
+  fix # the gate posture (see flightplan.yaml `postures:`). Which gates this
   # epic HAS — a judgment, so no hook sets it. SessionStart prompts every
   # session until it does, and the Gates rows below are trimmed to match.
-  # Left unset: bookshelf's flightplan.yaml defines no `postures:` yet (2026-09-27).
 depends-on: [] # [KEY-…] cross-epic deps that must land first
 release_note: Book lookups no longer hang when the book catalogue is slow to answer — you get a Try again option within seconds instead.
 # approved:                  # the owner's sign-offs on `approve: true` gates (ADR-007). [x] means the
@@ -43,13 +43,9 @@ It hit the localhost job too, so it was never deployed-only.
      documented skip (ADR-004). PostToolUse(Skill) flips a gate to [/] when its skill runs; ONLY
      /handoff writes [~] or [x]. -->
 
-- [~] spec `write-spec` → `docs/specs/**` — bug fix; the Jira ticket's acceptance criteria are the spec
-- [~] architecture `architecture` → `docs/architecture/ADR-*` — no new decision; a per-attempt timeout inside the existing BOOKSHELF-95 retry
-- [~] design `design-handoff` → `docs/design/**` — no UI change
 - [x] backend — per-attempt 3s abort timer in `apps/api/src/lib/books/providers/google-books.ts` (#146, `76971e1`)
 - [~] frontend — no change needed; BookSearch already shows the 502 as an error with "Try again"
 - [x] testing `testing-strategy` — 3 unit tests in `apps/api/test/lib/books/google-books.test.ts`; the two hang tests fail on the old code
-- [~] security `security-review` — no new endpoint, input, or secret; the change only bounds an outbound call
 
 <!-- Deliberate-skip example — always say why; `until:` records what would reopen the concern later
      (as a fresh up-next item or its own issue — the gate itself stays settled):
