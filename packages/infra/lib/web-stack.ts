@@ -84,22 +84,17 @@ export class WebStack extends cdk.Stack {
     //
     // BucketDeployment syncs the built dist/ into the active prefix and
     // invalidates CloudFront. prune: false preserves previous prefixes.
+    //
+    // No age-based lifecycle rule: S3 can't tell the live prefix from old ones,
+    // so a `builds/` expiry deletes the live site once a release is older than
+    // the window. A 30-day rule took prod down this way (BOOKSHELF-109). Builds
+    // are a few MB each, so keeping them all costs next to nothing.
     const bucket = new s3.Bucket(this, "WebBucket", {
       bucketName: `bookshelf-web-${this.account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL, // CloudFront OAC handles access
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: false, // versioning handled by prefix, not S3 object versions
       removalPolicy: cdk.RemovalPolicy.RETAIN,
-      lifecycleRules: [
-        {
-          // Keep only the 10 most recent build prefixes by age
-          // Builds older than 30 days are safe to remove (10 semver releases)
-          prefix: "builds/",
-          expiration: cdk.Duration.days(30),
-          id: "expire-old-builds",
-          enabled: true,
-        },
-      ],
     });
 
     // ── CloudFront Origin Access Control ──────────────────────────────────
