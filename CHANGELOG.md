@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.3](https://github.com/whoiskevinrich/bookshelf/compare/v0.7.2...v0.7.3) (2026-09-28)
+
+
+### Bug Fixes
+
+* **api:** time out stalled Google Books requests so lookups can't hang (BOOKSHELF-117) ([#146](https://github.com/whoiskevinrich/bookshelf/issues/146)) ([76971e1](https://github.com/whoiskevinrich/bookshelf/commit/76971e174d684e7331470399d5ef15137b490f5b))
+* **web:** fold camera scanning into "Add a book" (BOOKSHELF-112) ([#145](https://github.com/whoiskevinrich/bookshelf/issues/145)) ([2876246](https://github.com/whoiskevinrich/bookshelf/commit/287624656a39ffc23cf51219701a5571920e6b88))
+
 ## [0.7.2](https://github.com/whoiskevinrich/bookshelf/compare/v0.7.1...v0.7.2) (2026-09-27)
 
 
