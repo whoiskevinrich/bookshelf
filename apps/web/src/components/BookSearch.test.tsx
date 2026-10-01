@@ -114,4 +114,15 @@ describe("BookSearch", () => {
     expect(screen.getByRole("button", { name: "Add Owned" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Add to Wishlist" })).toBeDisabled();
   });
+
+  it("renders a Scan button only when onScan is provided (BOOKSHELF-112)", async () => {
+    const user = userEvent.setup();
+    const onScan = vi.fn();
+    const { rerender } = render(<BookSearch onAdd={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Scan" })).not.toBeInTheDocument();
+
+    rerender(<BookSearch onAdd={vi.fn()} onScan={onScan} />);
+    await user.click(screen.getByRole("button", { name: "Scan" }));
+    expect(onScan).toHaveBeenCalledOnce();
+  });
 });

@@ -62,6 +62,7 @@ import { Callout } from "../components/ui/Callout";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ScanModal } from "../components/scanner/ScanModal";
 import { supportsCameraScan } from "../lib/device";
+import { track } from "../lib/analytics";
 import { isConflictError, fetchShelfEntry } from "../lib/api-client";
 import type { ShelfEntry, ShelfStatus, BookSearchResult, Shelf } from "../lib/api-client";
 
@@ -99,24 +100,6 @@ function ChevronRightIcon() {
       aria-hidden="true"
     >
       <path d="M6 4l4 4-4 4" />
-    </svg>
-  );
-}
-
-function ScanIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="w-4 h-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-      <circle cx="12" cy="13" r="3" />
     </svg>
   );
 }
@@ -397,7 +380,7 @@ export function ShelfPage() {
   const [showScanner, setShowScanner] = useState(false);
   const searchPanelRef = useRef<HTMLDivElement>(null);
 
-  // Show the Scan button only where it makes sense: the device has a touch screen + camera.
+  // Offer Scan inside the add-a-book panel only where it makes sense: touch screen + camera.
   const canScan = useMemo(() => supportsCameraScan(), []);
 
   const shelfQuery = useShelf();
@@ -668,9 +651,10 @@ export function ShelfPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Scroll search panel into view whenever it opens.
+  // Scroll search panel into view whenever it opens (button, "/" shortcut, or empty state).
   useEffect(() => {
     if (showSearch) {
+      track("search_opened");
       searchPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [showSearch]);
@@ -814,7 +798,7 @@ export function ShelfPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold dark:text-white">My Library</h1>
-          {/* Manage mode (BOOKSHELF-59) swaps out the add/scan/new-shelf actions for a
+          {/* Manage mode (BOOKSHELF-59) swaps out the add/new-shelf actions for a
               single "Done" button — a clear visual state change that keeps adding
               books and bulk-editing them from happening at the same time. */}
           <div className="flex items-center gap-2">
@@ -833,21 +817,6 @@ export function ShelfPage() {
                 >
                   {showCreateShelf ? "Cancel" : "+ New shelf"}
                 </Button>
-                {canScan && (
-                  <Button
-                    variant="secondary"
-                    aria-label="Scan"
-                    className="inline-flex items-center gap-1.5"
-                    onClick={() => {
-                      setShowScanner(true);
-                      setShowSearch(false);
-                      setShowCreateShelf(false);
-                    }}
-                  >
-                    <ScanIcon />
-                    <span className="hidden sm:inline">Scan</span>
-                  </Button>
-                )}
                 <Button
                   variant="app"
                   onClick={() => {
@@ -921,7 +890,19 @@ export function ShelfPage() {
             ref={searchPanelRef}
             className="mb-8 p-4 border border-paper-300 dark:border-slate-700 rounded-xl"
           >
-            <BookSearch onAdd={handleAdd} isAdding={addMutation.isPending} />
+            <BookSearch
+              onAdd={handleAdd}
+              isAdding={addMutation.isPending}
+              onScan={
+                canScan
+                  ? () => {
+                      track("scan_opened");
+                      setShowScanner(true);
+                      setShowSearch(false);
+                    }
+                  : undefined
+              }
+            />
           </div>
         )}
 

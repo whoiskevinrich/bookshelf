@@ -1,0 +1,42 @@
+name: Web uptime (prod)
+
+# Daily check that prod's web front end actually serves (BOOKSHELF-111). Prod's
+# SPA returned S3 AccessDenied for 6½ weeks, starting 31 days after a deploy, so
+# no deploy-time check could have caught it (BOOKSHELF-109).
+#
+# Alerting: when a scheduled run fails, GitHub emails the user who last edited the
+# `cron` line below, so no alert address or AWS alarm to maintain. Caveat: GitHub
+# disables scheduled workflows in a public repo after 60 days with no commits; see
+# docs/runbooks/web-monitoring.md.
+#
+# No AWS credentials or `environment:`: the check is plain HTTPS against the public
+# site, and a daily `environment: prod` job would log a prod "deployment" every day.
+
+on:
+  schedule:
+    - cron: "0 15 * * *" # 15:00 UTC ≈ 08:00 PT, so a failure email lands in the morning
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Site to check (default: prod). Point at a bad path to test the failure alert."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  web-smoke:
+    name: Web smoke → prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Web smoke
+        env:
+          WEB_BASE_URL: ${{ inputs.url || 'https://bookshelf.whoiskevinrich.com' }}
+        run: node scripts/web-smoke.mjs

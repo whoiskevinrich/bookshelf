@@ -277,6 +277,15 @@ jobs:
           pnpm --filter @bookshelf/infra run cdk deploy BookshelfWeb \
             --require-approval never -c env=prod -c version=v${{ steps.resolve.outputs.version }}
 
+      - name: Web smoke (prod)
+        # The API smoke below never touches CloudFront/S3 — prod's web front end
+        # served AccessDenied for 6½ weeks unnoticed (BOOKSHELF-109). Check the
+        # deployed site itself: /, /shelf, /config.json → 200 with the right pool.
+        env:
+          WEB_BASE_URL: https://${{ vars.PROD_DOMAIN }}
+          EXPECTED_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
+        run: node scripts/web-smoke.mjs
+
       - name: Smoke tests (prod)
         env:
           API_BASE_URL: ${{ steps.outputs.outputs.api_url }}

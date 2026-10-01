@@ -5,50 +5,31 @@
 Solo developer. Web app for users to track books they own and want to read.
 Tech stack: Hono on Lambda + DynamoDB + Cognito + React SPA — see `docs/adrs/001-tech-stack.md`.
 Deployment target: AWS (CDK) — dev environment live; see `docs/runbooks/cicd-setup.md`.
+Layout: `apps/api` (Hono Lambda), `apps/mcp` (MCP server), `apps/web` (Vite SPA), `packages/infra` (CDK).
+
+Commands: `pnpm test` · `pnpm type-check` · `pnpm lint` · `pnpm qa:guards` · `pnpm preflight`
+(⚠ `preflight` runs `prettier --write` first — it modifies files).
 
 ## Mandatory Session Start
 
 Always begin every session with `/productivity:start`.
 No implementation work begins before running this skill.
 
-## Task List (Single Source of Truth)
+## Task Tracking
 
-The **only** task list is `todo/TASKS.md` in the **main worktree** (`G:\source\bookshelf\todo\TASKS.md`) — gitignored, so branch switches never touch it, and shared by every session. **There is no `docs/TASKS.md`.**
+Tasks live in **Jira project BOOKSHELF** (https://whoiskevinrich.atlassian.net/browse/BOOKSHELF), managed via the Atlassian MCP. `todo/TASKS.md` is **retired** (migrated 2026-06-30) — don't read or write it as a task list.
 
-All `/productivity:*` skills (`start`, `task-management`, `update`) must read and write **this** file. When a session runs inside a `.claude/worktrees/` worktree, still target the **main worktree's** `todo/TASKS.md` — never create a per-worktree copy — so tasks never fork across worktrees.
+Worktree branches must be named `BOOKSHELF-<n>-<slug>` (ADR-023) — commits, pushes, and PRs are blocked on keyless branches.
 
-## Worktree Setup (new worktrees only)
+## Flightplan (epic gates)
 
-When opening a session inside a git worktree (path contains `.claude/worktrees/`), run the setup script before any dev work.
+`.claude/flightplan.yaml` defines per-epic gates (spec, architecture, design, backend, frontend, infra, testing, security) and postures (`feature`/`ui`/`fix`/`infra`/`decision`/`spike`). Worklogs live in `docs/plans/<KEY>.md` and are **Prettier-ignored on purpose** — Prettier's YAML pass breaks Flightplan's `profile:` parsing, so never `prettier --write` them. Skills: `/implement` (design → build crossing), `/handoff` (close out a session), `/triage` (drain the capture inbox).
 
-**From bash (Bash tool):**
+## Worktree Setup
 
-```bash
-bash scripts/worktree-setup.sh
-```
+The SessionStart hook copies `apps/{api,web}/.env.local` from the main worktree and runs `pnpm install`. If the env files are still missing (API/web can't reach Cognito or DynamoDB), run `bash scripts/worktree-setup.sh` or `.\scripts\worktree-setup.ps1` (pass `-MainWorktree <path>` if the main worktree isn't `G:\source\bookshelf`).
 
-**From PowerShell (PowerShell tool):**
-
-```powershell
-.\scripts\worktree-setup.ps1
-```
-
-Both forms do the same thing: copy `apps/api/.env.local` and `apps/web/.env.local` from the main worktree (`G:\source\bookshelf`). Without these files neither the API nor the frontend can connect to Cognito or DynamoDB.
-
-If the script reports nothing to copy (files already exist), proceed normally.
-If the main worktree path differs, pass it:
-
-- Bash: `bash scripts/worktree-setup.sh -MainWorktree "C:\path\to\bookshelf"`
-- PowerShell: `.\scripts\worktree-setup.ps1 -MainWorktree "C:\path\to\bookshelf"`
-
-**After setup, start the dev servers** — see `docs/runbooks/local-dev.md`:
-
-```
-/dev
-```
-
-This skill checks for active AWS credentials, acquires them via
-`assume dev/AWSPowerUserAccess` if needed, then starts the API and web servers.
+Start the dev servers with `/dev` (checks/acquires `dev/AWSPowerUserAccess` creds, then starts API + web) — see `docs/runbooks/local-dev.md`.
 
 **[NON-NEGOTIABLE] Never use `dev:mock` mode.** Auth always runs against the real dev Cognito pool. Mock mode bypasses authentication entirely and must not be used or suggested — it produces a dev environment that doesn't reflect real app behaviour.
 
@@ -60,7 +41,7 @@ This skill checks for active AWS credentials, acquires them via
 - `cdk synth|diff|deploy` fail `CannotFindAsset` unless `apps/{api,mcp,web}/dist` exist — `pnpm -r build` first.
 - Clean no-op `cdk diff`: `-c env=dev -c version=<active> -c cloudfront-domain=d1n55zwqulukok.cloudfront.net` (omitting the last two diffs SPA callback URLs / version tags spuriously).
 - Cognito pool changes are **blue/green** via `-c authPool=legacy|cutover|green` (ADR-015) — never change email mutability or pool-identity props in place. The `green` deploy must run Api/Mcp/Web **before** BookshelfAuth (CFN won't delete still-imported exports).
-- **Release version is CI-derived (ADR-017):** the deploy workflow computes `max(existing v* tags) + 1` at merge time and tags after smoke passes. Never bump `package.json` (pinned to `0.0.0`) or create version tags by hand — there's no pre-PR bump step anymore.
+- **Releases come from Release Please (ADR-020):** every merge to `main` updates a standing `chore: release main` PR. Merging it cuts `vX.Y.Z` and auto-promotes to prod (`release-please.yml` → `promote.yml`). Never bump `package.json` (pinned to `0.0.0`) or create version tags by hand. That PR is opened by `GITHUB_TOKEN`, so CI doesn't run on it: close and reopen it to trigger the required checks before merging.
 
 ## Workflow: Idea to Production
 
@@ -74,7 +55,7 @@ This skill checks for active AWS credentials, acquires them via
 
 1. `/product-management:brainstorm` — if idea is vague
 2. `/product-management:write-spec` — required; output to `docs/specs/<slug>.md`
-3. `/productivity:task-management` — convert spec into TASKS.md items
+3. `/productivity:task-management` — convert spec into BOOKSHELF Jira issues
 
 ### Phase 2 — Architecture (before implementation)
 
@@ -92,7 +73,7 @@ This skill checks for active AWS credentials, acquires them via
 
 1. Follow `docs/runbooks/pr-workflow.md`: run `pnpm preflight`
    (`preflight` includes `pnpm qa:guards` — the same QA Guards check CI runs).
-   No version bump — the deploy workflow derives the version at merge (ADR-017).
+   No version bump — Release Please derives the version from Conventional Commits (ADR-020).
 2. **Decide the Release-Note** (BOOKSHELF-73): if this PR changes something users would
    notice, add a `Release-Note:` trailer to the PR description (app voice — plain,
    present-tense, benefit-first, not the Conventional-Commit subject) so it lands in the
@@ -109,8 +90,8 @@ This skill checks for active AWS credentials, acquires them via
 ### Phase 5 — Merge and Deploy
 
 1. `gh pr create` — then run `/pr-review-toolkit:review-pr all` and `/productivity:update` manually
-2. Merge to `main` → GitHub Actions auto-deploys to **dev** and tags the version (`docs/runbooks/cicd-setup.md`)
-3. Promote to **prod** via the **Promote** workflow (`.github/workflows/promote.yml`) by version tag, or `cdk deploy --all -c env=prod` (`docs/runbooks/prod-domain-setup.md`)
+2. Merge to `main` → GitHub Actions auto-deploys to **dev** and updates the Release Please PR (`docs/runbooks/cicd-setup.md`)
+3. Promote to **prod** by merging the Release Please PR (ADR-020). The **Promote** workflow (`.github/workflows/promote.yml`) can also be run by hand for an existing tag (re-promotes, hotfixes), or use `cdk deploy --all -c env=prod` (`docs/runbooks/prod-domain-setup.md`)
 
 ### Phase 6 — Post-Ship
 
@@ -193,16 +174,16 @@ blocks merge — so the list below is the rationale; the gate is in CI. Keep the
 These are the hooks **actually configured** in `.claude/settings.json` and via hookify rules
 (`.claude/hookify.*.local.md`):
 
-| Hook              | Source / Event               | Trigger                                                       | Action                                                                                               |
-| ----------------- | ---------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Worktree env copy | settings.json / SessionStart | New session (`startup`)                                       | Copy `.env.local` into worktree, then `pnpm install`                                                 |
-| Branch-key nudge  | settings.json / SessionStart | New session on keyless branch                                 | Tell agent to rename `claude/*` → `BOOKSHELF-<n>-<slug>` (non-blocking, ADR-023)                     |
-| Branch-key gate   | settings.json / PreToolUse   | `git commit`/`push`, `gh pr create` (Bash **and** PowerShell) | **Block** (exit 2) if a worktree branch has no Jira key; `BRANCH_GUARD_BYPASS=1` overrides (ADR-023) |
-| Pre-PR docs gate  | settings.json / PreToolUse   | `gh pr create`                                                | Echo docs-update reminder (non-blocking)                                                             |
-| Sensitive files   | hookify                      | `.env`/secret edits                                           | Warn                                                                                                 |
-| No env in source  | hookify                      | env values written to source                                  | Warn                                                                                                 |
-| ISBN reminder     | hookify                      | "isbn" in new text                                            | Warn                                                                                                 |
-| Hardcoded data    | hookify                      | ISBN/ASIN literals in source                                  | Warn                                                                                                 |
+| Hook              | Source / Event               | Trigger                                                                                 | Action                                                                                               |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Worktree env copy | settings.json / SessionStart | New session (`startup`)                                                                 | Copy `.env.local` into worktree, then `pnpm install`                                                 |
+| Branch-key nudge  | settings.json / SessionStart | New session on keyless branch                                                           | Tell agent to rename `claude/*` → `BOOKSHELF-<n>-<slug>` (non-blocking, ADR-023)                     |
+| Branch-key gate   | settings.json / PreToolUse   | any `git`, `gh pr create` (Bash **and** PowerShell); script scopes it to commit/push/PR | **Block** (exit 2) if a worktree branch has no Jira key; `BRANCH_GUARD_BYPASS=1` overrides (ADR-023) |
+| Pre-PR docs gate  | settings.json / PreToolUse   | `gh pr create`                                                                          | Echo docs-update reminder (non-blocking)                                                             |
+| Sensitive files   | hookify                      | `.env`/secret edits                                                                     | Warn                                                                                                 |
+| No env in source  | hookify                      | env values written to source                                                            | Warn                                                                                                 |
+| ISBN reminder     | hookify                      | "isbn" in new text                                                                      | Warn                                                                                                 |
+| Hardcoded data    | hookify                      | ISBN/ASIN literals in source                                                            | Warn                                                                                                 |
 
 The `/productivity:*`, `/simplify`, and `/pr-review-toolkit:review-pr` steps in the workflow above
 are run **manually** as slash commands — they are intentionally **not** wired as hooks. Per the

@@ -1,4 +1,5 @@
 import * as path from "path";
+import * as vm from "node:vm";
 import { describe, it, expect } from "vitest";
 import * as cdk from "aws-cdk-lib";
 import * as route53 from "aws-cdk-lib/aws-route53";
@@ -264,6 +265,54 @@ describe("WebStack", () => {
     // BucketDeployment is backed by a Lambda-powered custom resource
     template.resourceCountIs("Custom::CDKBucketDeployment", 1);
   });
+
+  // Distribution-level error responses also rewrote the API's 403/404s under
+  // /api/* into 200 index.html (BOOKSHELF-116). SPA routing must stay scoped to
+  // the default (S3) behavior via a viewer-request Function.
+  it("has no distribution-wide custom error responses", () => {
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({ CustomErrorResponses: Match.absent() }),
+    });
+  });
+
+  it("routes SPA paths with a viewer-request Function on the default behavior", () => {
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        DefaultCacheBehavior: Match.objectLike({
+          FunctionAssociations: [Match.objectLike({ EventType: "viewer-request" })],
+        }),
+      }),
+    });
+  });
+
+  it("rewrites extensionless client routes to /index.html and leaves files alone", () => {
+    const fns = template.findResources("AWS::CloudFront::Function", {
+      Properties: { FunctionConfig: { Comment: Match.stringLikeRegexp("SPA client routes") } },
+    });
+    // Run the synthesized Function source in an isolated context.
+    const code = Object.values(fns)[0]?.Properties.FunctionCode as string;
+    const sandbox: { result?: string } = {};
+    const route = (uri: string) => {
+      vm.runInNewContext(
+        `${code}\nresult = handler({ request: { uri: ${JSON.stringify(uri)} } }).uri;`,
+        sandbox,
+      );
+      return sandbox.result;
+    };
+
+    for (const uri of [
+      "/",
+      "/shelf",
+      "/book/9780441013593",
+      "/shelves/3f2a-uuid",
+      "/auth/callback",
+    ]) {
+      expect(route(uri)).toBe("/index.html");
+    }
+    for (const uri of ["/config.json", "/assets/index-abc.js", "/favicon.svg", "/whats-new.json"]) {
+      expect(route(uri)).toBe(uri);
+    }
+  });
 });
 
 // ── Custom-domain topology (prod, `-c env=prod`) ─────────────────────────────
@@ -362,8 +411,8 @@ describe("Custom-domain topology", () => {
       });
     });
 
-    it("adds a CloudFront Function to strip the /api prefix", () => {
-      template.resourceCountIs("AWS::CloudFront::Function", 1);
+    it("adds the /api-strip Function alongside the SPA routing Function", () => {
+      template.resourceCountIs("AWS::CloudFront::Function", 2); // SPA routing + /api strip
     });
 
     it("routes /api/* as an additional cache behavior", () => {
@@ -425,7 +474,7 @@ describe("Interim topology (same-origin, no custom domain)", () => {
     const template = Template.fromStack(iWeb);
 
     it("routes /api/* same-origin with the strip Function", () => {
-      template.resourceCountIs("AWS::CloudFront::Function", 1);
+      template.resourceCountIs("AWS::CloudFront::Function", 2); // SPA routing + /api strip
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
           CacheBehaviors: Match.arrayWith([Match.objectLike({ PathPattern: "/api/*" })]),

@@ -1,2 +1,31 @@
+# The routing table. Each gate is a row in a worklog's "Gates — definition of done" checklist.
+# `skill` (optional) is the skill whose run flips the gate to [/]; `artifact` (optional) is the glob
+# the gate's output lives under. Declared here rather than inherited because the plugin's default
+# roster points `architecture` at docs/architecture/ADR-*, and bookshelf's ADRs live in docs/adrs/.
+# `design` has no artifact: mockups are rendered in-session, not committed.
+gates:
+  - { id: spec, skill: write-spec, artifact: "docs/specs/**" }
+  - { id: architecture, skill: architecture, artifact: "docs/adrs/*" }
+  - { id: design, skill: design-handoff }
+  - { id: backend, artifact: "apps/{api,mcp}/src/**" }
+  - { id: frontend, artifact: "apps/web/src/**" }
+  - { id: infra, artifact: "{packages/infra,.github}/**" }
+  - { id: testing, skill: testing-strategy }
+  - { id: security, skill: security-review }
+
+# Which gates an epic HAS, chosen per worklog as `profile:` (ADR-004). A gate outside the posture
+# isn't part of that epic's definition of done; one inside it that doesn't apply still gets [~] + why.
+postures:
+  feature: [spec, architecture, design, backend, frontend, testing, security] # new capability, end to end
+  ui: [design, frontend, testing] # UI-only change, e.g. a user-feedback tweak
+  fix: [backend, frontend, testing] # bug fix; [~] the side it doesn't touch
+  infra: [infra, testing, security] # CDK, CI workflows, ops
+  decision: [architecture] # an ADR with no code behind it
+  spike: [] # commits to nothing
+  default: feature # what a fresh scaffold gets; trim at /handoff
+
+# phases: intentionally unset. It would hold PRs and build-artifact edits until the design gates
+# are signed off (ADR-007) — a workflow change to adopt deliberately, not alongside postures.
+
 flightplan:
   reviewed: M1

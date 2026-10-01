@@ -140,6 +140,55 @@ describe("createGoogleBooksProvider retry (BOOKSHELF-95)", () => {
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
+  // A fetch that never settles unless its abort signal fires — Google Books stalling a
+  // connection without erroring (BOOKSHELF-117).
+  function mockHang() {
+    mockFetch.mockImplementationOnce(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    );
+  }
+
+  it("aborts a stalled attempt after the per-attempt timeout and retries (BOOKSHELF-117)", async () => {
+    mockHang();
+    mockResponse([makeVolume()]);
+    const provider = createGoogleBooksProvider("key");
+    const promise = provider.getByIsbn("9780441013593");
+
+    // Still waiting just before the 3s cap; the retry fires once it passes.
+    await vi.advanceTimersByTimeAsync(2_900);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(100 + 300);
+
+    expect((await promise)?.isbn).toBe("9780441013593");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails within the bounded window when every attempt stalls (BOOKSHELF-117)", async () => {
+    mockHang();
+    mockHang();
+    mockHang();
+    const provider = createGoogleBooksProvider("key");
+    const outcome = provider.getByIsbn("9780441013593").then(
+      () => "resolved",
+      (err: Error) => err.message,
+    );
+
+    // 3 × 3s timeouts + 300ms + 600ms backoff — well under the E2E suite's 15s wait.
+    await vi.advanceTimersByTimeAsync(9_900);
+    expect(await outcome).toMatch(/timed out after 3000ms/);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("clears the per-attempt timer once the lookup succeeds", async () => {
+    mockResponse([makeVolume()]);
+    const provider = createGoogleBooksProvider("key");
+    await provider.getByIsbn("9780441013593");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("actually waits out the backoff delay between retries", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" });
     mockResponse([makeVolume()]);
